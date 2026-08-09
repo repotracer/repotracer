@@ -16,6 +16,24 @@ npx grephound setup
 
 Works with: **Claude Code · Codex · Cursor · OpenCode · MCP**
 
+### Why this exists (with numbers)
+
+| Claim | Number | Source |
+|------|--------|--------|
+| Delegated exploration can cut **main-agent tokens** | **up to −60.3%** | [Microsoft FastContext](https://arxiv.org/abs/2606.14066) research baseline |
+| End-to-end coding score with scout architecture | **up to +5.5** | FastContext on SWE-bench-style agents |
+| “Token saver” middleware that grades its own homework | **rtk advertised 60–90%** | [rtk](https://github.com/rtk-ai/rtk) marketing |
+| Same class of tool on a **paired complete-task bill** | **+7.6% more expensive** | [JetBrains RTK trial](https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/) · 80 pairs |
+
+FastContext proved the **architecture**. JetBrains proved **middleware counters lie**.  
+grephound is the production scout runtime that takes the first seriously and refuses the second.
+
+<p align="center">
+  <img src="assets/results-proof.png" alt="Attributed research baseline vs middleware counters vs grephound bill metric" width="920">
+</p>
+
+> grephound’s own paired product Δ ships only from raw `benchmarks/results/` artifacts. No invented savings.
+
 <p align="center">
   <img src="assets/hero.png" alt="grephound — small models search, big models solve" width="920">
 </p>
@@ -52,15 +70,20 @@ grephound scout "where is authentication handled?"
 
 Delete 98% of a command's output and you can claim “98% fewer tokens.”
 
-That doesn't mean your agent became 98% cheaper.
+That does **not** mean your agent became 98% cheaper.
 
 **We don't count characters we filtered. We measure the entire coding task.**
 
+| We publish | We refuse |
+|------------|-----------|
+| Total provider $ / task | “tokens avoided” scoreboards |
+| Explorer cost included | Unpaired one-off runs |
+| Task success / quality | Quality-blind compression wins |
+| Raw JSON artifacts | README fan fiction |
+
 If the invoice didn't shrink, you didn't save tokens.
 
-See [BENCHMARKS.md](./BENCHMARKS.md) and [docs/benchmarks/why-token-counters-lie.md](./docs/benchmarks/why-token-counters-lie.md).
-
-> Benchmark numbers will appear here only after paired runs. No fake savings.
+See [BENCHMARKS.md](./BENCHMARKS.md) · [why token counters lie](./docs/benchmarks/why-token-counters-lie.md)
 
 <p align="center">
   <img src="assets/benchmark-card.png" alt="Complete-task benchmark methodology" width="920">
