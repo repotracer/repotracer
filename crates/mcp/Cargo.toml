@@ -1,0 +1,18 @@
+[package]
+name = "grephound-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "MCP server for grephound"
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+grephound-core.workspace = true
+grephound-model.workspace = true
+grephound-repo-tools.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true

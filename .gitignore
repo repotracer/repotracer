@@ -1,0 +1,13 @@
+/target
+**/*.rs.bk
+.DS_Store
+.grephound/
+*.bak
+.env
+.idea/
+.vscode/
+node_modules/
+packages/npm/vendor/
+benchmarks/results/**/raw.jsonl
+.project/STATE.local.md
+third_party/
