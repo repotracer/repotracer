@@ -1,0 +1,34 @@
+name: Benchmark discrepancy
+description: Challenge or reproduce a published result
+labels: ["benchmark"]
+body:
+  - type: input
+    id: commit
+    attributes:
+      label: Benchmark / repo commit
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+  - type: input
+    id: agent
+    attributes:
+      label: Agent + version
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed numbers
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected numbers
+  - type: input
+    id: repro
+    attributes:
+      label: Reproduction command

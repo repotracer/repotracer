@@ -1,0 +1,27 @@
+name: Bug
+description: Something broken in grephound
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting. Include `grephound doctor` output when possible.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expect
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: grephound doctor
+  - type: input
+    id: version
+    attributes:
+      label: Version
