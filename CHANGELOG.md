@@ -12,5 +12,10 @@
 - CLI: `scout`, `serve`, `setup`, `doctor`, `status`, `config`, `uninstall`
 - MCP `repo_scout` tool over stdio
 - Claude Code, Codex, and Cursor auto-configuration
+- Interactive macOS, Linux, and Windows setup with Ollama install, model pull, and live tool-call verification
+- Zero-download Codex and Claude subscription backends through the official installed CLIs, with read-only execution, strict structured output, timeouts, and citation revalidation
+- Hardware-aware setup defaults plus explicit `--provider ollama|codex|claude|custom` selection
+- Grephound routing skills for Claude Code and Codex, Cursor rules, and GitHub Copilot instructions
+- MCP `repo_scout` prompt for generic clients
 - npm launcher package scaffold
 - Benchmark harness scaffold and methodology docs

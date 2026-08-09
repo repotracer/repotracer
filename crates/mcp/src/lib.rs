@@ -1,9 +1,7 @@
 //! Minimal MCP JSON-RPC server over stdio for grephound.
 //! NEVER write non-protocol text to stdout.
 
-use grephound_core::{ScoutEngine, ScoutRequest};
-use grephound_model::ModelBackend;
-use grephound_repo_tools::RepoTools;
+use grephound_core::{ScoutBackend, ScoutRequest};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -14,29 +12,16 @@ const PROTOCOL_VERSION: &str = "2024-11-05";
 const SERVER_NAME: &str = "grephound";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const REPO_SCOUT_DESC: &str = "Use repo_scout when you need to locate or understand behavior across an unfamiliar repository, trace multi-file flows, identify implementation and related tests, or discover where a feature lives. It autonomously explores the repository with a dedicated read-only model and returns focused file/line citations. Skip it for trivial known-file edits or when the exact relevant code is already in context.";
+const REPO_SCOUT_DESC: &str = "Use repo_scout when you need to locate or understand behavior across an unfamiliar repository, trace multi-file flows, identify implementation and related tests, or discover where a feature lives. It autonomously explores the repository with the configured read-only local, subscription, or custom-endpoint backend and returns focused file/line citations. Skip it for trivial known-file edits or when the exact relevant code is already in context.";
 
 pub struct McpServer {
-    engine: Arc<ScoutEngine>,
+    scout: Arc<dyn ScoutBackend>,
     root: PathBuf,
 }
 
 impl McpServer {
-    pub fn new(engine: ScoutEngine, root: PathBuf) -> Self {
-        Self {
-            engine: Arc::new(engine),
-            root,
-        }
-    }
-
-    pub fn from_backend(
-        model: Arc<dyn ModelBackend>,
-        root: PathBuf,
-        budget: grephound_core::ExplorerBudget,
-    ) -> Self {
-        let tools = RepoTools::new(root.clone());
-        let engine = ScoutEngine::new(model, tools, budget);
-        Self::new(engine, root)
+    pub fn new(scout: Arc<dyn ScoutBackend>, root: PathBuf) -> Self {
+        Self { scout, root }
     }
 
     /// Serve MCP over stdin/stdout until EOF.
@@ -75,7 +60,8 @@ impl McpServer {
             "initialize" => Ok(json!({
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": {
-                    "tools": {}
+                    "tools": {},
+                    "prompts": {}
                 },
                 "serverInfo": {
                     "name": SERVER_NAME,
@@ -91,7 +77,8 @@ impl McpServer {
             })),
             "tools/call" => self.tools_call(params).await,
             "resources/list" => Ok(json!({ "resources": [] })),
-            "prompts/list" => Ok(json!({ "prompts": [] })),
+            "prompts/list" => Ok(json!({ "prompts": [repo_scout_prompt_def()] })),
+            "prompts/get" => repo_scout_prompt(params),
             "" if msg.get("result").is_some() || msg.get("error").is_some() => {
                 return None;
             }
@@ -137,9 +124,15 @@ impl McpServer {
             .get("focus")
             .and_then(|v| v.as_str())
             .map(PathBuf::from);
+        if focus.as_deref().is_some_and(|path| !valid_focus(path)) {
+            return Ok(tool_text(
+                "Error: `focus` must be a repository-relative subdirectory.",
+                true,
+            ));
+        }
 
         let result = self
-            .engine
+            .scout
             .scout(ScoutRequest {
                 query,
                 root: self.root.clone(),
@@ -170,6 +163,17 @@ impl McpServer {
         }))
     }
 }
+fn valid_focus(path: &std::path::Path) -> bool {
+    !path.is_absolute()
+        && !path.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+}
 
 fn repo_scout_tool_def() -> Value {
     json!({
@@ -190,6 +194,43 @@ fn repo_scout_tool_def() -> Value {
             "required": ["query"]
         }
     })
+}
+
+fn repo_scout_prompt_def() -> Value {
+    json!({
+        "name": "repo_scout",
+        "description": "Delegate unfamiliar or multi-file repository exploration to Grephound.",
+        "arguments": [{
+            "name": "query",
+            "description": "Precise semantic repository question or flow to trace.",
+            "required": true
+        }]
+    })
+}
+
+fn repo_scout_prompt(params: Value) -> Result<Value, Value> {
+    if params.get("name").and_then(Value::as_str) != Some("repo_scout") {
+        return Err(rpc_error(-32602, "Unknown prompt".into()));
+    }
+    let query = params
+        .get("arguments")
+        .and_then(|value| value.get("query"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    if query.is_empty() {
+        return Err(rpc_error(-32602, "`query` is required".into()));
+    }
+    Ok(json!({
+        "description": "Explore the repository with Grephound, then use its citations as focused evidence.",
+        "messages": [{
+            "role": "user",
+            "content": {
+                "type": "text",
+                "text": format!("Call the `repo_scout` tool with this repository question, then read only the validated citations it returns: {query}")
+            }
+        }]
+    }))
 }
 
 fn tool_text(text: &str, is_error: bool) -> Value {
@@ -259,4 +300,34 @@ fn write_message<W: Write>(writer: &mut W, msg: &Value) -> anyhow::Result<()> {
     writer.write_all(&body)?;
     writer.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repo_scout_prompt_requires_and_preserves_query() {
+        let error =
+            repo_scout_prompt(json!({ "name": "repo_scout", "arguments": {} })).unwrap_err();
+        assert_eq!(error["code"], -32602);
+
+        let result = repo_scout_prompt(json!({
+            "name": "repo_scout",
+            "arguments": { "query": "trace refresh-token rotation" }
+        }))
+        .unwrap();
+        assert!(result["messages"][0]["content"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("trace refresh-token rotation"));
+        assert_eq!(repo_scout_prompt_def()["arguments"][0]["required"], true);
+    }
+
+    #[test]
+    fn focus_must_stay_repository_relative() {
+        assert!(valid_focus(std::path::Path::new("src/auth")));
+        assert!(!valid_focus(std::path::Path::new("../secrets")));
+        assert!(!valid_focus(std::path::Path::new("/tmp/secrets")));
+    }
 }

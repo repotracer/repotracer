@@ -127,7 +127,7 @@ impl Default for ModelConfig {
     fn default() -> Self {
         Self {
             base_url: "http://127.0.0.1:11434/v1".into(),
-            model: "fastcontext".into(),
+            model: "hf.co/mitkox/FastContext-1.0-4B-RL-Q4_K_M-GGUF:latest".into(),
             api_key: Some("ollama".into()),
             timeout_ms: 120_000,
             temperature: 0.0,

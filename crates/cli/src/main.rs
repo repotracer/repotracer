@@ -2,10 +2,11 @@ mod agents;
 mod config;
 mod doctor;
 mod setup;
+mod subscription;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use grephound_core::{ExplorerBudget, GrephoundConfig, ScoutEngine, ScoutRequest};
+use grephound_core::{ExplorerBudget, GrephoundConfig, ScoutBackend, ScoutEngine, ScoutRequest};
 use grephound_mcp::McpServer;
 use grephound_model::{MockModel, ModelBackend, ModelConfig, OpenAiCompatBackend};
 use grephound_repo_tools::RepoTools;
@@ -18,7 +19,7 @@ use tracing_subscriber::EnvFilter;
 #[command(
     name = "grephound",
     version,
-    about = "Local repository scout for AI coding agents. Small models search. Big models solve.",
+    about = "Repository scout for AI coding agents. Small models search. Big models solve.",
     long_about = None
 )]
 struct Cli {
@@ -60,19 +61,21 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Explore the repository with the local scout
+    /// Explore the repository with the configured scout
     Scout {
         /// Question to ask
         query: Vec<String>,
         #[arg(long)]
         max_turns: Option<u32>,
     },
-    /// One-command setup: detect agents, write config, optional model pull
+    /// One-command setup: select backend, verify it, and configure agents
     Setup {
         #[arg(long)]
         yes: bool,
         #[arg(long)]
         dry_run: bool,
+        #[arg(long, value_enum, default_value_t = setup::ProviderChoice::Auto)]
+        provider: setup::ProviderChoice,
     },
     /// Run MCP server on stdio
     Serve,
@@ -146,7 +149,11 @@ async fn run(cli: Cli) -> Result<()> {
             }
             cmd_scout(&root, &cfg, &q, max_turns, cli.json, cli.mock).await
         }
-        Commands::Setup { yes, dry_run } => setup::run(&root, &cfg_path, &cfg, yes, dry_run).await,
+        Commands::Setup {
+            yes,
+            dry_run,
+            provider,
+        } => setup::run(&root, &cfg_path, &cfg, yes, dry_run, provider).await,
         Commands::Serve => cmd_serve(&root, &cfg, cli.mock).await,
         Commands::Doctor => doctor::run(&root, &cfg, cli.json).await,
         Commands::Status => cmd_status(&root, &cfg_path, &cfg, cli.json),
@@ -171,7 +178,7 @@ async fn run(cli: Cli) -> Result<()> {
             println!("Run: cargo run -p grephound-bench -- --help");
             Ok(())
         }
-        Commands::Uninstall { yes } => setup::uninstall(yes),
+        Commands::Uninstall { yes } => setup::uninstall(&root, yes),
         Commands::Version => {
             println!("grephound {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -187,7 +194,7 @@ async fn cmd_scout(
     json: bool,
     mock: bool,
 ) -> Result<()> {
-    let engine = build_engine(root, cfg, mock)?;
+    let engine = build_scout(root, cfg, mock)?;
     let result = engine
         .scout(ScoutRequest {
             query: query.to_string(),
@@ -208,7 +215,7 @@ async fn cmd_scout(
 
 async fn cmd_serve(root: &std::path::Path, cfg: &GrephoundConfig, mock: bool) -> Result<()> {
     // Logs must not touch stdout.
-    let engine = build_engine(root, cfg, mock)?;
+    let engine = build_scout(root, cfg, mock)?;
     let server = McpServer::new(engine, root.to_path_buf());
     server.serve_stdio().await
 }
@@ -219,14 +226,20 @@ fn cmd_status(
     cfg: &GrephoundConfig,
     json: bool,
 ) -> Result<()> {
-    let agents = agents::detect();
+    let agents = agents::detect(root);
     if json {
+        let mut config = serde_json::to_value(cfg)?;
+        if let Some(api_key) = config.pointer_mut("/model/api_key") {
+            if !api_key.is_null() {
+                *api_key = serde_json::Value::String("<redacted>".into());
+            }
+        }
         println!(
             "{}",
             serde_json::to_string_pretty(&serde_json::json!({
                 "root": root,
                 "config_path": cfg_path,
-                "config": cfg,
+                "config": config,
                 "agents": agents,
             }))?
         );
@@ -234,7 +247,11 @@ fn cmd_status(
         println!("grephound status\n");
         println!("Root     {}", root.display());
         println!("Config   {}", cfg_path.display());
-        println!("Model    {} @ {}", cfg.model.model, cfg.model.base_url);
+        if subscription::is_subscription_backend(cfg) {
+            println!("Model    {}", cfg.model.model);
+        } else {
+            println!("Model    {} @ {}", cfg.model.model, cfg.model.base_url);
+        }
         println!("Backend  {}", cfg.model.backend);
         println!("\nAgents");
         for a in agents {
@@ -253,7 +270,14 @@ fn cmd_status(
     Ok(())
 }
 
-fn build_engine(root: &std::path::Path, cfg: &GrephoundConfig, mock: bool) -> Result<ScoutEngine> {
+fn build_scout(
+    root: &std::path::Path,
+    cfg: &GrephoundConfig,
+    mock: bool,
+) -> Result<Arc<dyn ScoutBackend>> {
+    if !mock && subscription::is_subscription_backend(cfg) {
+        return Ok(Arc::new(subscription::CliScout::from_config(cfg)?));
+    }
     let model: Arc<dyn ModelBackend> = if mock {
         Arc::new(MockModel::grep_then_cite(
             "README.md",
@@ -262,15 +286,14 @@ fn build_engine(root: &std::path::Path, cfg: &GrephoundConfig, mock: bool) -> Re
             "mock citation",
         ))
     } else {
-        let mc = ModelConfig {
+        Arc::new(OpenAiCompatBackend::new(ModelConfig {
             base_url: cfg.model.base_url.clone(),
             model: cfg.model.model.clone(),
             api_key: cfg.model.api_key.clone(),
             timeout_ms: cfg.model.timeout_ms,
             temperature: cfg.model.temperature,
             max_tokens: None,
-        };
-        Arc::new(OpenAiCompatBackend::new(mc)?)
+        })?)
     };
     let tools = RepoTools::new(root);
     let budget = ExplorerBudget {
@@ -280,7 +303,7 @@ fn build_engine(root: &std::path::Path, cfg: &GrephoundConfig, mock: bool) -> Re
         tool_timeout_seconds: cfg.explorer.tool_timeout_seconds,
         concurrency: cfg.explorer.concurrency,
     };
-    Ok(ScoutEngine::new(model, tools, budget))
+    Ok(Arc::new(ScoutEngine::new(model, tools, budget)))
 }
 
 fn init_tracing(verbose: bool) {
