@@ -4,6 +4,8 @@
 
 **If the invoice didn't shrink, don't call it token savings.**
 
+![Benchmark the bill, not a middleware counter](./assets/invoice-vs-counter.png)
+
 We benchmark complete coding tasks:
 
 | Metric | Why |

@@ -16,42 +16,17 @@ npx grephound setup
 
 Works with: **Claude Code · Codex · Cursor · OpenCode · MCP**
 
+<p align="center">
+  <img src="assets/hero.png" alt="grephound — small models search, big models solve" width="920">
+</p>
+
 ---
 
 ## The problem
 
-```text
-WITHOUT grephound
-
-Claude / Codex
-  ↓ grep
-  ↓ read
-  ↓ read
-  ↓ glob
-  ↓ grep
-  ↓ read
-  ↓ finally solve
-
-All exploration enters expensive context.
-```
-
-```text
-WITH grephound
-
-Claude / Codex
-       ↓
-  repo_scout("trace auth")
-       ↓
-   Local 4B scout
-   ↙   ↓   ↘
-Read Grep Glob
-   ↘   ↓   ↙
-  3 citations
-       ↓
-Claude reads 3 focused regions
-       ↓
-solve
-```
+<p align="center">
+  <img src="assets/architecture.png" alt="Without grephound versus delegated repository exploration" width="920">
+</p>
 
 ---
 
@@ -87,6 +62,10 @@ See [BENCHMARKS.md](./BENCHMARKS.md) and [docs/benchmarks/why-token-counters-lie
 
 > Benchmark numbers will appear here only after paired runs. No fake savings.
 
+<p align="center">
+  <img src="assets/benchmark-card.png" alt="Complete-task benchmark methodology" width="920">
+</p>
+
 ---
 
 ## How it works
@@ -98,6 +77,10 @@ See [BENCHMARKS.md](./BENCHMARKS.md) and [docs/benchmarks/why-token-counters-lie
 5. The frontier model reads only those regions and solves
 
 The scout can search your code. **It cannot change it.**
+
+<p align="center">
+  <img src="assets/flow-detail.png" alt="repo_scout engine flow and citation validation" width="920">
+</p>
 
 ---
 
@@ -200,6 +183,10 @@ your repository → local scout model → citations → your coding agent
 No telemetry by default. No source code leaves the machine for the scout when using a local backend.
 
 If you point the scout at a remote model endpoint, code snippets may reach that provider.
+
+<p align="center">
+  <img src="assets/local-privacy.png" alt="Local grephound privacy flow" width="920">
+</p>
 
 ---
 
