@@ -1,0 +1,52 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/repo-tools",
+    "crates/model",
+    "crates/cli",
+    "crates/mcp",
+    "crates/bench",
+]
+default-members = ["crates/cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/grephound/grephound"
+homepage = "https://github.com/grephound/grephound"
+authors = ["Grephound Contributors"]
+rust-version = "1.80"
+
+[workspace.dependencies]
+grephound-core = { path = "crates/core" }
+grephound-repo-tools = { path = "crates/repo-tools" }
+grephound-model = { path = "crates/model" }
+grephound-mcp = { path = "crates/mcp" }
+grephound-bench = { path = "crates/bench" }
+
+anyhow = "1"
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive", "env"] }
+dirs = "6"
+futures = "0.3"
+globset = "0.4"
+ignore = "0.4"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+which = "7"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
