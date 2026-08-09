@@ -25,6 +25,8 @@ Main LLM
  → solve
 ```
 
+![Delegated repository exploration](../assets/architecture.png)
+
 ## Crates
 
 | Crate | Role |
@@ -46,6 +48,8 @@ query → system prompt → model
 
 Hard controls: max turns, max tool calls, per-tool timeout, total timeout, output caps, cancellation via timeout.
 
+![repo_scout engine flow](../assets/flow-detail.png)
+
 ## Security
 
 - Read-only tools only
@@ -63,3 +67,7 @@ Upstream fixes included:
 
 1. **Parallel tool execution** (was sequential)
 2. **Grep `count` → `--count-matches`** (schema/impl mismatch)
+
+## Category landscape
+
+![Repository-context tool landscape](../assets/competitive-map.png)

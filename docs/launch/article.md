@@ -1,5 +1,7 @@
 # We stopped paying frontier models to search the repository
 
+![Grephound demo storyboard](../../assets/demo-storyboard.png)
+
 ## 1. The stupid part of coding-agent economics
 
 Your most expensive model is doing `grep` duty.
