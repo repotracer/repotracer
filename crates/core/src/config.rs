@@ -29,6 +29,8 @@ impl GrephoundConfig {
 pub struct ModelSettings {
     #[serde(default = "default_backend")]
     pub backend: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executable: Option<String>,
     #[serde(default = "default_model")]
     pub model: String,
     #[serde(default = "default_base_url")]
@@ -41,11 +43,13 @@ pub struct ModelSettings {
     pub temperature: f32,
 }
 
+pub const FASTCONTEXT_MODEL: &str = "hf.co/mitkox/FastContext-1.0-4B-RL-Q4_K_M-GGUF:latest";
+
 fn default_backend() -> String {
     "ollama".into()
 }
 fn default_model() -> String {
-    "fastcontext".into()
+    FASTCONTEXT_MODEL.into()
 }
 fn default_base_url() -> String {
     "http://127.0.0.1:11434/v1".into()
@@ -58,6 +62,7 @@ impl Default for ModelSettings {
     fn default() -> Self {
         Self {
             backend: default_backend(),
+            executable: None,
             model: default_model(),
             base_url: default_base_url(),
             api_key: Some("ollama".into()),

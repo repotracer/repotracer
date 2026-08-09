@@ -204,6 +204,13 @@ impl ScoutEngine {
     }
 }
 
+#[async_trait::async_trait]
+impl crate::types::ScoutBackend for ScoutEngine {
+    async fn scout(&self, request: ScoutRequest) -> anyhow::Result<ScoutResult> {
+        ScoutEngine::scout(self, request).await
+    }
+}
+
 fn empty_result(
     summary: &str,
     turns: u32,

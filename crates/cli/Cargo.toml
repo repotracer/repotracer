@@ -3,7 +3,7 @@ name = "grephound"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Local repository scout for AI coding agents"
+description = "Repository scout for AI coding agents"
 repository.workspace = true
 default-run = "grephound"
 
@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
 chrono.workspace = true
 clap.workspace = true
 dirs.workspace = true

@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 
+#[async_trait::async_trait]
+pub trait ScoutBackend: Send + Sync {
+    async fn scout(&self, request: ScoutRequest) -> anyhow::Result<ScoutResult>;
+}
+
 #[derive(Debug, Clone)]
 pub struct ScoutRequest {
     pub query: String,

@@ -509,6 +509,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "async-trait",
  "chrono",
  "clap",
  "dirs",
@@ -570,8 +571,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "grephound-core",
- "grephound-model",
- "grephound-repo-tools",
  "serde",
  "serde_json",
  "tokio",

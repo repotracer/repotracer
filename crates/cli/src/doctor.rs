@@ -1,11 +1,11 @@
 use crate::agents;
+use crate::subscription::{is_subscription_backend, CliScout};
 use anyhow::Result;
-use grephound_core::{ExplorerBudget, GrephoundConfig, ScoutEngine, ScoutRequest};
-use grephound_model::{MockModel, ModelBackend, ModelConfig, OpenAiCompatBackend};
+use grephound_core::GrephoundConfig;
+use grephound_model::{ModelBackend, ModelConfig, OpenAiCompatBackend};
 use grephound_repo_tools::{RepoTools, ToolCall};
 use serde_json::json;
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Instant;
 
 pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<()> {
@@ -62,98 +62,64 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
         Check::fail("concurrent execution", "one or more tools failed")
     });
 
-    // Model
-    let ollama_url = cfg
-        .model
-        .base_url
-        .trim_end_matches('/')
-        .trim_end_matches("/v1")
-        .to_string();
-    let tags = format!("{ollama_url}/api/tags");
-    let reachable = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(2))
-        .build()
-        .ok()
-        .map(|c| async move { c.get(&tags).send().await.is_ok() });
-    let reachable = match reachable {
-        Some(f) => f.await,
-        None => false,
-    };
-    if reachable {
-        checks.push(Check::ok("Ollama reachable", &cfg.model.base_url));
+    // Configured scout backend
+    if is_subscription_backend(cfg) {
+        match CliScout::from_config(cfg) {
+            Ok(scout) => {
+                let installed =
+                    scout.executable().is_file() || which::which(scout.executable()).is_ok();
+                checks.push(if installed {
+                    Check::ok(
+                        "subscription CLI",
+                        &format!(
+                            "{} ({})",
+                            scout.provider().label(),
+                            scout.executable().display()
+                        ),
+                    )
+                } else {
+                    Check::fail(
+                        "subscription CLI",
+                        &format!("{} not found", scout.executable().display()),
+                    )
+                });
+                if installed {
+                    checks.push(match scout.probe(root).await {
+                        Ok(()) => {
+                            Check::ok("model", &format!("{} ready", scout.provider().label()))
+                        }
+                        Err(error) => Check::fail("model", &error.to_string()),
+                    });
+                }
+            }
+            Err(error) => checks.push(Check::fail("subscription CLI", &error.to_string())),
+        }
     } else {
-        checks.push(Check::fail(
-            "Ollama reachable",
-            &format!(
-                "Could not reach {}. Start: ollama serve",
-                cfg.model.base_url
-            ),
-        ));
-    }
-
-    // Mock exploration always works
-    let mock = Arc::new(MockModel::grep_then_cite("Cargo.toml", 1, 5, "manifest"));
-    // Ensure Cargo.toml exists for validation when in workspace
-    let engine = ScoutEngine::new(
-        mock,
-        RepoTools::new(root),
-        ExplorerBudget {
-            max_turns: 3,
-            ..ExplorerBudget::default()
-        },
-    );
-    let t2 = Instant::now();
-    // Use a fixture file that exists
-    let cite_path = if root.join("Cargo.toml").exists() {
-        "Cargo.toml"
-    } else {
-        "."
-    };
-    let _ = cite_path;
-    match engine
-        .scout(ScoutRequest {
-            query: "doctor test".into(),
-            root: root.to_path_buf(),
-            focus: None,
-            max_turns: Some(3),
-            timeout: Some(std::time::Duration::from_secs(15)),
-        })
-        .await
-    {
-        Ok(_r) => checks.push(Check::ok(
-            "test exploration",
-            &format!("{} ms (mock)", t2.elapsed().as_millis()),
-        )),
-        Err(e) => checks.push(Check::fail("test exploration", &e.to_string())),
-    }
-
-    // Live model optional probe
-    if reachable {
-        let mc = ModelConfig {
+        let backend = OpenAiCompatBackend::new(ModelConfig {
             base_url: cfg.model.base_url.clone(),
             model: cfg.model.model.clone(),
             api_key: cfg.model.api_key.clone(),
-            timeout_ms: 5_000,
+            timeout_ms: cfg.model.timeout_ms.min(10_000),
             temperature: 0.0,
             max_tokens: Some(16),
-        };
-        match OpenAiCompatBackend::new(mc) {
+        });
+        match backend {
             Ok(backend) => {
-                let req = grephound_model::ModelRequest {
-                    messages: vec![grephound_model::ChatMessage::user("ping")],
+                let request = grephound_model::ModelRequest {
+                    messages: vec![grephound_model::ChatMessage::user("Reply with ok.")],
                     tools: vec![],
                     temperature: 0.0,
                     max_tokens: Some(8),
                 };
-                match backend.complete(req).await {
-                    Ok(_) => checks.push(Check::ok("model", &cfg.model.model)),
-                    Err(e) => checks.push(Check::fail(
+                checks.push(match backend.complete(request).await {
+                    Ok(_) => Check::ok(
                         "model",
-                        &format!("{e}\n  Try: ollama pull {}", cfg.model.model),
-                    )),
-                }
+                        &format!("{} @ {}", cfg.model.model, cfg.model.base_url),
+                    ),
+                    Err(error) => Check::fail("model", &error.to_string()),
+                });
             }
-            Err(e) => checks.push(Check::fail("model", &e.to_string())),
+            Err(error) => checks.push(Check::fail("model", &error.to_string())),
         }
     }
 
@@ -161,7 +127,7 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
     checks.push(Check::ok("MCP", "grephound serve"));
 
     // Agents
-    for a in agents::detect() {
+    for a in agents::detect(root) {
         if a.configured {
             checks.push(Check::ok(&a.name, "configured"));
         } else {
@@ -193,11 +159,11 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
         print_check(c);
     }
     println!("\nExplorer");
-    for c in checks
+    for check in checks
         .iter()
-        .filter(|c| c.name.contains("Ollama") || c.name == "model" || c.name == "test exploration")
+        .filter(|check| matches!(check.name.as_str(), "subscription CLI" | "model"))
     {
-        print_check(c);
+        print_check(check);
     }
     println!("\nTools");
     for c in checks.iter().filter(|c| {
@@ -217,6 +183,7 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
         c.name.contains("Claude")
             || c.name.contains("Codex")
             || c.name.contains("Cursor")
+            || c.name.contains("Copilot")
             || c.name.contains("MCP (generic)")
     }) {
         print_check(c);
