@@ -1,0 +1,32 @@
+{
+  "name": "grephound",
+  "version": "0.1.0",
+  "description": "Local repository scout for AI coding agents. Small models search. Big models solve.",
+  "bin": {
+    "grephound": "bin/grephound.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/fetch-binary.js || true"
+  },
+  "keywords": [
+    "mcp",
+    "coding-agent",
+    "claude-code",
+    "codex",
+    "repository",
+    "code-search",
+    "local-ai"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grephound/grephound.git"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
