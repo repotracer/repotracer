@@ -6,6 +6,21 @@
 
 ![Benchmark the bill, not a middleware counter](./assets/invoice-vs-counter.png)
 
+
+## What we can sell today (attributed)
+
+Until grephound paired product runs land under `benchmarks/results/`, public numbers are **sourced**, not invented:
+
+| Number | Meaning | Attribution |
+|--------|---------|-------------|
+| **−60.3%** main-agent tokens | Upper bound from delegated repo exploration | Microsoft FastContext ([arXiv:2606.14066](https://arxiv.org/abs/2606.14066), project README) |
+| **+5.5** end-to-end score | Scout architecture can improve solve quality | FastContext SWE-bench-style evaluations |
+| **+7.6%** task cost | Middleware “token killer” increased the bill | [JetBrains RTK trial](https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/) · 80 clean pairs · low effort |
+| **96.2M tokens “saved”** | rtk self-report while invoice rose | Same JetBrains writeup |
+
+![Attributed proof card](./assets/results-proof.png)
+
+**Rule for grephound headlines:** only medians from repeated paired complete-task runs, explorer included, quality counted.
 We benchmark complete coding tasks:
 
 | Metric | Why |
