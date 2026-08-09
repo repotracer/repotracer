@@ -21,6 +21,7 @@ Until grephound paired product runs land under `benchmarks/results/`, public num
 ![Attributed proof card](./assets/results-proof.png)
 
 **Rule for grephound headlines:** only medians from repeated paired complete-task runs, explorer included, quality counted.
+
 We benchmark complete coding tasks:
 
 | Metric | Why |
