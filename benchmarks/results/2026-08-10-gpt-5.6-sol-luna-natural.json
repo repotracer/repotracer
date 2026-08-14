@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-10",
+  "status": "single-pair natural-routing diagnostic; not a headline result",
+  "prompt": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "protocol": {
+    "main_model": "gpt-5.6-sol",
+    "main_reasoning_effort": "high",
+    "scout_model": "gpt-5.6-luna",
+    "scout_reasoning_effort": "low",
+    "provider": "Codex CLI user configuration via Codex LB",
+    "runs_per_arm": 1,
+    "routing": "natural",
+    "billing_source": "Codex LB request logs",
+    "quality_method": "manual acceptance check against the six requested setup behaviors"
+  },
+  "arms": {
+    "direct": {
+      "conversation_id": "019fec1a-261c-7651-89c9-dc1cffabf71e",
+      "provider_requests": 7,
+      "input_tokens": 126648,
+      "cached_input_tokens": 72448,
+      "output_tokens": 2606,
+      "reasoning_tokens": 775,
+      "provider_latency_ms": 77284,
+      "wall_ms": 116674,
+      "provider_cost_usd": 0.385404,
+      "quality_checks_passed": "6/6"
+    },
+    "assisted": {
+      "main_conversation_id": "019fec9d-4f99-7611-9f79-aa44685bce20",
+      "scout_conversation_id": "019fec9d-93f5-7861-b0ce-e35b485e6a12",
+      "repo_scout_calls": 1,
+      "provider_requests": 12,
+      "input_tokens": 205854,
+      "cached_input_tokens": 113664,
+      "output_tokens": 3064,
+      "reasoning_tokens": 687,
+      "provider_latency_ms": 77881,
+      "wall_ms": 108082,
+      "provider_cost_usd": 0.3068268,
+      "quality_checks_passed": "6/6",
+      "main": {
+        "provider_requests": 6,
+        "input_tokens": 72885,
+        "cached_input_tokens": 26624,
+        "output_tokens": 1653,
+        "reasoning_tokens": 603,
+        "provider_latency_ms": 46446,
+        "provider_cost_usd": 0.294207
+      },
+      "scout": {
+        "provider_requests": 6,
+        "input_tokens": 132969,
+        "cached_input_tokens": 87040,
+        "output_tokens": 1411,
+        "reasoning_tokens": 84,
+        "provider_latency_ms": 31435,
+        "provider_cost_usd": 0.0126198,
+        "grephound_duration_ms": 36393,
+        "validated_citations": 6
+      }
+    }
+  },
+  "deltas": {
+    "complete_provider_cost_percent": -20.3883,
+    "wall_time_percent": -7.36,
+    "main_input_tokens_percent": -42.45,
+    "all_model_input_tokens_percent": 62.54,
+    "provider_latency_percent": 0.77
+  },
+  "conclusion": "The naturally routed Luna-low scout reduced complete provider cost by 20.39% and wall time by 7.36% in this pair while both arms passed all six quality checks. Total all-model input increased 62.54%; the lower bill came from shifting work from Sol to cheaper Luna, not from reducing aggregate tokens.",
+  "warning": "One pair is a diagnostic, not a launch claim. Repeat across the preregistered suite before reporting a median.",
+  "repricing_note": "Repriced 2026-08-11 using Luna subscription-equivalent rates: $0.20/M uncached input, $0.02/M cached reads, and $1.20/M output including reasoning. Cache writes are not billed and are excluded by definition."
+}

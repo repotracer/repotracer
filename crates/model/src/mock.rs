@@ -12,6 +12,8 @@ pub enum MockStep {
     Tools(Vec<(String, String)>),
     /// Assistant final text (include `<final_answer>` for citations).
     Final(String),
+    /// Assistant final text, but only when no tools are exposed.
+    FinalWithoutTools(String),
 }
 
 #[derive(Debug, Clone)]
@@ -57,7 +59,7 @@ impl ModelBackend for MockModel {
         &self.name
     }
 
-    async fn complete(&self, _request: ModelRequest) -> Result<ModelResponse, ModelError> {
+    async fn complete(&self, request: ModelRequest) -> Result<ModelResponse, ModelError> {
         let i = self.idx.fetch_add(1, Ordering::SeqCst);
         let step = self
             .script
@@ -79,6 +81,14 @@ impl ModelBackend for MockModel {
                 ChatMessage::assistant_tools(None, tool_calls)
             }
             MockStep::Final(text) => ChatMessage::assistant(text.clone()),
+            MockStep::FinalWithoutTools(text) if request.tools.is_empty() => {
+                ChatMessage::assistant(text.clone())
+            }
+            MockStep::FinalWithoutTools(_) => {
+                return Err(ModelError::InvalidResponse(
+                    "final turn still exposed tools".into(),
+                ));
+            }
         };
 
         Ok(ModelResponse {

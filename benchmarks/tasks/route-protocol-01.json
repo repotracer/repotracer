@@ -1,0 +1,11 @@
+{
+  "id": "route-protocol-01",
+  "prompt": "When a coding agent narrows a repository-scout request to a subdirectory, keep every search and citation inside that subtree rather than treating it as a hint. Reject symlink escapes and preserve repository-relative citations.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/mcp/src/lib.rs",
+    "crates/core/src/types.rs",
+    "crates/core/src/engine.rs",
+    "crates/repo-tools/src/pathutil.rs"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "route-cli-09",
+  "prompt": "In `packages/npm/bin/grephound.js`, update `platformKey()` to reject unsupported operating-system and architecture pairs with a clear installation hint instead of returning an arbitrary key.",
+  "expected_scout": false,
+  "expected_paths": [
+    "packages/npm/bin/grephound.js"
+  ]
+}

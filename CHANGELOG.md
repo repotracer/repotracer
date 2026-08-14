@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Thirty independent routing benchmark tasks, bringing the predeclared suite to 34 tasks: 20 scout-eligible and 14 expected skips
+- Tamper-evident benchmark result index and SHA-256 ledger, including rejected runs and the Sol request-sequence analysis
+
+### Changed
+- Product support is limited to Codex until other agent hosts have equivalent end-to-end quality and cost evidence
+
+### Fixed
+- Codex GPT scouts ignore inherited MCP servers and instructions, disable unrelated apps, browser, computer-use, image-generation, multi-agent, and plugin capabilities, and retain only login and provider routing
+- Luna scout reasoning is configurable as `low`, `medium`, or `high` and defaults to the only level that completed all three isolated quality runs: `medium`
+- Codex scout telemetry reports repository tool counts plus input, cache, output, and reasoning tokens
+- Scout prompts budget at most three repository tools and request batched independent reads
+- Scout handoffs cap output at five citations and 6 KiB of evidence while preserving direct source excerpts
+- Read, Glob, and Grep results share a 32 KiB hard cap with explicit continuation guidance
+- Routing decides eligibility before repository operations, calls the scout first for broad unknown-location exploration, and prevents duplicate broad searches after a validated handoff
+- GPT scout prompts request a ranked 3–4 citation evidence map instead of verbose repository narration
+- Setup is zero-question and GPT-only: it verifies the existing Codex login, pins `gpt-5.6-luna`, and configures detected hosts without a model download or API key
+- Benchmark tasks use ordinary user-style prompts; routing labels and expected paths remain evaluator-only, and natural arms never force a scout call
+
 ## 0.1.0 — 2026-08-08
 
 ### Added

@@ -1,0 +1,646 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-11",
+  "status": "complete",
+  "completed_at": "2026-08-11T17:37:39.118002+00:00",
+  "change": "32 KiB final-output cap for Read, Glob, and Grep",
+  "method": "Ten paired alternating-order runs per arm on deterministic worst-case fixtures. Both binaries execute the real repository tools; they differ only in MAX_OUTPUT_BYTES (10 MiB baseline versus 32 KiB candidate).",
+  "scope": "Measures final serialized tool-output footprint and tool latency. It does not claim provider token or complete-task savings.",
+  "summary": [
+    {
+      "tool": "Read",
+      "baseline_median_bytes": 3991018.0,
+      "capped_median_bytes": 32073.0,
+      "byte_reduction_percent": 99.1964,
+      "baseline_median_duration_ms": 3.0,
+      "capped_median_duration_ms": 3.0,
+      "capped_all_truncated": true,
+      "capped_all_actionable": true,
+      "baseline_any_truncated": false
+    },
+    {
+      "tool": "Grep",
+      "baseline_median_bytes": 70226.0,
+      "capped_median_bytes": 32074.0,
+      "byte_reduction_percent": 54.3275,
+      "baseline_median_duration_ms": 7.0,
+      "capped_median_duration_ms": 7.0,
+      "capped_all_truncated": true,
+      "capped_all_actionable": true,
+      "baseline_any_truncated": true
+    },
+    {
+      "tool": "Glob",
+      "baseline_median_bytes": 50599.0,
+      "capped_median_bytes": 32467.0,
+      "byte_reduction_percent": 35.8347,
+      "baseline_median_duration_ms": 13.0,
+      "capped_median_duration_ms": 13.0,
+      "capped_all_truncated": true,
+      "capped_all_actionable": true,
+      "baseline_any_truncated": false
+    }
+  ],
+  "runs": [
+    {
+      "repeat": 1,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 1,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 14,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 1,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 16,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 1,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 4,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 1,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 9,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 1,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 17,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 2,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 2,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 2,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 13,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 2,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 2,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 2,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 12,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 3,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 3,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 3,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 13,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 3,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 3,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 8,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 3,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 14,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 4,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 4,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 4,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 14,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 4,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 4,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 4,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 13,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 5,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 5,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 5,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 13,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 5,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 5,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 5,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 13,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 6,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 6,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 6,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 6,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 13,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 6,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 6,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 6,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 13,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 7,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 7,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 6,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 7,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 13,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 7,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 7,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 7,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 13,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 8,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 8,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 6,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 8,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 13,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 8,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 8,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 8,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 8,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 13,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 9,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 9,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 6,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 9,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 12,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 9,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 9,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 9,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 12,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 10,
+      "arm": "uncapped_baseline",
+      "tool": "Read",
+      "output_bytes": 3991018,
+      "output_lines": 2002,
+      "duration_ms": 3,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 10,
+      "arm": "uncapped_baseline",
+      "tool": "Grep",
+      "output_bytes": 70226,
+      "output_lines": 101,
+      "duration_ms": 6,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 10,
+      "arm": "uncapped_baseline",
+      "tool": "Glob",
+      "output_bytes": 50599,
+      "output_lines": 100,
+      "duration_ms": 13,
+      "truncated": false,
+      "actionable_continuation": false
+    },
+    {
+      "repeat": 10,
+      "arm": "capped_32k",
+      "tool": "Read",
+      "output_bytes": 32073,
+      "output_lines": 19,
+      "duration_ms": 3,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 10,
+      "arm": "capped_32k",
+      "tool": "Grep",
+      "output_bytes": 32074,
+      "output_lines": 47,
+      "duration_ms": 7,
+      "truncated": true,
+      "actionable_continuation": true
+    },
+    {
+      "repeat": 10,
+      "arm": "capped_32k",
+      "tool": "Glob",
+      "output_bytes": 32467,
+      "output_lines": 65,
+      "duration_ms": 12,
+      "truncated": true,
+      "actionable_continuation": true
+    }
+  ]
+}

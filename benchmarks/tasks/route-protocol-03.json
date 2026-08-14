@@ -1,0 +1,11 @@
+{
+  "id": "route-protocol-03",
+  "prompt": "Make repository-scout responses report why a run ended—completed, timed out, turn budget exhausted, tool budget exhausted, or backend failure—and expose the same status in CLI JSON and MCP structured output.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/core/src/types.rs",
+    "crates/core/src/engine.rs",
+    "crates/mcp/src/lib.rs",
+    "crates/cli/src/main.rs"
+  ]
+}

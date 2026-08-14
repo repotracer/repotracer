@@ -21,8 +21,16 @@ static ENTRY_RE: LazyLock<Regex> =
 /// Parse citations from model final text.
 pub fn parse_citations(text: &str) -> (String, Vec<Citation>) {
     let Some(caps) = FINAL_ANSWER_RE.captures(text) else {
-        let summary = text.trim().to_string();
-        return (summary, Vec::new());
+        let citations = text
+            .lines()
+            .filter_map(|line| parse_entry(line.trim()))
+            .collect::<Vec<_>>();
+        let summary = if !citations.is_empty() && text.contains("</final_answer>") {
+            String::new()
+        } else {
+            text.trim().to_string()
+        };
+        return (summary, citations);
     };
 
     let body = caps.get(1).map(|m| m.as_str()).unwrap_or("").trim();
@@ -144,6 +152,22 @@ src/auth/refresh.ts:10-20
         assert_eq!(cites.len(), 2);
         assert_eq!(cites[0].start_line, 81);
         assert_eq!(cites[0].end_line, 144);
+    }
+
+    #[test]
+    fn parses_untagged_citations_for_compatibility() {
+        let text = "/repo/src/auth.rs:3-9 (auth flow)";
+        let (_, cites) = parse_citations(text);
+        assert_eq!(cites.len(), 1);
+        assert_eq!(cites[0].path, "/repo/src/auth.rs");
+    }
+
+    #[test]
+    fn cleans_dangling_final_answer_close_tag() {
+        let text = "/repo/src/auth.rs:3-9 (auth flow)\n</final_answer>";
+        let (summary, cites) = parse_citations(text);
+        assert!(summary.is_empty());
+        assert_eq!(cites.len(), 1);
     }
 
     #[test]

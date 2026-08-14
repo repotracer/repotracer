@@ -1,0 +1,8 @@
+{
+  "id": "route-protocol-08",
+  "prompt": "Update `read_message` in `crates/mcp/src/lib.rs` to reject Content-Length bodies larger than 1 MiB before allocating the buffer, with boundary coverage in the same module.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/mcp/src/lib.rs"
+  ]
+}

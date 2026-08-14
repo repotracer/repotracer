@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-11",
+  "status": "complete diagnostic; immediate routing retained; remaining request-turn savings are hypotheses",
+  "kind": "request_sequence_analysis",
+  "question_scope": "One read-only cross-file setup question, three randomized pairs in each compared cohort",
+  "sources": {
+    "previous_policy": "2026-08-10-gpt-5.6-sol-luna-repeated-optimized.json",
+    "immediate_routing": "2026-08-11-stage-a-immediate-routing.json",
+    "request_logs": "Codex LB rows for the six assisted main-model conversation IDs"
+  },
+  "models": {
+    "main": "gpt-5.6-sol high",
+    "scout": "gpt-5.6-luna low"
+  },
+  "observed_medians": {
+    "previous_assisted": {
+      "main_provider_requests": 7,
+      "main_input_tokens": 77878,
+      "main_cached_input_tokens": 43776,
+      "main_output_tokens": 2012
+    },
+    "immediate_routing_assisted": {
+      "main_provider_requests": 6,
+      "main_input_tokens": 61736,
+      "main_cached_input_tokens": 17920,
+      "main_output_tokens": 1485
+    },
+    "immediate_vs_previous_percent": {
+      "main_provider_requests": -14.29,
+      "main_input_tokens": -20.73,
+      "main_cached_input_tokens": -59.06,
+      "main_output_tokens": -26.19
+    },
+    "immediate_vs_paired_direct_main_input_percent": -50.19,
+    "quality_passing_pairs": "3/3",
+    "complete_cost_wins": "3/3"
+  },
+  "immediate_request_sequence": {
+    "main_provider_requests_per_run_including_prewarm": [5, 6, 6],
+    "known_zero_output_prewarm_input_tokens_per_run": [8108, 8108, 8108],
+    "known_prewarm_share_of_median_main_input_percent": 13.13,
+    "post_prewarm_requests_per_run": [4, 5, 5],
+    "repository_operations_before_scout": [0, 0, 0],
+    "repository_operations_after_handoff": [0, 0, 0],
+    "repo_scout_calls_per_run": [1, 1, 1]
+  },
+  "candidate_excess_turn_upper_bound": {
+    "method": "Treat the first post-prewarm request as routing/tool invocation and the last as final answer; sum every middle main-model request. This is an upper bound, not proof that each middle request can be removed.",
+    "middle_request_input_tokens_per_run": [19419, 29382, 29344],
+    "median_middle_request_input_tokens": 29344,
+    "median_share_of_total_main_input_percent": 47.48
+  },
+  "findings": [
+    {
+      "classification": "verified product waste",
+      "finding": "Preliminary main-agent repository exploration before delegation",
+      "decision": "Removed by immediate routing. This is the only measured optimization that materially reduced Sol input while preserving all quality checks."
+    },
+    {
+      "classification": "verified measurement overhead",
+      "finding": "Each measured conversation includes an 8108-input-token, zero-output prewarm request",
+      "decision": "Warm the provider before starting the measured conversation. Do not market this as a product saving."
+    },
+    {
+      "classification": "optimization target, cause unproven",
+      "finding": "Four to five post-prewarm Sol requests remain despite exactly one scout call and no repository operations before or after it",
+      "decision": "Instrument request phases before changing behavior. The theoretical two-request route-plus-final floor would remove a median upper bound of 29344 Sol input tokens, but current logs do not preserve enough event semantics to claim those turns are avoidable."
+    },
+    {
+      "classification": "secondary optimization target",
+      "finding": "The immediate-routing median handoff is 7758 characters and is re-ingested by every later Sol continuation",
+      "decision": "Ablate a 4 KiB evidence cap against the current 6 KiB cap with blind quality grading; do not shrink citations without proof."
+    }
+  ],
+  "optimization_order": [
+    "Retain immediate first-operation routing for eligible unknown-location exploration.",
+    "Move prewarming outside the benchmark measurement boundary.",
+    "Instrument Sol requests as pre-scout, scout-call, handoff-processing, and final-answer phases; then remove the specific extra phase rather than guessing.",
+    "If extra phases are host-imposed, prototype pre-scout evidence injection so Sol receives the user request and evidence in one final-answer turn.",
+    "Only after request-count work, test a 4 KiB handoff and Sol medium reasoning; their expected token impact is smaller."
+  ],
+  "limitations": [
+    "The comparison is between independent stochastic three-pair cohorts on one question, not 34 independent tasks.",
+    "Codex LB request logs preserve token counts and timing but not response/tool event semantics, so middle requests cannot be labeled definitively.",
+    "The 29344-token middle-request number is an elimination ceiling, not an expected saving.",
+    "Luna medium is the production scout default, but this immediate-routing cohort used Luna low."
+  ]
+}

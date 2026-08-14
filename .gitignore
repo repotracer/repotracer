@@ -11,3 +11,6 @@ packages/npm/vendor/
 benchmarks/results/**/raw.jsonl
 .project/STATE.local.md
 third_party/
+
+.fastcontext/
+docs/benchmarks/*.log

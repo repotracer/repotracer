@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-10",
+  "status": "single-run forced report-injection diagnostic; not headline or routing evidence",
+  "conclusion": "All arms passed the 22 named checks. Appending pre-generated Luna-low scout reports increased complete provider cost 16.20% across four tasks. The hard-task increase came from 15 extra Sol turns, not scout inference: the Sol trajectory added 825600 cached-input tokens and 3250 output tokens while uncached input fell by 3104. This run cannot establish that scouting caused the difference because each arm ran once, all assisted tasks were forced despite already naming relevant files or symbols, and the benchmark bypassed the Grephound runtime handoff.",
+  "protocol": {
+    "baseline": "GPT-5.6 Sol high solves the task directly.",
+    "luna_report_arm": "A separate GPT-5.6 Luna low Codex session explores the repository; its complete prose report is appended to the otherwise matching GPT-5.6 Sol high task prompt.",
+    "local_report_arm": "A local FastContext 4B report is appended to the GPT-5.6 Sol high task prompt.",
+    "mode": "forced report injection, not natural repo_scout routing",
+    "runs_per_task_per_arm": 1,
+    "tasks": 4,
+    "quality_contracts": 22,
+    "source_metadata": "/tmp/grephound-codex-benchmark-results.json",
+    "main_trajectory_source": "~/.codex/sessions/2026/08/10/*.jsonl",
+    "billing_source": "~/.codex-lb/store.db"
+  },
+  "aggregate": {
+    "sol_alone": {
+      "quality_contracts_passed": "22/22",
+      "known_all_tokens": 3147770,
+      "provider_cost_usd": 4.400854,
+      "wall_seconds": 2398
+    },
+    "sol_with_luna_low_report": {
+      "quality_contracts_passed": "22/22",
+      "known_all_tokens": 4323769,
+      "main_cost_usd": 4.882067,
+      "scout_cost_usd": 0.231606,
+      "provider_cost_usd": 5.113673,
+      "cost_delta_pct": 16.1973,
+      "wall_seconds": 2341
+    },
+    "sol_with_local_4b_report": {
+      "quality_contracts_passed": "22/22",
+      "known_all_tokens_lower_bound": 2925770,
+      "provider_cost_usd_excluding_local_compute": 4.795013,
+      "cost_delta_pct": 8.9561,
+      "wall_seconds": 1676,
+      "limitation": "The super-hard local scout timed out without complete usage."
+    }
+  },
+  "hard_task_forensics": {
+    "baseline": {
+      "main_model_requests": 21,
+      "tool_calls": 20,
+      "input_tokens": 862961,
+      "cached_input_tokens": 772096,
+      "output_tokens": 11430,
+      "provider_cost_usd": 1.227648
+    },
+    "luna_assisted": {
+      "main_model_requests": 36,
+      "tool_calls": 35,
+      "input_tokens": 1685457,
+      "cached_input_tokens": 1597696,
+      "output_tokens": 14680,
+      "main_provider_cost_usd": 1.678053,
+      "scout_provider_cost_usd": 0.0476766,
+      "complete_provider_cost_usd": 1.7257296,
+      "complete_cost_delta_pct": 40.572,
+      "scout_report": {
+        "bytes": 4250,
+        "words": 298,
+        "lines": 17,
+        "citations": 16,
+        "unique_files": 9,
+        "used_grephound_final_answer_contract": false
+      }
+    },
+    "main_trajectory_delta": {
+      "model_requests": 15,
+      "tool_calls": 15,
+      "input_tokens": 822496,
+      "cached_input_tokens": 825600,
+      "uncached_input_tokens": -3104,
+      "output_tokens": 3250,
+      "first_prompt_tokens": 1140,
+      "tool_output_characters": -31454,
+      "main_cost_usd_under_equal_request_pricing": 0.49478
+    },
+    "tool_call_breakdown": {
+      "baseline": {
+        "read_or_search": 6,
+        "plan_or_status": 3,
+        "patch": 5,
+        "test_or_format": 4,
+        "poll": 0,
+        "diff_or_status": 2,
+        "commit_attempt": 0
+      },
+      "assisted": {
+        "read_or_search": 8,
+        "plan_or_status": 3,
+        "patch": 9,
+        "test_or_format": 7,
+        "poll": 6,
+        "diff_or_status": 1,
+        "commit_attempt": 1
+      }
+    },
+    "observed_rework": [
+      "Both trajectories first missed the grephound_model::Usage re-export and repaired the same compile error.",
+      "The assisted trajectory additionally invoked a nonexistent grephound-cli package target, then corrected it.",
+      "The assisted trajectory used six one-second polling calls for tests; the baseline used longer blocking test calls.",
+      "The assisted trajectory attempted a git commit that the read-only disposable clone rejected.",
+      "The assisted trajectory patched seven unique files in eleven file edits; the baseline patched six unique files in nine file edits."
+    ],
+    "interpretation": "The report was accurate but redundant with a task prompt that already named the usage types, parsers, aggregation paths, constructors, mocks, and tests. The extra prompt changed a stochastic solver trajectory; one pair cannot attribute the resulting implementation and validation rework to report quality."
+  },
+  "routing_assessment": {
+    "paper_contract": "Use the explorer for cold-start repository exploration, broad cross-file localization, or a failed direct search; skip when the issue already names the relevant file or symbol.",
+    "current_tasks": "All four prompts supplied exact files, symbols, tests, or a precise change surface before the scout report was appended.",
+    "verdict": "The forced assisted arms mostly measured redundant evidence injection, not the intended Grephound routing policy."
+  },
+  "required_next_protocol": [
+    "Use the same solver model, reasoning effort, agent build, base prompt, repository commit, environment, timeout, and service tier in every paired arm.",
+    "Measure natural routing as the product result; keep forced scouting as a separate conditional-efficacy ablation.",
+    "Use the actual repo_scout runtime and return only validated focused evidence, not a raw Codex scout report.",
+    "Predeclare scout eligibility before running and stratify results by eligible, called, useful, and skipped tasks.",
+    "Run at least 30 independent tasks with at least three randomized repeats per arm, then increase sample size if a preregistered power analysis requires it.",
+    "Keep prewarming outside measured conversation IDs and equalize build and provider cache conditions.",
+    "Use blinded task-specific quality graders and include failures in the economics.",
+    "Report paired medians, spread, bootstrap confidence intervals, win rate, and complete main-plus-scout provider cost."
+  ],
+  "sources": [
+    "https://arxiv.org/html/2606.14066v3#A1.SS4",
+    "https://arxiv.org/html/2606.14066v3#A2",
+    "https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/"
+  ],
+  "repricing_note": "Not repriced: this artifact records Luna cost but not Luna input, cached-read, and output token categories, so the current subscription-equivalent bill cannot be reconstructed. Historical cost fields remain as originally recorded."
+}

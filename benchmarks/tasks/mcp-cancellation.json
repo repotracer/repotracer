@@ -1,0 +1,8 @@
+{
+  "id": "mcp-cancellation",
+  "prompt": "Cancelling an in-flight MCP request can produce more than one response for the same request ID or leave work running. Make cancellation stop the matching work, return one standard cancellation error, and keep later requests working.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/mcp/src/lib.rs"
+  ]
+}

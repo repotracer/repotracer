@@ -1,9 +1,0 @@
-{
-  "id": "auth-refresh",
-  "query": "Trace how refresh tokens are created, validated, rotated, and revoked.",
-  "expected_paths": [
-    "src/auth/refresh.ts",
-    "src/auth/session.ts",
-    "tests/auth/refresh.test.ts"
-  ]
-}

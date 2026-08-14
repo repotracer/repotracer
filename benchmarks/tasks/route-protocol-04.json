@@ -1,0 +1,11 @@
+{
+  "id": "route-protocol-04",
+  "prompt": "Add a paired routing-benchmark mode that runs each task with and without repository scouting, records per-arm duration and token usage, and writes one reproducible result artifact per task plus a suite aggregate.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/bench/src/main.rs",
+    "crates/bench/Cargo.toml",
+    "crates/core/src/types.rs",
+    "crates/model/src/types.rs"
+  ]
+}

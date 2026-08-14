@@ -1,0 +1,8 @@
+{
+  "id": "route-runtime-08",
+  "prompt": "Update `ReadTool::schema` in `crates/repo-tools/src/read.rs` so `offset` and `limit` declare a JSON Schema minimum of 1; leave runtime behavior unchanged.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/repo-tools/src/read.rs"
+  ]
+}

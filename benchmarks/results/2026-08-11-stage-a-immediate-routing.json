@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-11",
+  "status": "retained after Sol-token reduction became the primary optimization objective; still not a launch headline",
+  "prompt": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "protocol": {
+    "main_model": "gpt-5.6-sol",
+    "main_reasoning_effort": "high",
+    "scout_model": "gpt-5.6-luna",
+    "scout_reasoning_effort": "low",
+    "routing": "natural",
+    "runs_per_arm": 3,
+    "arm_orders": [
+      [
+        "direct",
+        "assisted"
+      ],
+      [
+        "assisted",
+        "direct"
+      ],
+      [
+        "direct",
+        "assisted"
+      ]
+    ],
+    "billing_source": "Codex LB request logs; all correlated main and scout requests including prewarm",
+    "quality_method": "manual six-check setup behavior rubric",
+    "isolation": "fresh equivalent repository copies; read-only ephemeral Codex runs; identical natural user prompt"
+  },
+  "stage_a_change": [
+    "decide scout eligibility from the request and current context before repository operations",
+    "call repo_scout as the first repository operation for eligible unknown-location broad exploration",
+    "skip when one targeted lookup is sufficient or scouting would not replace multiple uncertain searches",
+    "prohibit preliminary pwd, file listing, CodeGraph probe, Grep, Glob, Read, or shell search before an eligible scout call"
+  ],
+  "quality_checks": [
+    "supported hosts plus generic MCP",
+    "executable/config-directory detection plus configured-state detection",
+    "normal automatic selection plus dry-run selection",
+    "host-specific MCP and managed routing configuration",
+    "dry-run write suppression",
+    "uninstall confirmation, cleanup scope, and retained provider login/binary"
+  ],
+  "observed_invariants": [
+    "repo_scout was the first repository operation in all three assisted runs",
+    "zero main-agent repository commands before repo_scout in all three assisted runs",
+    "zero main-agent repository commands after the validated handoff in all three assisted runs",
+    "all six answers passed all six checks"
+  ],
+  "pairs": [
+    {
+      "pair": "a1",
+      "quality_checks_passed": "6/6",
+      "direct": {
+        "provider_requests": 7,
+        "input_tokens": 126664,
+        "cached_input_tokens": 81664,
+        "output_tokens": 3273,
+        "reasoning_tokens": 1197,
+        "provider_latency_ms": 85767,
+        "provider_cost_usd": 0.364022,
+        "conversation_id": "019ff0e1-407e-7f13-8c84-4a24206616d7",
+        "wall_ms": 88006
+      },
+      "assisted": {
+        "provider_requests": 11,
+        "input_tokens": 154493,
+        "cached_input_tokens": 82432,
+        "output_tokens": 3297,
+        "reasoning_tokens": 595,
+        "provider_latency_ms": 82732,
+        "provider_cost_usd": 0.23809084,
+        "wall_ms": 81103,
+        "repo_scout_calls": 1,
+        "main_repository_commands_before_scout": 0,
+        "main_repository_commands_after_scout": 0,
+        "main": {
+          "provider_requests": 5,
+          "input_tokens": 52062,
+          "cached_input_tokens": 17920,
+          "output_tokens": 1583,
+          "reasoning_tokens": 315,
+          "provider_latency_ms": 39401,
+          "provider_cost_usd": 0.22716,
+          "conversation_id": "019ff0e2-9850-75e2-b45f-de0b4951fc8a"
+        },
+        "scout": {
+          "provider_requests": 6,
+          "input_tokens": 102431,
+          "cached_input_tokens": 64512,
+          "output_tokens": 1714,
+          "reasoning_tokens": 280,
+          "provider_latency_ms": 43331,
+          "provider_cost_usd": 0.01093084,
+          "conversation_id": "019ff0e2-c8b4-7e41-9462-0d7d552235ee",
+          "validated_citations": 5,
+          "handoff_chars": 9003
+        }
+      },
+      "deltas_percent": {
+        "complete_provider_cost": -34.5944,
+        "wall_time": -7.84,
+        "main_input_tokens": -58.9,
+        "all_model_input_tokens": 21.97
+      }
+    },
+    {
+      "pair": "a2",
+      "quality_checks_passed": "6/6",
+      "direct": {
+        "provider_requests": 6,
+        "input_tokens": 98280,
+        "cached_input_tokens": 47360,
+        "output_tokens": 2543,
+        "reasoning_tokens": 566,
+        "provider_latency_ms": 70071,
+        "provider_cost_usd": 0.35457,
+        "conversation_id": "019ff0e5-027f-7cb0-a9f3-74128a74457e",
+        "wall_ms": 72324
+      },
+      "assisted": {
+        "provider_requests": 12,
+        "input_tokens": 128692,
+        "cached_input_tokens": 59904,
+        "output_tokens": 3062,
+        "reasoning_tokens": 956,
+        "provider_latency_ms": 80065,
+        "provider_cost_usd": 0.28031648,
+        "wall_ms": 77131,
+        "repo_scout_calls": 1,
+        "main_repository_commands_before_scout": 0,
+        "main_repository_commands_after_scout": 0,
+        "main": {
+          "provider_requests": 6,
+          "input_tokens": 61736,
+          "cached_input_tokens": 17920,
+          "output_tokens": 1485,
+          "reasoning_tokens": 544,
+          "provider_latency_ms": 37046,
+          "provider_cost_usd": 0.27259,
+          "conversation_id": "019ff0e3-d537-7e13-9d97-22da0470f0e3"
+        },
+        "scout": {
+          "provider_requests": 6,
+          "input_tokens": 66956,
+          "cached_input_tokens": 41984,
+          "output_tokens": 1577,
+          "reasoning_tokens": 412,
+          "provider_latency_ms": 43019,
+          "provider_cost_usd": 0.00772648,
+          "conversation_id": "019ff0e3-ffb3-7c01-b3a6-c5ab68cf0d07",
+          "validated_citations": 5,
+          "handoff_chars": 7118
+        }
+      },
+      "deltas_percent": {
+        "complete_provider_cost": -20.9419,
+        "wall_time": 6.65,
+        "main_input_tokens": -37.18,
+        "all_model_input_tokens": 30.94
+      }
+    },
+    {
+      "pair": "a3",
+      "quality_checks_passed": "6/6",
+      "direct": {
+        "provider_requests": 6,
+        "input_tokens": 124108,
+        "cached_input_tokens": 65792,
+        "output_tokens": 2244,
+        "reasoning_tokens": 560,
+        "provider_latency_ms": 53609,
+        "provider_cost_usd": 0.391796,
+        "conversation_id": "019ff0e6-1cec-7cf3-9b44-04fc997dcbfc",
+        "wall_ms": 55795
+      },
+      "assisted": {
+        "provider_requests": 12,
+        "input_tokens": 138895,
+        "cached_input_tokens": 66048,
+        "output_tokens": 2861,
+        "reasoning_tokens": 378,
+        "provider_latency_ms": 78993,
+        "provider_cost_usd": 0.27962756,
+        "wall_ms": 77051,
+        "repo_scout_calls": 1,
+        "main_repository_commands_before_scout": 0,
+        "main_repository_commands_after_scout": 0,
+        "main": {
+          "provider_requests": 6,
+          "input_tokens": 61814,
+          "cached_input_tokens": 17920,
+          "output_tokens": 1424,
+          "reasoning_tokens": 237,
+          "provider_latency_ms": 42966,
+          "provider_cost_usd": 0.27115,
+          "conversation_id": "019ff0e6-f6e9-7571-80da-52a834544af1"
+        },
+        "scout": {
+          "provider_requests": 6,
+          "input_tokens": 77081,
+          "cached_input_tokens": 48128,
+          "output_tokens": 1437,
+          "reasoning_tokens": 141,
+          "provider_latency_ms": 36027,
+          "provider_cost_usd": 0.00847756,
+          "conversation_id": "019ff0e7-2f95-7a90-ac97-987d522bf9ef",
+          "validated_citations": 5,
+          "handoff_chars": 7758
+        }
+      },
+      "deltas_percent": {
+        "complete_provider_cost": -28.6293,
+        "wall_time": 38.1,
+        "main_input_tokens": -50.19,
+        "all_model_input_tokens": 11.91
+      }
+    }
+  ],
+  "summary": {
+    "quality_passing_pairs": "3/3",
+    "cost_win_rate": "3/3",
+    "median_paired_complete_cost_delta_percent": -28.63,
+    "median_paired_wall_time_delta_percent": 6.65,
+    "median_paired_main_input_delta_percent": -50.19,
+    "median_paired_all_model_input_delta_percent": 21.97,
+    "median_direct_cost_usd": 0.364022,
+    "median_assisted_cost_usd": 0.27962756,
+    "median_main_cost_usd": 0.27115,
+    "median_scout_cost_usd": 0.00847756,
+    "median_handoff_chars": 7758
+  },
+  "comparison_to_previous_three_pair_build": {
+    "previous_median_paired_complete_cost_delta_percent": -39.2,
+    "stage_a_median_paired_complete_cost_delta_percent": -28.63,
+    "previous_median_paired_wall_time_delta_percent": 31.21,
+    "stage_a_median_paired_wall_time_delta_percent": 6.65,
+    "previous_median_paired_main_input_delta_percent": -26.82,
+    "stage_a_median_paired_main_input_delta_percent": -50.19,
+    "previous_median_paired_all_model_input_delta_percent": 43.44,
+    "stage_a_median_paired_all_model_input_delta_percent": 21.97,
+    "interpretation": "Stage A preserved quality and the routing invariant, but its median assisted cost and paired saving remained worse than the prior cohort under corrected Luna pricing."
+  },
+  "conclusion": "Stage A forced immediate natural routing successfully and preserved 6/6 quality. Corrected Luna pricing gives a -28.63% median paired complete-cost delta and 3/3 cost wins; median wall time still rose 6.65%.",
+  "decision": "Ship Stage A because it is the only measured change that improved the median Sol-input delta from -26.82% to -50.19% while preserving 3/3 quality and complete-cost wins. It did not prove a lower absolute assisted cost than the previous stochastic cohort.",
+  "warning": "Three repeats of one read-only question are optimization evidence only. Revalidate routing, Sol input, and quality across the preregistered 34-task suite.",
+  "repricing_note": "Repriced 2026-08-11 using Luna subscription-equivalent rates: $0.20/M uncached input, $0.02/M cached reads, and $1.20/M output including reasoning. Cache writes are not billed and are excluded by definition."
+}

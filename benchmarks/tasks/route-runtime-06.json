@@ -1,0 +1,11 @@
+{
+  "id": "route-runtime-06",
+  "prompt": "Turn and tool budgets are inconsistent around the forced final answer and citation-correction retry: some runs exceed the configured limit, while exhausted or timed-out runs lose progress statistics. Make every exit path enforce the configured budgets exactly and preserve accurate model-step, tool-call, and duration counts.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/core/src/engine.rs",
+    "crates/core/src/config.rs",
+    "crates/core/src/types.rs",
+    "crates/repo-tools/src/exec.rs"
+  ]
+}

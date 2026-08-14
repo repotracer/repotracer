@@ -1,0 +1,14 @@
+033bc7c7f130ff36ddd798d124d659db46730dd5b052641d3a96d65fd6057cc3  2026-08-09-gpt-5.6-luna-forced.json
+446a255c4cac58d7be53a048aac3b3e6ee999fe607a33b8e9ab9a8c05a5d7c88  2026-08-09-gpt-5.6-luna-low-natural.json
+e0484eaaf96cb4e9d78d0b059d5c7057c98ab0678ae94eae8881aec8f3682a67  2026-08-09-gpt-5.6-sol-swebench-astropy-13453.json
+1aa882ea1790180358b4dd62e51665bff5b1a9fbf23195958bb4b78b754b8c8e  2026-08-10-gpt-5.6-sol-luna-natural.json
+5fdca75528bc2cffe66bb06866cc715ae66415a916b033e75050cb4031986ba9  2026-08-10-gpt-5.6-sol-luna-repeated-optimized.json
+806b19ce40bcb8ecddc97308d1e99bf8c90c601e673825380dbce781db15f0f1  2026-08-10-gpt-5.6-sol-luna-savecostmax.json
+5420ee5ca2f674a78d5fb378b2e44d24b4bc7c7280937147e6e25ad6ae8c23c8  2026-08-10-gpt-5.6-sol-scout-report-diagnostic.json
+3b3ab37a500f27649d165753796861bfb3fbbedbe81b77c1661dfbfb1ca8b608  2026-08-11-extended-timeout-diagnostics.json
+5c2f75907f5acf795da7112ab22484b7294cf3284fb05007e0be325e40570a8d  2026-08-11-native-map-ablation.json
+5b9d9e009c6030a4a700dd39777ab5042e77b317ff3eeb8f142c71339e47eae4  2026-08-11-reasoning-stage-b-local.json
+14c66c6b18fdbc26bea59fb6d87c27abef5d7b54b38d977c026124404486ef43  2026-08-11-routing-suite-summary.json
+d07ae6667e040eb1aef2fa7780ba0ac328f8c41724aaaa2539bc685b71347310  2026-08-11-sol-request-token-analysis.json
+e58d538100823f614880d2817ebc22cb948044db5cf734660bc20386db71f324  2026-08-11-stage-a-immediate-routing.json
+e13116b539cf31de9fa53e228cd39b1b535d5e3205329064768c6663978959fb  2026-08-11-tool-output-footprint-ablation.json

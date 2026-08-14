@@ -35,7 +35,11 @@ pub struct ScoutStats {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_tokens: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_prompt_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completion_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_output_tokens: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +76,7 @@ impl ScoutResult {
             }
         }
         out.push_str(&format!(
-            "\n(scout: {} · {} turns · {} tools · {} ms)",
+            "\n(scout: {} · {} model steps · {} tools · {} ms)",
             self.stats.model, self.stats.turns, self.stats.tool_calls, self.stats.duration_ms
         ));
         out
@@ -98,7 +102,7 @@ impl ScoutResult {
             out.push_str(&format!("Summary: {}\n\n", self.summary.trim()));
         }
         out.push_str(&format!(
-            "Scout: {}\nTurns: {}\nTool calls: {}\n",
+            "Scout: {}\nModel steps: {}\nTool calls: {}\n",
             self.stats.model, self.stats.turns, self.stats.tool_calls
         ));
         out

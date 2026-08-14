@@ -1,0 +1,8 @@
+{
+  "id": "route-cli-08",
+  "prompt": "In `crates/cli/src/agents.rs`, explain whether `replace_managed_block` preserves user text before and after an existing Grephound-managed block, and what it does when the closing marker is missing.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/cli/src/agents.rs"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "route-runtime-09",
+  "prompt": "In `crates/core/src/prompt.rs`, update `list_top` so it sorts entries before applying its limit; keep hidden-entry filtering unchanged.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/core/src/prompt.rs"
+  ]
+}

@@ -1,5 +1,5 @@
 //! Read / Glob / Grep tools for grephound.
-//! FastContext-compatible contracts with concurrent execution and fixed count mode.
+//! Model-facing contracts with concurrent execution and fixed count mode.
 
 mod exec;
 mod glob_tool;

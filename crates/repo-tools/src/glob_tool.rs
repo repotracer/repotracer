@@ -1,10 +1,11 @@
 use crate::pathutil::resolve_in_root;
+use crate::read::{finish_output, MAX_OUTPUT_BYTES};
 use crate::types::{ToolError, ToolSchema};
 use ignore::WalkBuilder;
 use serde::Deserialize;
 use serde_json::json;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 const DEFAULT_LIMIT: usize = 100;
 const DESCRIPTION: &str = include_str!("../prompts/glob.md");
@@ -47,7 +48,7 @@ impl GlobTool {
                 "properties": {
                     "directory": {
                         "type": "string",
-                        "description": "The absolute path of the directory to search in. If not provided, the current working directory will be used."
+                        "description": "Repository-relative directory to search. Use `.` or omit it for the repository root; never use an absolute path."
                     },
                     "pattern": {
                         "type": "string",
@@ -174,7 +175,7 @@ fn run_glob(root: &Path, directory: &Path, pattern: &str) -> Result<String, Tool
 
     let total = matched.len();
     let limit = DEFAULT_LIMIT;
-    let mut lines: Vec<String> = matched
+    let lines: Vec<String> = matched
         .into_iter()
         .take(limit)
         .map(|(p, _)| {
@@ -184,15 +185,29 @@ fn run_glob(root: &Path, directory: &Path, pattern: &str) -> Result<String, Tool
                 .replace('\\', "/")
         })
         .collect();
+    let evidence = lines.join("\n");
+    let line_truncated = total > limit;
+    let line_notice = line_truncated.then(|| {
+        format!(
+            "[Output truncated: showing first {limit} of {total} results. Use a more specific directory or pattern to continue.]"
+        )
+    });
+    let separator = usize::from(!evidence.is_empty() && !evidence.ends_with('\n'));
+    let byte_truncated =
+        evidence.len() + separator + line_notice.as_ref().map_or(0, String::len) > MAX_OUTPUT_BYTES;
+    let notice = match (line_truncated, byte_truncated) {
+        (true, true) => Some(format!(
+            "[Output truncated: {total} results exceeded the {limit}-result / 32 KiB cap. Use a more specific directory or pattern to continue.]"
+        )),
+        (true, false) => line_notice,
+        (false, true) => Some(
+            "[Output truncated at 32 KiB. Use a more specific directory or pattern to continue.]"
+                .into(),
+        ),
+        (false, false) => None,
+    };
 
-    if total > limit {
-        lines.push(format!(
-            "Results are truncated: showing first {limit} of {total} results. Consider using a more specific path or pattern."
-        ));
-    }
-
-    let _ = Duration::from_secs(0); // keep import used if optimized later
-    Ok(lines.join("\n"))
+    Ok(finish_output(&evidence, notice.as_deref()))
 }
 
 #[cfg(test)]
@@ -210,5 +225,21 @@ mod tests {
         let tool = GlobTool::new(dir.path());
         let out = tool.call(r#"{"pattern":"**/*auth*"}"#).await.unwrap();
         assert!(out.contains("auth.rs"));
+    }
+
+    #[tokio::test]
+    async fn bounds_paths_and_reports_how_to_continue() {
+        let dir = tempdir().unwrap();
+        let deep = dir.path().join("a".repeat(180)).join("b".repeat(180));
+        fs::create_dir_all(&deep).unwrap();
+        for index in 0..101 {
+            fs::write(deep.join(format!("file-{index:03}.txt")), "").unwrap();
+        }
+        let tool = GlobTool::new(dir.path());
+        let out = tool.call(r#"{"pattern":"**/*.txt"}"#).await.unwrap();
+
+        assert!(out.len() <= MAX_OUTPUT_BYTES, "{} bytes", out.len());
+        assert!(out.contains("Output truncated"), "{out}");
+        assert!(out.contains("specific directory or pattern"), "{out}");
     }
 }

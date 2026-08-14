@@ -3,7 +3,9 @@ use crate::config::ExplorerBudget;
 use crate::prompt::{build_system_prompt, user_query_prompt};
 use crate::types::{ScoutRequest, ScoutResult, ScoutStats};
 use grephound_model::{ChatMessage, ModelBackend, ModelRequest, ToolSpec};
-use grephound_repo_tools::{RepoTools, ToolCall};
+use grephound_repo_tools::{resolve_in_root, RepoTools, ToolCall};
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, warn};
@@ -53,7 +55,9 @@ impl ScoutEngine {
                     duration_ms: started.elapsed().as_millis() as u64,
                     model: self.model.name().to_string(),
                     prompt_tokens: None,
+                    cached_prompt_tokens: None,
                     completion_tokens: None,
+                    reasoning_output_tokens: None,
                 },
                 raw_final: None,
             }),
@@ -88,6 +92,7 @@ impl ScoutEngine {
         let mut prompt_tokens: u32 = 0;
         let mut completion_tokens: u32 = 0;
         let mut correction_used = false;
+        let mut seen_tool_calls = HashSet::new();
 
         loop {
             turns += 1;
@@ -102,9 +107,10 @@ impl ScoutEngine {
                 ));
             }
 
-            if turns == max_turns + 1 {
+            let final_turn = turns == max_turns + 1;
+            if final_turn {
                 messages.push(ChatMessage::user(
-                    "Max number of turns reached. Please provide the final answer based on the information you have gathered.",
+                    "Max number of turns reached. Return the final answer now from gathered evidence, with no more tool calls.",
                 ));
             }
 
@@ -112,8 +118,12 @@ impl ScoutEngine {
                 .model
                 .complete(ModelRequest {
                     messages: messages.clone(),
-                    tools: tool_specs.clone(),
-                    temperature: 0.0,
+                    tools: if final_turn {
+                        Vec::new()
+                    } else {
+                        tool_specs.clone()
+                    },
+                    temperature: self.model.temperature(),
                     max_tokens: None,
                 })
                 .await?;
@@ -142,16 +152,39 @@ impl ScoutEngine {
                         .map(|c| ToolCall {
                             id: c.id.clone(),
                             name: c.name.clone(),
-                            arguments: c.arguments.clone(),
+                            arguments: sandbox_search_arguments(
+                                &c.name,
+                                &c.arguments,
+                                self.tools.root(),
+                            ),
                         })
                         .collect();
+                    let mut fresh_calls = Vec::new();
+                    let mut duplicate_ids = HashSet::new();
+                    for call in &tool_calls {
+                        debug!(name = %call.name, arguments = %call.arguments, "model tool call");
+                        if seen_tool_calls.insert((call.name.clone(), call.arguments.clone())) {
+                            fresh_calls.push(call.clone());
+                        } else {
+                            duplicate_ids.insert(call.id.clone());
+                        }
+                    }
 
-                    debug!(count = tool_calls.len(), "executing tools concurrently");
-                    let results = self.tools.call_many(&tool_calls).await;
+                    debug!(count = fresh_calls.len(), "executing tools concurrently");
+                    let results = self.tools.call_many(&fresh_calls).await;
                     tool_calls_total += results.len() as u32;
+                    let mut results: HashMap<_, _> = results
+                        .into_iter()
+                        .map(|result| (result.tool_call_id, result.output))
+                        .collect();
 
-                    for r in results {
-                        messages.push(ChatMessage::tool(r.tool_call_id, r.output));
+                    for call in tool_calls {
+                        let output = if duplicate_ids.contains(&call.id) {
+                            "<system-reminder>This exact tool call already ran. Use the prior result, narrow the search, or provide the final answer.</system-reminder>".into()
+                        } else {
+                            results.remove(&call.id).unwrap_or_default()
+                        };
+                        messages.push(ChatMessage::tool(call.id, output));
                     }
                     continue;
                 }
@@ -162,21 +195,16 @@ impl ScoutEngine {
             let (summary, raw_citations) = parse_citations(&content);
             let validated = validate_citations(&root, &raw_citations);
 
-            // One correction turn if all citations invalid but model claimed some.
-            if validated.is_empty() && !raw_citations.is_empty() && !correction_used {
+            // One correction turn if claimed citations are invalid or malformed.
+            if validated.is_empty()
+                && !correction_used
+                && (!raw_citations.is_empty() || content.contains("<final_answer>"))
+            {
                 correction_used = true;
                 messages.push(ChatMessage::user(
-                    "Some citations were invalid (missing file or bad line range). Please correct paths/lines using tools if needed, then provide an updated <final_answer>.",
+                    "The final_answer citations were missing or invalid. Return only one citation per line in the exact form `repository/path:START-END (reason)` inside <final_answer>. Correct paths or lines with tools if needed.",
                 ));
                 continue;
-            }
-
-            // If no final_answer tag and no citations, still return summary.
-            if validated.is_empty()
-                && raw_citations.is_empty()
-                && content.contains("<final_answer>")
-            {
-                // empty final answer
             }
 
             return Ok(ScoutResult {
@@ -192,11 +220,13 @@ impl ScoutEngine {
                     } else {
                         None
                     },
+                    cached_prompt_tokens: None,
                     completion_tokens: if completion_tokens > 0 {
                         Some(completion_tokens)
                     } else {
                         None
                     },
+                    reasoning_output_tokens: None,
                 },
                 raw_final: Some(content),
             });
@@ -209,6 +239,53 @@ impl crate::types::ScoutBackend for ScoutEngine {
     async fn scout(&self, request: ScoutRequest) -> anyhow::Result<ScoutResult> {
         ScoutEngine::scout(self, request).await
     }
+}
+
+fn sandbox_search_arguments(name: &str, arguments: &str, root: &Path) -> String {
+    let field = match name {
+        "Read" | "Grep" => "path",
+        "Glob" => "directory",
+        _ => return arguments.to_string(),
+    };
+    let Ok(mut value) = serde_json::from_str::<serde_json::Value>(arguments) else {
+        return arguments.to_string();
+    };
+    let Some(path) = value.get(field).and_then(|path| path.as_str()) else {
+        return arguments.to_string();
+    };
+
+    let trimmed = path.trim_start_matches(['/', '\\']);
+    let root_name = root.file_name().and_then(|name| name.to_str());
+    let named_relative = root_name
+        .and_then(|root_name| trimmed.strip_prefix(root_name))
+        .and_then(|path| path.strip_prefix(['/', '\\']));
+    let parts: Vec<_> = trimmed.split(['/', '\\']).collect();
+    let existing_relative = (1..parts.len())
+        .map(|index| parts[index..].join("/"))
+        .find(|path| root.join(path).exists());
+    let relative = named_relative
+        .map(str::to_owned)
+        .or(existing_relative)
+        .filter(|path| resolve_in_root(root, path).is_ok());
+
+    if let Some(relative) = relative {
+        value[field] = relative.into();
+        debug!(field, "normalized model path inside repository root");
+    } else if Path::new(path).is_absolute() && resolve_in_root(root, path).is_err() {
+        if name == "Read" {
+            value[field] = trimmed.into();
+            debug!(
+                field,
+                "normalized escaped model read inside repository root"
+            );
+        } else {
+            value.as_object_mut().unwrap().remove(field);
+            debug!(field, "broadened escaped model search to repository root");
+        }
+    } else {
+        return arguments.to_string();
+    }
+    value.to_string()
 }
 
 fn empty_result(
@@ -232,11 +309,13 @@ fn empty_result(
             } else {
                 None
             },
+            cached_prompt_tokens: None,
             completion_tokens: if completion_tokens > 0 {
                 Some(completion_tokens)
             } else {
                 None
             },
+            reasoning_output_tokens: None,
         },
         raw_final: None,
     }
@@ -298,5 +377,130 @@ mod tests {
         assert_eq!(result.citations[0].path, "src/auth/session.rs");
         assert!(result.stats.tool_calls >= 2);
         assert!(result.stats.turns >= 2);
+    }
+
+    #[tokio::test]
+    async fn turn_limit_forces_an_answer_without_tools() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("lib.rs"), "fn answer() {}\n").unwrap();
+        let model = Arc::new(MockModel::new(MockScript {
+            steps: vec![
+                MockStep::Tools(vec![("Read".into(), r#"{"path":"lib.rs"}"#.into())]),
+                MockStep::FinalWithoutTools(
+                    "<final_answer>\nlib.rs:1-1 (answer)\n</final_answer>".into(),
+                ),
+            ],
+        }));
+        let engine = ScoutEngine::new(model, RepoTools::new(dir.path()), ExplorerBudget::default());
+
+        let result = engine
+            .scout(ScoutRequest {
+                query: "find answer".into(),
+                root: dir.path().to_path_buf(),
+                focus: None,
+                max_turns: Some(1),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.citations.len(), 1);
+        assert_eq!(result.stats.turns, 2);
+    }
+
+    #[tokio::test]
+    async fn duplicate_tool_calls_are_not_executed_twice() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("a.rs"), "fn setup() {}\n").unwrap();
+        let repeated = ("Grep".into(), r#"{"pattern":"setup"}"#.into());
+        let model = Arc::new(MockModel::new(MockScript {
+            steps: vec![
+                MockStep::Tools(vec![repeated.clone()]),
+                MockStep::Tools(vec![repeated]),
+                MockStep::Final("<final_answer>\na.rs:1-1\n</final_answer>".into()),
+            ],
+        }));
+        let engine = ScoutEngine::new(model, RepoTools::new(dir.path()), ExplorerBudget::default());
+
+        let result = engine
+            .scout(ScoutRequest {
+                query: "find setup".into(),
+                root: dir.path().into(),
+                focus: None,
+                max_turns: Some(4),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.stats.tool_calls, 1);
+        assert_eq!(result.citations.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn malformed_final_answer_gets_one_correction_turn() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("a.rs"), "fn setup() {}\n").unwrap();
+        let model = Arc::new(MockModel::new(MockScript {
+            steps: vec![
+                MockStep::Final("<final_answer>setup is in a.rs</final_answer>".into()),
+                MockStep::Final("<final_answer>\na.rs:1-1 (setup)\n</final_answer>".into()),
+            ],
+        }));
+        let engine = ScoutEngine::new(model, RepoTools::new(dir.path()), ExplorerBudget::default());
+
+        let result = engine
+            .scout(ScoutRequest {
+                query: "find setup".into(),
+                root: dir.path().into(),
+                focus: None,
+                max_turns: Some(4),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.stats.turns, 2);
+        assert_eq!(result.citations.len(), 1);
+    }
+
+    #[test]
+    fn escaped_model_searches_fall_back_to_repository_root() {
+        let dir = tempdir().unwrap();
+        let arguments = sandbox_search_arguments(
+            "Grep",
+            r#"{"pattern":"token","path":"/guessed/auth"}"#,
+            dir.path(),
+        );
+        let value: serde_json::Value = serde_json::from_str(&arguments).unwrap();
+        assert_eq!(value["pattern"], "token");
+        assert!(value.get("path").is_none());
+    }
+
+    #[test]
+    fn escaped_model_reads_are_normalized_inside_repository_root() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("Gigo");
+        let arguments = sandbox_search_arguments(
+            "Read",
+            r#"{"path":"/Gigo/internal/server/server.go"}"#,
+            &root,
+        );
+        let value: serde_json::Value = serde_json::from_str(&arguments).unwrap();
+        assert_eq!(value["path"], "internal/server/server.go");
+    }
+
+    #[test]
+    fn model_paths_prefixed_with_repository_name_are_normalized() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("checkout");
+        fs::create_dir_all(root.join("crates/core")).unwrap();
+
+        for (tool, field) in [("Read", "path"), ("Grep", "path"), ("Glob", "directory")] {
+            let arguments = format!(r#"{{"{field}":"grephound/crates/core","pattern":"engine"}}"#);
+            let normalized = sandbox_search_arguments(tool, &arguments, &root);
+            let value: serde_json::Value = serde_json::from_str(&normalized).unwrap();
+            assert_eq!(value[field], "crates/core");
+        }
     }
 }

@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-10",
+  "status": "single-pair natural-routing optimization diagnostic; not a headline result",
+  "prompt": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "protocol": {
+    "main_model": "gpt-5.6-sol",
+    "main_reasoning_effort": "high",
+    "scout_model": "gpt-5.6-luna",
+    "scout_reasoning_effort": "low",
+    "provider": "Codex CLI with Codex LB provider routing",
+    "runs_per_arm": 1,
+    "routing": "natural",
+    "arm_order": [
+      "assisted",
+      "direct"
+    ],
+    "billing_source": "Codex LB request logs; all requests including prewarm",
+    "quality_method": "manual acceptance check against six setup behaviors",
+    "process_deadline_seconds": 300,
+    "isolation": "fresh equivalent repository copies; read-only ephemeral Codex runs; user config ignored"
+  },
+  "quality_checks": [
+    "names supported hosts and generic MCP",
+    "explains executable/config-directory detection and configured-state detection",
+    "explains normal automatic selection and dry-run selection",
+    "explains host-specific MCP plus managed routing configuration",
+    "explains dry-run write suppression",
+    "explains uninstall confirmation, cleanup scope, and retained provider login/binary"
+  ],
+  "arms": {
+    "direct": {
+      "conversation_id": "019fed31-e659-7f93-b794-64ab111235cc",
+      "provider_requests": 6,
+      "input_tokens": 117904,
+      "cached_input_tokens": 65536,
+      "output_tokens": 2312,
+      "reasoning_tokens": 737,
+      "provider_latency_ms": 61245,
+      "wall_ms": 63882,
+      "provider_cost_usd": 0.363968,
+      "main_repository_commands": 3,
+      "quality_checks_passed": "6/6"
+    },
+    "assisted": {
+      "main_conversation_id": "019fed30-a0dc-7f22-a883-66839104f829",
+      "scout_conversation_id": "019fed30-e07c-7613-9f11-f6d3d0cef0b7",
+      "repo_scout_calls": 1,
+      "provider_requests": 11,
+      "input_tokens": 149672,
+      "cached_input_tokens": 83200,
+      "output_tokens": 3030,
+      "reasoning_tokens": 637,
+      "provider_latency_ms": 70278,
+      "wall_ms": 73541,
+      "provider_cost_usd": 0.24276112,
+      "quality_checks_passed": "6/6",
+      "main": {
+        "provider_requests": 5,
+        "input_tokens": 56713,
+        "cached_input_tokens": 22784,
+        "output_tokens": 1749,
+        "reasoning_tokens": 498,
+        "provider_latency_ms": 39932,
+        "provider_cost_usd": 0.233507,
+        "repository_commands_before_scout": 1,
+        "repository_commands_after_scout": 0
+      },
+      "scout": {
+        "provider_requests": 6,
+        "input_tokens": 92959,
+        "cached_input_tokens": 60416,
+        "output_tokens": 1281,
+        "reasoning_tokens": 139,
+        "provider_latency_ms": 30346,
+        "provider_cost_usd": 0.00925412,
+        "grephound_duration_ms": 33409,
+        "model_steps": 4,
+        "repository_tool_calls": 3,
+        "validated_citations": 6,
+        "mcp_text_handoff_chars": 11347
+      }
+    }
+  },
+  "deltas": {
+    "complete_provider_cost_percent": -33.3015,
+    "wall_time_percent": 15.12,
+    "main_input_tokens_percent": -51.9,
+    "all_model_input_tokens_percent": 26.94,
+    "provider_latency_percent": 14.75
+  },
+  "conclusion": "The naturally routed Luna-low scout reduced complete provider cost by 33.30% while both answers passed all six checks. Main-agent input fell 51.90%, but complete all-model input rose 26.94%; savings came from moving exploration to Luna. The assisted arm was 15.12% slower in wall time and 14.75% higher in summed provider latency.",
+  "warning": "One stochastic pair is diagnostic evidence, not a launch headline. Repeated randomized quality-passing pairs are still required.",
+  "repricing_note": "Repriced 2026-08-11 using Luna subscription-equivalent rates: $0.20/M uncached input, $0.02/M cached reads, and $1.20/M output including reasoning. Cache writes are not billed and are excluded by definition."
+}

@@ -1,0 +1,9 @@
+{
+  "id": "json-version",
+  "prompt": "`grephound --json version` should return the same version as the normal version command, but as one JSON object with a `version` field. Keep the human-readable output unchanged.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/cli/src/main.rs",
+    "crates/cli/tests/setup.rs"
+  ]
+}

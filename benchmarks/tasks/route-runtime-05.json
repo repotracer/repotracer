@@ -1,0 +1,10 @@
+{
+  "id": "route-runtime-05",
+  "prompt": "Scout handoffs often contain duplicate and overlapping evidence ranges, which wastes the citation budget and makes human and compact output disagree. Canonicalize validated evidence into a deterministic minimal set without losing useful reasons, and make both renderers use it.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/core/src/citations.rs",
+    "crates/core/src/types.rs",
+    "crates/core/src/engine.rs"
+  ]
+}

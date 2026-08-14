@@ -8,6 +8,44 @@ use tokio::fs;
 const MAX_LINES: usize = 2000;
 const MAX_LINE_LENGTH: usize = 2000;
 const MAX_FILE_BYTES: u64 = 10 * 1024 * 1024; // 10 MiB
+pub(crate) const MAX_OUTPUT_BYTES: usize = 32 * 1024;
+const READ_NOTICE_RESERVE: usize = 128;
+
+pub(crate) fn evidence_prefix(text: &str, max_bytes: usize) -> &str {
+    if text.len() <= max_bytes {
+        return text;
+    }
+
+    let mut end = max_bytes;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    if let Some(newline) = text[..end].rfind('\n') {
+        if end - (newline + 1) <= 4096 {
+            end = newline + 1;
+        }
+    }
+    &text[..end]
+}
+
+pub(crate) fn finish_output(evidence: &str, notice: Option<&str>) -> String {
+    if notice.is_none() && evidence.len() <= MAX_OUTPUT_BYTES {
+        return evidence.to_owned();
+    }
+
+    let notice = notice.unwrap_or("[Output truncated at 32 KiB. Narrow the request to continue.]");
+    let separator = usize::from(!evidence.is_empty() && !evidence.ends_with('\n'));
+    let budget = MAX_OUTPUT_BYTES.saturating_sub(notice.len() + separator);
+    let prefix = evidence_prefix(evidence, budget);
+    let separator = if prefix.is_empty() || prefix.ends_with('\n') {
+        ""
+    } else {
+        "\n"
+    };
+    let output = format!("{prefix}{separator}{notice}");
+    debug_assert!(output.len() <= MAX_OUTPUT_BYTES);
+    output
+}
 
 const DESCRIPTION: &str = include_str!("../prompts/read.md");
 
@@ -38,7 +76,7 @@ impl ReadTool {
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "The absolute path of the file to read."
+                        "description": "Repository-relative path of the file to read. Never use an absolute path."
                     },
                     "offset": {
                         "type": "integer",
@@ -131,7 +169,7 @@ impl ReadTool {
         }
 
         let mut end_line = match args.limit {
-            Some(limit) => offset + limit as usize - 1,
+            Some(limit) => offset.saturating_add(limit as usize).saturating_sub(1),
             None => raw_lines.len(),
         };
         if end_line > raw_lines.len() {
@@ -145,10 +183,9 @@ impl ReadTool {
         }
 
         let total_read = end_line.saturating_sub(offset - 1);
-        let mut truncated = false;
-        if total_read > MAX_LINES {
+        let line_truncated = total_read > MAX_LINES;
+        if line_truncated {
             end_line = offset + MAX_LINES - 1;
-            truncated = true;
         }
 
         let mut lines = Vec::new();
@@ -156,20 +193,48 @@ impl ReadTool {
             let mut line = (*raw).to_string();
             let core = line.trim_end_matches(['\n', '\r']);
             if core.len() > MAX_LINE_LENGTH {
-                line = format!("{}...\n", &core[..MAX_LINE_LENGTH]);
+                line = format!("{}...\n", evidence_prefix(core, MAX_LINE_LENGTH));
             }
             if !line.ends_with('\n') {
                 line.push('\n');
             }
             lines.push(format!("{}|{}", i + 1, line));
         }
-        if truncated {
-            lines.push("...\n".into());
-        }
 
         let shown = display_path(&self.root, &path);
         let body = lines.concat();
-        Ok(format!("```{shown}:{offset}-{end_line}\n{body}```"))
+        let line_notice = line_truncated.then(|| {
+            format!(
+                "[Output truncated after {MAX_LINES} lines. Continue with offset {}.]\n",
+                end_line + 1
+            )
+        });
+        let header = format!("```{shown}:{offset}-{end_line}\n");
+        let notice_separator = usize::from(line_notice.is_some());
+        let complete_len = header.len()
+            + body.len()
+            + 3
+            + notice_separator
+            + line_notice.as_ref().map_or(0, String::len);
+        if complete_len <= MAX_OUTPUT_BYTES {
+            return Ok(format!(
+                "{header}{body}```{separator}{notice}",
+                separator = if line_notice.is_some() { "\n" } else { "" },
+                notice = line_notice.as_deref().unwrap_or("")
+            ));
+        }
+
+        let body_budget = MAX_OUTPUT_BYTES.saturating_sub(header.len() + READ_NOTICE_RESERVE + 3);
+        let prefix = evidence_prefix(&body, body_budget);
+        let kept_lines = prefix.bytes().filter(|byte| *byte == b'\n').count();
+        let shown_end = offset + kept_lines.saturating_sub(1);
+        let notice = format!(
+            "[Output truncated at 32 KiB. Continue with offset {}.]",
+            shown_end + 1
+        );
+        let output = format!("```{shown}:{offset}-{shown_end}\n{prefix}```\n{notice}");
+        debug_assert!(output.len() <= MAX_OUTPUT_BYTES);
+        Ok(output)
     }
 }
 
@@ -196,6 +261,26 @@ mod tests {
             .unwrap();
         assert!(out.contains("1|fn main()"));
         assert!(out.contains("2|let x = 1;"));
+    }
+
+    #[tokio::test]
+    async fn bounds_output_and_gives_next_offset() {
+        let dir = tempdir().unwrap();
+        let content = (0..400)
+            .map(|_| format!("{}\n", "x".repeat(100)))
+            .collect::<String>();
+        fs::write(dir.path().join("large.rs"), content).unwrap();
+        let tool = ReadTool::new(dir.path());
+        let out = tool.call(r#"{"path":"large.rs"}"#).await.unwrap();
+        assert!(out.contains("```\n[Output truncated"), "{out}");
+
+        assert!(out.len() <= MAX_OUTPUT_BYTES, "{} bytes", out.len());
+        assert!(out.contains("Continue with offset"), "{out}");
+
+        let small = tool.call(r#"{"path":"large.rs","limit":2}"#).await.unwrap();
+        assert!(small.contains("2|"), "{small}");
+        assert!(!small.contains("3|"), "{small}");
+        assert!(!small.contains("Output truncated"), "{small}");
     }
 
     #[tokio::test]

@@ -1,0 +1,170 @@
+{
+  "schema_version": 2,
+  "date": "2026-08-09",
+  "status": "single-instance diagnostic; not headline evidence",
+  "replaces": "benchmarks/results/2026-08-09-gpt-5.6-sol-three-mode.json",
+  "question": "On one real SWE-bench Verified task, compare GPT-5.6 Sol alone with the same solver assisted by FastContext exploration backed by GPT-5.6 Luna-low or the local FastContext 4B Q4 model.",
+  "protocol": {
+    "dataset": {
+      "name": "princeton-nlp/SWE-bench_Verified",
+      "revision": "c104f840cc67f8b6eec6f759ebc8b2693d585d4a",
+      "instance_id": "astropy__astropy-13453",
+      "repository": "astropy/astropy",
+      "base_commit": "19cc80471739bcb67b7e8099246b391c355023ee"
+    },
+    "task": "Fix Astropy's ASCII HTML writer so write(formats=...) formats HTML table output.",
+    "main_agent": {
+      "model": "openrouter/openai/gpt-5.6-sol",
+      "temperature": 0.0,
+      "runner": "mini-swe-agent through FastContext's preserved SWE-bench runner",
+      "step_limit": 150,
+      "cost_limit_usd": 5.0,
+      "environment": "fresh official SWE-bench Docker container per arm"
+    },
+    "arms": {
+      "sol_alone": "FastContext disabled; FastContext routing instructions removed.",
+      "luna_low": {
+        "model": "openrouter/openai/gpt-5.6-luna",
+        "reasoning_effort": "low",
+        "max_output_tokens": 4096,
+        "explorer_max_turns": 5
+      },
+      "fastcontext_local": {
+        "model": "hf.co/mitkox/FastContext-1.0-4B-RL-Q4_K_M-GGUF:latest",
+        "backend": "local Ollama OpenAI-compatible endpoint",
+        "temperature": 0.7,
+        "max_output_tokens": 4096,
+        "explorer_max_turns": 5
+      }
+    },
+    "routing": "Natural. Sol received the same task in every arm and chose whether and how to invoke FastContext in assisted arms.",
+    "wall_time_scope": "Runner start through patch submission. Includes fresh container startup and assisted-arm FastContext wheel installation; excludes model download.",
+    "usage_source": "LiteLLM response usage and cost fields from every recorded main-agent and Luna explorer response.",
+    "verification": {
+      "gold_test": "astropy/io/ascii/tests/test_html.py::test_write_table_formatted_columns",
+      "additional_test_file": "astropy/io/ascii/tests/test_html.py",
+      "environment_setup": "pyerfa, numpy<2, pytest, hypothesis, pytest-doctestplus, pyyaml, and editable Astropy install"
+    }
+  },
+  "arms": {
+    "sol_alone": {
+      "outcome": "pass",
+      "wall_seconds": 426.522,
+      "main_model_turns": 29,
+      "main_shell_tool_calls": 42,
+      "main_usage": {
+        "input_tokens": 823105,
+        "cached_input_tokens": 785514,
+        "cache_write_tokens": 37504,
+        "output_tokens": 8061,
+        "reasoning_tokens": 1523,
+        "total_tokens": 831166,
+        "provider_cost_usd": 0.869422
+      },
+      "scout_usage": null,
+      "all_model_total_tokens": 831166,
+      "total_provider_cost_usd": 0.869422,
+      "patch_sha256": "feda269341725233cf7ef63605c555a2d7507e3d412308be98d9b62d84bf7d8a",
+      "verification": {
+        "gold_test": "1 passed",
+        "html_test_file": "10 passed, 16 skipped"
+      }
+    },
+    "luna_low": {
+      "outcome": "pass",
+      "wall_seconds": 385.57,
+      "main_model_turns": 25,
+      "main_shell_tool_calls": 31,
+      "main_usage": {
+        "input_tokens": 324636,
+        "cached_input_tokens": 308810,
+        "cache_write_tokens": 15751,
+        "output_tokens": 5736,
+        "reasoning_tokens": 880,
+        "total_tokens": 330372,
+        "provider_cost_usd": 0.42530375
+      },
+      "scout_result": {
+        "usable": true,
+        "model_turns": 5,
+        "repository_tool_calls": 14,
+        "validated_answer": true,
+        "note": "The scout returned the HTML writer, shared formatting path, existing tests, and focused file/line evidence. The submitted patch matches the two-line gold fix."
+      },
+      "scout_usage": {
+        "input_tokens": 62766,
+        "cached_input_tokens": 40544,
+        "cache_write_tokens": 22207,
+        "output_tokens": 1642,
+        "reasoning_tokens": 30,
+        "total_tokens": 64408,
+        "provider_cost_usd": 0.00833603
+      },
+      "all_model_total_tokens": 394780,
+      "total_provider_cost_usd": 0.43363978,
+      "delta_vs_sol_alone": {
+        "provider_cost_pct": -50.1232,
+        "all_model_total_tokens_pct": -52.5,
+        "main_input_tokens_pct": -60.56,
+        "wall_time_pct": -9.6
+      },
+      "patch_sha256": "c2348828aca621c530ac97b2e62169d04ff9b8fc18582dd9e58236a68d09576d",
+      "verification": {
+        "gold_test": "1 passed",
+        "html_test_file": "10 passed, 16 skipped"
+      }
+    },
+    "fastcontext_local": {
+      "outcome": "pass after solver fallback",
+      "wall_seconds": 408.006,
+      "main_model_turns": 30,
+      "main_shell_tool_calls": 46,
+      "main_usage": {
+        "input_tokens": 451781,
+        "cached_input_tokens": 436372,
+        "cache_write_tokens": 15319,
+        "output_tokens": 6157,
+        "reasoning_tokens": 1269,
+        "total_tokens": 457938,
+        "provider_cost_usd": 0.49908975
+      },
+      "scout_result": {
+        "usable": false,
+        "invocations": 2,
+        "first_failure": "The local model returned malformed citation data; the preserved FastContext formatter raised TypeError: string indices must be integers, not 'str'.",
+        "second_failure": "Without citation mode, the local model emitted a literal unresolved Glob tool request as final output.",
+        "trajectory_available": false,
+        "trajectory_note": "The solver removed the in-repository .fastcontext directory before the runner could extract it. Failure outputs remain in the main trajectory."
+      },
+      "scout_usage": {
+        "total_tokens": null,
+        "provider_cost_usd": 0.0,
+        "note": "Local token usage was not preserved; local compute and electricity are not monetized."
+      },
+      "all_model_total_tokens": null,
+      "known_main_model_total_tokens": 457938,
+      "total_provider_cost_usd": 0.49908975,
+      "delta_vs_sol_alone": {
+        "provider_cost_pct": -42.6,
+        "main_model_total_tokens_pct": -44.9,
+        "main_input_tokens_pct": -45.11,
+        "wall_time_pct": -4.34,
+        "attribution": "Not attributable to useful scout evidence because both local explorer invocations failed."
+      },
+      "patch_sha256": "9d7fe4ca9164cd700f038145ffcdfdbc1ccf7009674f07c178a70c011dc7f099",
+      "verification": {
+        "gold_test": "1 passed",
+        "html_test_file": "10 passed, 16 skipped"
+      }
+    }
+  },
+  "conclusion": "All three submitted passing patches. Luna-low was the only successful scout: its arm used 52.50% fewer all-model tokens and cost 50.60% less in provider charges on this run. The local FastContext model failed its output contract twice, so its lower main-agent bill is not a scout win. This is one stochastic instance, not a headline benchmark.",
+  "limitations": [
+    "One instance and one run per arm; no statistical inference or product savings claim.",
+    "Arms ran sequentially, so wall time includes uncontrolled cache and host-load effects.",
+    "The benchmark exercises the preserved FastContext Python explorer scaffold, not Grephound's Rust repo_scout runtime.",
+    "Provider-reported API cost excludes local compute and electricity.",
+    "Local explorer token usage is unavailable because its trajectory was removed before extraction."
+  ],
+  "repricing_note": "Repriced 2026-08-11 using Luna subscription-equivalent rates: $0.20/M uncached input, $0.02/M cached reads, and $1.20/M output including reasoning. Luna cache writes are not billed. Sol provider costs remain as recorded, including reported Sol cache-write tokens."
+}

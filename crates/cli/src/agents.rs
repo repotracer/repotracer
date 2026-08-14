@@ -1,26 +1,11 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 const MANAGED_START: &str = "<!-- grephound:start -->";
 const MANAGED_END: &str = "<!-- grephound:end -->";
 
-pub const ROUTING_SKILL: &str = r#"---
-name: grephound-scout
-description: Delegate unfamiliar or multi-file repository exploration to Grephound. Use for tracing behavior across modules, locating an implementation and its tests, understanding an unfamiliar subsystem, or finding change impact. Skip for trivial known-file reads or when the relevant code is already in context.
----
-
-# Grephound repository scout
-
-Use the `repo_scout` MCP tool before manual Read/Grep/Glob chains when a task requires repository exploration across unknown or multiple files.
-
-Give `repo_scout` one precise semantic question naming the behavior or flow to trace. Grephound selects its configured read-only local, subscription, or custom-endpoint backend internally. Use its validated file:line citations to read only the returned locations, then solve the task with normal coding tools.
-
-Do not invoke Grephound's backend CLI directly. Do not use Grephound when the exact relevant file or symbol is already known and one targeted read is enough, or when no repository exploration is needed.
-"#;
-
-const ROUTING_INSTRUCTIONS: &str = "Use the Grephound `repo_scout` MCP tool before manual Read/Grep/Glob chains when a coding task requires understanding unfamiliar code, tracing behavior across multiple files, locating implementation plus tests, or assessing multi-module change impact. Ask one precise semantic repository question, then read only the validated file:line citations it returns. Skip Grephound for trivial known-file reads or when the relevant code is already in context.";
+const ROUTING_INSTRUCTIONS: &str = "Decide repository-scout eligibility from the request and current context before repository operations. When unfamiliar or cross-file understanding would otherwise require broad exploration, call repo_scout as the first repository operation; do not run preliminary pwd, listing, CodeGraph, Grep, Glob, Read, or shell searches. Skip it when one targeted lookup is sufficient or the relevant files, symbols, source, or precise change surface are already known. Do not call it merely because a task is difficult. Validated citations complete broad exploration; use the handoff summary and evidence excerpts, and do not repeat broad searches. If it returns no validated citations, fall back to normal repository tools.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInfo {
@@ -30,36 +15,8 @@ pub struct AgentInfo {
     pub path: Option<String>,
 }
 
-pub fn detect(root: &Path) -> Vec<AgentInfo> {
-    vec![
-        detect_json_agent("Claude Code", "claude", claude_config_path()),
-        detect_codex(),
-        detect_json_agent("Cursor", "cursor", cursor_mcp_path()),
-        detect_json_agent("GitHub Copilot", "copilot", Some(copilot_mcp_path(root))),
-        AgentInfo {
-            name: "MCP (generic)".into(),
-            detected: true,
-            configured: true,
-            path: Some("grephound serve".into()),
-        },
-    ]
-}
-
-fn detect_json_agent(name: &str, command: &str, path: Option<PathBuf>) -> AgentInfo {
-    let detected = which::which(command).is_ok()
-        || path
-            .as_ref()
-            .and_then(|p| p.parent())
-            .is_some_and(Path::exists);
-    let configured = path
-        .as_ref()
-        .is_some_and(|p| p.exists() && file_contains_grephound(p));
-    AgentInfo {
-        name: name.into(),
-        detected,
-        configured,
-        path: path.map(|p| p.display().to_string()),
-    }
+pub fn detect(_root: &Path) -> Vec<AgentInfo> {
+    vec![detect_codex()]
 }
 
 fn detect_codex() -> AgentInfo {
@@ -86,113 +43,44 @@ fn file_contains_grephound(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub fn claude_config_path() -> Option<PathBuf> {
-    Some(dirs::home_dir()?.join(".claude.json"))
+fn codex_home() -> Option<PathBuf> {
+    std::env::var_os("CODEX_HOME")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")))
 }
 
 pub fn codex_config_path() -> Option<PathBuf> {
-    Some(dirs::home_dir()?.join(".codex").join("config.toml"))
-}
-
-pub fn cursor_mcp_path() -> Option<PathBuf> {
-    Some(dirs::home_dir()?.join(".cursor").join("mcp.json"))
-}
-
-pub fn copilot_mcp_path(root: &Path) -> PathBuf {
-    root.join(".github").join("copilot").join("mcp.json")
-}
-
-fn claude_skill_path() -> anyhow::Result<PathBuf> {
-    Ok(dirs::home_dir()
-        .ok_or_else(|| anyhow::anyhow!("no home dir"))?
-        .join(".claude")
-        .join("skills")
-        .join("grephound-scout")
-        .join("SKILL.md"))
+    Some(codex_home()?.join("config.toml"))
 }
 
 fn codex_skill_path() -> anyhow::Result<PathBuf> {
-    Ok(dirs::home_dir()
-        .ok_or_else(|| anyhow::anyhow!("no home dir"))?
-        .join(".codex")
+    Ok(codex_home()
+        .ok_or_else(|| anyhow::anyhow!("no Codex home"))?
         .join("skills")
         .join("grephound-scout")
         .join("SKILL.md"))
 }
 
-fn cursor_rule_path(root: &Path) -> PathBuf {
-    root.join(".cursor")
-        .join("rules")
-        .join("grephound-scout.mdc")
-}
-
-fn copilot_instructions_path(root: &Path) -> PathBuf {
-    root.join(".github").join("copilot-instructions.md")
-}
-
-pub fn grephound_mcp_entry(binary: &Path) -> Value {
-    json!({
-        "command": binary.display().to_string(),
-        "args": ["serve"],
-    })
-}
-
-pub fn install_claude(binary: &Path, dry_run: bool) -> anyhow::Result<String> {
-    let config = claude_config_path().ok_or_else(|| anyhow::anyhow!("no home dir"))?;
-    let skill = claude_skill_path()?;
-    if !dry_run {
-        install_json_mcp(&config, "mcpServers", binary)?;
-        write_managed_file(&skill, ROUTING_SKILL)?;
-    }
-    Ok(format!(
-        "{} Claude Code MCP + skill ({})",
-        action(dry_run),
-        config.display()
-    ))
+fn codex_instructions_path() -> anyhow::Result<PathBuf> {
+    Ok(codex_home()
+        .ok_or_else(|| anyhow::anyhow!("no Codex home"))?
+        .join("AGENTS.md"))
 }
 
 pub fn install_codex(binary: &Path, dry_run: bool) -> anyhow::Result<String> {
-    let config = codex_config_path().ok_or_else(|| anyhow::anyhow!("no home dir"))?;
-    let skill = codex_skill_path()?;
+    let config = codex_config_path().ok_or_else(|| anyhow::anyhow!("no Codex home"))?;
+    let instructions = codex_instructions_path()?;
     if !dry_run {
         install_codex_config(&config, binary)?;
-        write_managed_file(&skill, ROUTING_SKILL)?;
-    }
-    Ok(format!(
-        "{} Codex MCP + skill ({})",
-        action(dry_run),
-        config.display()
-    ))
-}
-
-pub fn install_cursor(binary: &Path, root: &Path, dry_run: bool) -> anyhow::Result<String> {
-    let config = cursor_mcp_path().ok_or_else(|| anyhow::anyhow!("no home dir"))?;
-    let rule = cursor_rule_path(root);
-    if !dry_run {
-        install_json_mcp(&config, "mcpServers", binary)?;
-        write_managed_file(
-            &rule,
-            &format!(
-                "---\ndescription: Route multi-file repository exploration through Grephound\nalwaysApply: true\n---\n\n{ROUTING_INSTRUCTIONS}\n"
-            ),
-        )?;
-    }
-    Ok(format!(
-        "{} Cursor MCP + project rule ({})",
-        action(dry_run),
-        config.display()
-    ))
-}
-
-pub fn install_copilot(binary: &Path, root: &Path, dry_run: bool) -> anyhow::Result<String> {
-    let config = copilot_mcp_path(root);
-    let instructions = copilot_instructions_path(root);
-    if !dry_run {
-        install_json_mcp(&config, "servers", binary)?;
         upsert_managed_block(&instructions, ROUTING_INSTRUCTIONS)?;
+        if let Ok(skill) = codex_skill_path() {
+            if skill.exists() {
+                fs::remove_file(skill)?;
+            }
+        }
     }
     Ok(format!(
-        "{} GitHub Copilot MCP + project instructions ({})",
+        "{} Codex MCP + automatic routing ({})",
         action(dry_run),
         config.display()
     ))
@@ -204,27 +92,6 @@ fn action(dry_run: bool) -> &'static str {
     } else {
         "configured"
     }
-}
-
-fn install_json_mcp(path: &Path, key: &str, binary: &Path) -> anyhow::Result<()> {
-    ensure_parent(path)?;
-    backup_file(path)?;
-    let mut root: Value = if path.exists() {
-        serde_json::from_str(&fs::read_to_string(path)?)?
-    } else {
-        json!({})
-    };
-    let map = root
-        .as_object_mut()
-        .ok_or_else(|| anyhow::anyhow!("{} must contain a JSON object", path.display()))?;
-    let servers = map
-        .entry(key)
-        .or_insert_with(|| json!({}))
-        .as_object_mut()
-        .ok_or_else(|| anyhow::anyhow!("`{key}` in {} must be an object", path.display()))?;
-    servers.insert("grephound".into(), grephound_mcp_entry(binary));
-    fs::write(path, serde_json::to_string_pretty(&root)? + "\n")?;
-    Ok(())
 }
 
 fn install_codex_config(path: &Path, binary: &Path) -> anyhow::Result<()> {
@@ -276,20 +143,12 @@ fn remove_toml_section(text: &str, header: &str) -> String {
     replace_toml_section(text, header, "")
 }
 
-fn write_managed_file(path: &Path, content: &str) -> anyhow::Result<()> {
-    ensure_parent(path)?;
-    backup_file(path)?;
-    fs::write(path, content)?;
-    Ok(())
-}
-
 fn upsert_managed_block(path: &Path, content: &str) -> anyhow::Result<()> {
     ensure_parent(path)?;
     backup_file(path)?;
     let existing = fs::read_to_string(path).unwrap_or_default();
     let block = format!("{MANAGED_START}\n{content}\n{MANAGED_END}");
-    let updated = replace_managed_block(&existing, &block);
-    fs::write(path, updated)?;
+    fs::write(path, replace_managed_block(&existing, &block))?;
     Ok(())
 }
 
@@ -319,69 +178,38 @@ fn remove_managed_block(existing: &str) -> String {
     existing.to_string()
 }
 
-pub fn uninstall_all(root: &Path) -> anyhow::Result<Vec<String>> {
+pub fn uninstall_all(_root: &Path) -> anyhow::Result<Vec<String>> {
     let mut messages = Vec::new();
-    remove_json_mcp(claude_config_path().as_deref(), "mcpServers", &mut messages)?;
-    remove_json_mcp(cursor_mcp_path().as_deref(), "mcpServers", &mut messages)?;
-    remove_json_mcp(Some(&copilot_mcp_path(root)), "servers", &mut messages)?;
-
     if let Some(path) = codex_config_path().filter(|p| p.exists()) {
         backup_file(&path)?;
         let updated = remove_toml_section(&fs::read_to_string(&path)?, "[mcp_servers.grephound]");
         fs::write(&path, updated)?;
         messages.push(format!("removed Grephound from {}", path.display()));
     }
-
-    for path in [
-        claude_skill_path().ok(),
-        codex_skill_path().ok(),
-        Some(cursor_rule_path(root)),
-    ]
-    .into_iter()
-    .flatten()
-    {
+    if let Ok(path) = codex_skill_path() {
         if path.exists() {
             fs::remove_file(&path)?;
             messages.push(format!("removed {}", path.display()));
         }
     }
-
-    let instructions = copilot_instructions_path(root);
-    if instructions.exists() {
-        let updated = remove_managed_block(&fs::read_to_string(&instructions)?);
-        if updated.is_empty() {
-            fs::remove_file(&instructions)?;
-        } else {
-            fs::write(&instructions, updated + "\n")?;
-        }
-        messages.push(format!(
-            "removed Grephound instructions from {}",
-            instructions.display()
-        ));
-    }
-
+    remove_managed_instructions(&codex_instructions_path()?, &mut messages)?;
     Ok(messages)
 }
 
-fn remove_json_mcp(
-    path: Option<&Path>,
-    key: &str,
-    messages: &mut Vec<String>,
-) -> anyhow::Result<()> {
-    let Some(path) = path.filter(|p| p.exists()) else {
+fn remove_managed_instructions(path: &Path, messages: &mut Vec<String>) -> anyhow::Result<()> {
+    if !path.exists() {
         return Ok(());
-    };
-    let mut root: Value = serde_json::from_str(&fs::read_to_string(path)?)?;
-    let removed = root
-        .get_mut(key)
-        .and_then(Value::as_object_mut)
-        .and_then(|servers| servers.remove("grephound"))
-        .is_some();
-    if removed {
-        backup_file(path)?;
-        fs::write(path, serde_json::to_string_pretty(&root)? + "\n")?;
-        messages.push(format!("removed Grephound from {}", path.display()));
     }
+    let updated = remove_managed_block(&fs::read_to_string(path)?);
+    if updated.is_empty() {
+        fs::remove_file(path)?;
+    } else {
+        fs::write(path, updated + "\n")?;
+    }
+    messages.push(format!(
+        "removed Grephound instructions from {}",
+        path.display()
+    ));
     Ok(())
 }
 
@@ -409,26 +237,6 @@ pub fn current_binary() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
-
-    #[test]
-    fn json_install_preserves_other_servers() {
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("mcp.json");
-        fs::write(&path, r#"{"mcpServers":{"other":{"command":"other"}}}"#).unwrap();
-        install_json_mcp(
-            &path,
-            "mcpServers",
-            Path::new("C:\\Grephound\\grephound.exe"),
-        )
-        .unwrap();
-        let value: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
-        assert_eq!(value["mcpServers"]["other"]["command"], "other");
-        assert_eq!(
-            value["mcpServers"]["grephound"]["command"],
-            "C:\\Grephound\\grephound.exe"
-        );
-    }
 
     #[test]
     fn codex_section_update_is_idempotent() {
@@ -458,9 +266,9 @@ mod tests {
     }
 
     #[test]
-    fn skill_has_positive_and_negative_routing_rules() {
-        assert!(ROUTING_SKILL.contains("multi-file"));
-        assert!(ROUTING_SKILL.contains("Do not use Grephound"));
-        assert!(ROUTING_SKILL.contains("file:line citations"));
+    fn codex_routing_starts_with_the_scout_and_stops_after_handoff() {
+        assert!(ROUTING_INSTRUCTIONS.contains("first repository operation"));
+        assert!(ROUTING_INSTRUCTIONS.contains("complete broad exploration"));
+        assert!(ROUTING_INSTRUCTIONS.contains("do not repeat broad searches"));
     }
 }
