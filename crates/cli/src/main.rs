@@ -68,14 +68,10 @@ enum Commands {
         #[arg(long)]
         max_turns: Option<u32>,
     },
-    /// One-command setup: select backend, verify it, and configure agents
+    /// Zero-question GPT setup: verify Codex and configure detected agents
     Setup {
         #[arg(long)]
-        yes: bool,
-        #[arg(long)]
         dry_run: bool,
-        #[arg(long, value_enum, default_value_t = setup::ProviderChoice::Auto)]
-        provider: setup::ProviderChoice,
     },
     /// Run MCP server on stdio
     Serve,
@@ -133,6 +129,7 @@ async fn run(cli: Cli) -> Result<()> {
     }
     if let Some(u) = &cli.base_url {
         cfg.model.base_url = u.clone();
+        cfg.model.backend = "openai-compatible".into();
     }
 
     // Shorthand: grephound "where is auth?"
@@ -149,11 +146,7 @@ async fn run(cli: Cli) -> Result<()> {
             }
             cmd_scout(&root, &cfg, &q, max_turns, cli.json, cli.mock).await
         }
-        Commands::Setup {
-            yes,
-            dry_run,
-            provider,
-        } => setup::run(&root, &cfg_path, &cfg, yes, dry_run, provider).await,
+        Commands::Setup { dry_run } => setup::run(&root, &cfg_path, &cfg, dry_run).await,
         Commands::Serve => cmd_serve(&root, &cfg, cli.mock).await,
         Commands::Doctor => doctor::run(&root, &cfg, cli.json).await,
         Commands::Status => cmd_status(&root, &cfg_path, &cfg, cli.json),
@@ -278,6 +271,12 @@ fn build_scout(
     if !mock && subscription::is_subscription_backend(cfg) {
         return Ok(Arc::new(subscription::CliScout::from_config(cfg)?));
     }
+    if !mock && !cfg.model.model.starts_with("gpt-") {
+        bail!(
+            "unsupported model `{}`: Grephound currently supports GPT scouts only",
+            cfg.model.model
+        );
+    }
     let model: Arc<dyn ModelBackend> = if mock {
         Arc::new(MockModel::grep_then_cite(
             "README.md",
@@ -289,7 +288,7 @@ fn build_scout(
         Arc::new(OpenAiCompatBackend::new(ModelConfig {
             base_url: cfg.model.base_url.clone(),
             model: cfg.model.model.clone(),
-            api_key: cfg.model.api_key.clone(),
+            api_key: cfg.model.resolved_api_key(),
             timeout_ms: cfg.model.timeout_ms,
             temperature: cfg.model.temperature,
             max_tokens: None,

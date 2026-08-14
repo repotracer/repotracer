@@ -1,0 +1,8 @@
+{
+  "id": "route-protocol-09",
+  "prompt": "In `crates/bench/src/main.rs`, sort the loaded `BenchTask` values by `id` before they are printed and aggregated so suite output is deterministic.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/bench/src/main.rs"
+  ]
+}

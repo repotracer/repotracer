@@ -1,0 +1,11 @@
+{
+  "id": "route-cli-06",
+  "prompt": "Administrators need to audit onboarding before it writes anything. Provide a machine-readable preview of every configuration and integration action, ensure applying onboarding produces the same action set, redact secrets, and keep preview mode free of filesystem changes and login probes.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/cli/src/main.rs",
+    "crates/cli/src/setup.rs",
+    "crates/cli/src/agents.rs",
+    "crates/cli/tests/setup.rs"
+  ]
+}

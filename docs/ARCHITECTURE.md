@@ -32,38 +32,37 @@ Main LLM
 | Crate | Role |
 |-------|------|
 | `grephound-repo-tools` | Read, Glob, Grep + concurrent executor |
-| `grephound-model` | OpenAI-compatible backend + mock |
+| `grephound-model` | OpenAI-compatible GPT backend + mock |
 | `grephound-core` | Scout engine, citations, config |
 | `grephound-mcp` | stdio MCP server (`repo_scout`) |
-| `grephound` (cli) | setup / doctor / scout / serve + official CLI subscription runners |
+| `grephound` (cli) | setup / doctor / scout / serve + isolated Codex runner |
 | `grephound-bench` | complete-task benchmark harness |
 
 ## Host integration
 
-MCP is the portable capability layer. Setup also installs a compact host-native routing policy so agents delegate unfamiliar or multi-file exploration instead of falling back to manual Read/Grep/Glob chains. Claude Code and Codex receive an Agent Skill; Cursor receives a project rule; GitHub Copilot receives project instructions. Hooks are not required for the default path.
+Setup installs Grephound's MCP server and a managed routing policy into Codex. The policy delegates unfamiliar or cross-file exploration before Codex falls back to manual Read/Grep/Glob chains. Other agent hosts are intentionally unsupported until they have equivalent end-to-end evidence.
 
-## Backend selection
+## GPT scout execution
 
 ```text
 repo_scout
-  ├─ ollama / openai-compatible → Grephound tool loop → Read / Glob / Grep
-  ├─ codex-cli                  → ephemeral `codex exec` → structured result
-  └─ claude-cli                 → safe `claude -p` → structured result
+  ├─ default → isolated ephemeral `codex exec` → GPT-5.6 Luna
+  └─ custom  → OpenAI-compatible GPT endpoint → Read / Glob / Grep loop
                                       ↓
-                            shared citation validation
+                  bounded excerpts + validated citations
 ```
 
-Subscription mode delegates one complete exploration to the provider's official installed CLI. The CLI retains credential ownership. Grephound passes no tokens, disables inherited agent configuration/MCP recursion, constrains execution to read-only operations, applies a process deadline, parses a strict result schema, and validates citations itself.
+The zero-config path delegates one exploration to the installed Codex CLI. Codex retains credential and provider ownership. Grephound passes no token, ignores inherited user instructions and MCP servers, constrains the process to read-only access, applies a deadline, parses strict structured output, and validates citations itself.
 
-## Local/custom engine loop
+The custom-endpoint loop is available for GPT-compatible endpoints:
 
 ```text
-query → system prompt → model
+query → system prompt → GPT model
   → tool calls? → validate → execute concurrently → append results → loop
   → final text → parse <final_answer> → validate citations → ScoutResult
 ```
 
-Hard controls: max turns, max tool calls, per-tool timeout, total timeout, output caps, cancellation via timeout.
+Hard controls: maximum model steps, maximum tool calls, per-tool timeout, total timeout, output caps, and cancellation.
 
 
 ## Security
@@ -75,13 +74,8 @@ Hard controls: max turns, max tool calls, per-tool timeout, total timeout, outpu
 - No shell interpolation
 - No telemetry by default
 
-## FastContext compatibility
+## Repository tools
 
-Internal tools keep FastContext names and schemas so the specialist model stays effective.
-Public product surface is one tool: `repo_scout`.
+The custom endpoint loop exposes only read-only `Read`, `Glob`, and `Grep` tools. Independent calls execute concurrently, and Grep `count` maps to ripgrep `--count-matches`.
 
-Upstream fixes included:
-
-1. **Parallel tool execution** (was sequential)
-2. **Grep `count` → `--count-matches`** (schema/impl mismatch)
-
+The public product surface remains one high-level tool: `repo_scout`.

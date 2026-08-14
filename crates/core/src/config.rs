@@ -33,6 +33,8 @@ pub struct ModelSettings {
     pub executable: Option<String>,
     #[serde(default = "default_model")]
     pub model: String,
+    #[serde(default = "default_reasoning_effort")]
+    pub reasoning_effort: String,
     #[serde(default = "default_base_url")]
     pub base_url: String,
     #[serde(default)]
@@ -43,16 +45,25 @@ pub struct ModelSettings {
     pub temperature: f32,
 }
 
-pub const FASTCONTEXT_MODEL: &str = "hf.co/mitkox/FastContext-1.0-4B-RL-Q4_K_M-GGUF:latest";
+impl ModelSettings {
+    pub fn resolved_api_key(&self) -> Option<String> {
+        std::env::var("GREPHOUND_API_KEY")
+            .ok()
+            .or_else(|| self.api_key.clone())
+    }
+}
 
 fn default_backend() -> String {
-    "ollama".into()
+    "codex-cli".into()
 }
 fn default_model() -> String {
-    FASTCONTEXT_MODEL.into()
+    "gpt-5.6-luna".into()
+}
+fn default_reasoning_effort() -> String {
+    "medium".into()
 }
 fn default_base_url() -> String {
-    "http://127.0.0.1:11434/v1".into()
+    "https://api.openai.com/v1".into()
 }
 fn default_timeout_ms() -> u64 {
     120_000
@@ -64,8 +75,9 @@ impl Default for ModelSettings {
             backend: default_backend(),
             executable: None,
             model: default_model(),
+            reasoning_effort: default_reasoning_effort(),
             base_url: default_base_url(),
-            api_key: Some("ollama".into()),
+            api_key: None,
             timeout_ms: default_timeout_ms(),
             temperature: 0.0,
         }

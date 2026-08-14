@@ -1,0 +1,1447 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-11",
+  "status": "complete",
+  "change": "bounded native repository orientation map in the Codex/Luna scout prompt",
+  "model": "gpt-5.6-luna",
+  "reasoning_effort": "medium",
+  "pricing_usd_per_1m": {
+    "uncached_input": 0.2,
+    "cached_input_read": 0.02,
+    "cache_write": 0.0,
+    "output_including_reasoning": 1.2
+  },
+  "method": "Three independent repository questions, three randomized paired repeats per task. Same source tree, config, Codex CLI, model, reasoning, timeout, and output schema; binaries differ only by prompt map injection.",
+  "tasks": [
+    {
+      "id": "setup-integrations",
+      "prompt": "Explain how grephound setup detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Return a concise explanation with direct citations.",
+      "expected_paths": [
+        "crates/cli/src/agents.rs",
+        "crates/cli/src/setup.rs",
+        "crates/cli/tests/setup.rs"
+      ],
+      "orders": [
+        [
+          "native_map",
+          "baseline_no_map"
+        ],
+        [
+          "baseline_no_map",
+          "native_map"
+        ],
+        [
+          "native_map",
+          "baseline_no_map"
+        ]
+      ]
+    },
+    {
+      "id": "mcp-request-flow",
+      "prompt": "Trace a repo_scout request from MCP tools/call through backend execution, citation validation, and the returned text plus structured evidence. Explain failure and empty-evidence behavior with direct citations.",
+      "expected_paths": [
+        "crates/mcp/src/lib.rs",
+        "crates/core/src/types.rs",
+        "crates/core/src/citations.rs"
+      ],
+      "orders": [
+        [
+          "baseline_no_map",
+          "native_map"
+        ],
+        [
+          "native_map",
+          "baseline_no_map"
+        ],
+        [
+          "baseline_no_map",
+          "native_map"
+        ]
+      ]
+    },
+    {
+      "id": "repository-tools",
+      "prompt": "Explain how Read, Glob, and Grep repository tool calls are sandboxed, executed concurrently, timed out, bounded, and returned in deterministic order. Cite the implementation and regression tests.",
+      "expected_paths": [
+        "crates/repo-tools/src/lib.rs",
+        "crates/repo-tools/src/exec.rs",
+        "crates/repo-tools/src/read.rs",
+        "crates/repo-tools/src/glob_tool.rs",
+        "crates/repo-tools/src/grep.rs"
+      ],
+      "orders": [
+        [
+          "native_map",
+          "baseline_no_map"
+        ],
+        [
+          "baseline_no_map",
+          "native_map"
+        ],
+        [
+          "native_map",
+          "baseline_no_map"
+        ]
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "task": "setup-integrations",
+      "repeat": 1,
+      "arm": "native_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 169.118,
+      "provider_cost_usd": 0.0073364,
+      "expected_path_hits": [
+        "crates/cli/src/agents.rs",
+        "crates/cli/src/setup.rs",
+        "crates/cli/tests/setup.rs"
+      ],
+      "expected_path_recall": 1.0,
+      "result": {
+        "summary": "`grephound setup` first detects the environment and four host integrations\u2014Claude Code, Codex, Cursor, and GitHub Copilot\u2014by checking each CLI and/or its expected config location; it also records whether the config already contains Grephound. The generic MCP option is always available but excluded from automatic host selection. [crates/cli/src/agents.rs:50-96](crates/cli/src/agents.rs:50) [crates/cli/src/setup.rs:10-35](crates/cli/src/setup.rs:10)\n\nIt normalizes the GPT scout configuration: Codex backends become `codex-cli` with a GPT model and a minimum timeout; OpenAI-compatible backends must use a `gpt-*` model; other backends fall back to Codex CLI with `gpt-5.6-luna`. Non-dry runs verify the Codex executable and login status. [crates/cli/src/setup.rs:106-165](crates/cli/src/setup.rs:106)\n\nSelection uses all detected integrations during `--dry-run`, allowing the dry-run to show the complete plan; normal setup selects only detected hosts. Each selected host receives native MCP configuration plus routing assets: Claude gets a skill, Codex gets TOML MCP plus `AGENTS.md`, Cursor gets MCP plus a project rule, and Copilot gets MCP plus project instructions. [crates/cli/src/setup.rs:171-176](crates/cli/src/setup.rs:171) [crates/cli/src/agents.rs:175-238](crates/cli/src/agents.rs:175)\n\nDry-run paths only print planned actions and skip writes, ending with an explicit \u201cno files or services changed\u201d message; normal setup writes the Grephound config. Tests verify both the no-write behavior and GPT-only validation. [crates/cli/src/setup.rs:84-99](crates/cli/src/setup.rs:84) [crates/cli/tests/setup.rs:5-35](crates/cli/tests/setup.rs:5)\n\n`grephound uninstall` requires `--yes`; it removes Grephound MCP entries from all host configs, removes skills/rules, strips managed instruction blocks, and deletes the local Grephound config while preserving provider logins and the binary. [crates/cli/src/setup.rs:179-193](crates/cli/src/setup.rs:179) [crates/cli/src/agents.rs:362-416](crates/cli/src/agents.rs:362)",
+        "citations": [
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 50,
+            "end_line": 96,
+            "reason": "Direct implementation of integration detection and configured-state checks."
+          },
+          {
+            "path": "crates/cli/src/setup.rs",
+            "start_line": 106,
+            "end_line": 165,
+            "reason": "Direct implementation of GPT configuration normalization and Codex verification."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 175,
+            "end_line": 238,
+            "reason": "Leaf implementations of host-specific installation/configuration behavior."
+          },
+          {
+            "path": "crates/cli/tests/setup.rs",
+            "start_line": 5,
+            "end_line": 35,
+            "reason": "Tests proving dry-run avoids writes and reports planned integrations."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 362,
+            "end_line": 416,
+            "reason": "Leaf uninstall implementation for MCP entries, skills, rules, and managed instructions."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 169092,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 60568,
+          "cached_prompt_tokens": 37120,
+          "completion_tokens": 1587,
+          "reasoning_output_tokens": 471
+        },
+        "raw_final": "{\"answer\":\"`grephound setup` first detects the environment and four host integrations\u2014Claude Code, Codex, Cursor, and GitHub Copilot\u2014by checking each CLI and/or its expected config location; it also records whether the config already contains Grephound. The generic MCP option is always available but excluded from automatic host selection. [crates/cli/src/agents.rs:50-96](crates/cli/src/agents.rs:50) [crates/cli/src/setup.rs:10-35](crates/cli/src/setup.rs:10)\\n\\nIt normalizes the GPT scout configuration: Codex backends become `codex-cli` with a GPT model and a minimum timeout; OpenAI-compatible backends must use a `gpt-*` model; other backends fall back to Codex CLI with `gpt-5.6-luna`. Non-dry runs verify the Codex executable and login status. [crates/cli/src/setup.rs:106-165](crates/cli/src/setup.rs:106)\\n\\nSelection uses all detected integrations during `--dry-run`, allowing the dry-run to show the complete plan; normal setup selects only detected hosts. Each selected host receives native MCP configuration plus routing assets: Claude gets a skill, Codex gets TOML MCP plus `AGENTS.md`, Cursor gets MCP plus a project rule, and Copilot gets MCP plus project instructions. [crates/cli/src/setup.rs:171-176](crates/cli/src/setup.rs:171) [crates/cli/src/agents.rs:175-238](crates/cli/src/agents.rs:175)\\n\\nDry-run paths only print planned actions and skip writes, ending with an explicit \u201cno files or services changed\u201d message; normal setup writes the Grephound config. Tests verify both the no-write behavior and GPT-only validation. [crates/cli/src/setup.rs:84-99](crates/cli/src/setup.rs:84) [crates/cli/tests/setup.rs:5-35](crates/cli/tests/setup.rs:5)\\n\\n`grephound uninstall` requires `--yes`; it removes Grephound MCP entries from all host configs, removes skills/rules, strips managed instruction blocks, and deletes the local Grephound config while preserving provider logins and the binary. [crates/cli/src/setup.rs:179-193](crates/cli/src/setup.rs:179) [crates/cli/src/agents.rs:362-416](crates/cli/src/agents.rs:362)\",\"citations\":[{\"end_line\":96,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Direct implementation of integration detection and configured-state checks.\" ,\"start_line\":50},{\"end_line\":165,\"path\":\"crates/cli/src/setup.rs\",\"reason\":\"Direct implementation of GPT configuration normalization and Codex verification.\",\"start_line\":106},{\"end_line\":238,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Leaf implementations of host-specific installation/configuration behavior.\",\"start_line\":175},{\"end_line\":35,\"path\":\"crates/cli/tests/setup.rs\",\"reason\":\"Tests proving dry-run avoids writes and reports planned integrations.\",\"start_line\":5},{\"end_line\":416,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Leaf uninstall implementation for MCP entries, skills, rules, and managed instructions.\",\"start_line\":362}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.0073364
+    },
+    {
+      "task": "setup-integrations",
+      "repeat": 1,
+      "arm": "baseline_no_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 176.034,
+      "provider_cost_usd": 0.0122712,
+      "expected_path_hits": [
+        "crates/cli/src/agents.rs",
+        "crates/cli/src/setup.rs",
+        "crates/cli/tests/setup.rs"
+      ],
+      "expected_path_recall": 1.0,
+      "result": {
+        "summary": "- Detection enumerates Claude Code, Codex, Cursor, Copilot, and generic MCP. Each host is considered detected when its CLI exists or its config directory exists; configuration is separately recognized by finding Grephound content in the config file. [crates/cli/src/agents.rs:57](crates/cli/src/agents.rs:57)\n- Selection excludes generic MCP and, normally, keeps only detected hosts; dry-run selects every supported host so it can preview all actions. Setup dispatches each selected host to its installer. [crates/cli/src/setup.rs:171](crates/cli/src/setup.rs:171) [crates/cli/src/setup.rs:10](crates/cli/src/setup.rs:10)\n- Configuration writes host-native MCP entries plus routing artifacts: Claude skill, Codex TOML/instructions, Cursor rule, and Copilot project instructions. With `dry_run`, installers only return \u201cwould configure\u201d messages; setup plans the config write and ends with an explicit no-changes result. [crates/cli/src/agents.rs:175](crates/cli/src/agents.rs:175) [crates/cli/src/setup.rs:84](crates/cli/src/setup.rs:84)\n- Uninstall requires `--yes`, removes integration entries, managed skills/rules/instructions, and the Grephound config; Codex config is backed up before its MCP section is removed. [crates/cli/src/agents.rs:362](crates/cli/src/agents.rs:362) [crates/cli/src/setup.rs:179](crates/cli/src/setup.rs:179)\n- Tests verify dry-run creates no config, Codex/Copilot plans are reported, and normal setup uses an existing Codex login without prompts. [crates/cli/tests/setup.rs:5](crates/cli/tests/setup.rs:5)",
+        "citations": [
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 57,
+            "end_line": 84,
+            "reason": "Host enumeration and JSON-agent detection/configuration logic."
+          },
+          {
+            "path": "crates/cli/src/setup.rs",
+            "start_line": 10,
+            "end_line": 40,
+            "reason": "Setup environment detection and dispatch to integration installers."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 175,
+            "end_line": 242,
+            "reason": "Leaf implementations for Claude, Codex, Cursor, and Copilot configuration, including dry-run behavior."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 362,
+            "end_line": 400,
+            "reason": "Leaf uninstall implementation, including Codex backup and removal of managed artifacts."
+          },
+          {
+            "path": "crates/cli/tests/setup.rs",
+            "start_line": 5,
+            "end_line": 34,
+            "reason": "Direct dry-run test assertions and no-write checks."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 176004,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 56208,
+          "cached_prompt_tokens": 8960,
+          "completion_tokens": 2202,
+          "reasoning_output_tokens": 1107
+        },
+        "raw_final": "{\"answer\":\"- Detection enumerates Claude Code, Codex, Cursor, Copilot, and generic MCP. Each host is considered detected when its CLI exists or its config directory exists; configuration is separately recognized by finding Grephound content in the config file. [crates/cli/src/agents.rs:57](crates/cli/src/agents.rs:57)\\n- Selection excludes generic MCP and, normally, keeps only detected hosts; dry-run selects every supported host so it can preview all actions. Setup dispatches each selected host to its installer. [crates/cli/src/setup.rs:171](crates/cli/src/setup.rs:171) [crates/cli/src/setup.rs:10](crates/cli/src/setup.rs:10)\\n- Configuration writes host-native MCP entries plus routing artifacts: Claude skill, Codex TOML/instructions, Cursor rule, and Copilot project instructions. With `dry_run`, installers only return \u201cwould configure\u201d messages; setup plans the config write and ends with an explicit no-changes result. [crates/cli/src/agents.rs:175](crates/cli/src/agents.rs:175) [crates/cli/src/setup.rs:84](crates/cli/src/setup.rs:84)\\n- Uninstall requires `--yes`, removes integration entries, managed skills/rules/instructions, and the Grephound config; Codex config is backed up before its MCP section is removed. [crates/cli/src/agents.rs:362](crates/cli/src/agents.rs:362) [crates/cli/src/setup.rs:179](crates/cli/src/setup.rs:179)\\n- Tests verify dry-run creates no config, Codex/Copilot plans are reported, and normal setup uses an existing Codex login without prompts. [crates/cli/tests/setup.rs:5](crates/cli/tests/setup.rs:5)\",\"citations\":[{\"end_line\":84,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Host enumeration and JSON-agent detection/configuration logic.\",\"start_line\":57},{\"end_line\":40,\"path\":\"crates/cli/src/setup.rs\",\"reason\":\"Setup environment detection and dispatch to integration installers.\",\"start_line\":10},{\"end_line\":242,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Leaf implementations for Claude, Codex, Cursor, and Copilot configuration, including dry-run behavior.\",\"start_line\":175},{\"end_line\":400,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Leaf uninstall implementation, including Codex backup and removal of managed artifacts.\",\"start_line\":362},{\"end_line\":34,\"path\":\"crates/cli/tests/setup.rs\",\"reason\":\"Direct dry-run test assertions and no-write checks.\",\"start_line\":5}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.0122712
+    },
+    {
+      "task": "setup-integrations",
+      "repeat": 2,
+      "arm": "baseline_no_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 37.654,
+      "provider_cost_usd": 0.00726872,
+      "expected_path_hits": [
+        "crates/cli/src/agents.rs",
+        "crates/cli/src/setup.rs",
+        "crates/cli/tests/setup.rs"
+      ],
+      "expected_path_recall": 1.0,
+      "result": {
+        "summary": "`grephound setup` detects Claude Code, Codex, Cursor, and GitHub Copilot by checking their executable or config-directory presence; it separately marks an integration configured when its config contains Grephound. It always exposes generic MCP as a fallback. [crates/cli/src/agents.rs:57](crates/cli/src/agents.rs:57)\n\nIt selects all detected integrations (or all non-generic integrations during `--dry-run`), then dispatches per-agent installers. Installers write the appropriate MCP config plus agent-specific skill, rule, or routing-instruction files; dry-run skips writes and reports \u201cwould configure.\u201d [crates/cli/src/setup.rs:171](crates/cli/src/setup.rs:171) [crates/cli/src/agents.rs:175](crates/cli/src/agents.rs:175)\n\nSetup also validates/selects the GPT scout, writes the local config only outside dry-run, and the tests verify dry-run leaves config and integration directories absent. [crates/cli/src/setup.rs:31](crates/cli/src/setup.rs:31) [crates/cli/tests/setup.rs:5](crates/cli/tests/setup.rs:5)\n\n`uninstall --yes` removes Grephound\u2019s agent integrations and local config; without `--yes` it only prints the confirmation requirement. Removal covers JSON MCP entries, the Codex TOML section, managed skills/rules, and related instruction files. [crates/cli/src/setup.rs:179](crates/cli/src/setup.rs:179) [crates/cli/src/agents.rs:362](crates/cli/src/agents.rs:362)",
+        "citations": [
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 57,
+            "end_line": 86,
+            "reason": "Direct detection logic for supported agents, generic MCP fallback, and configured-state checks."
+          },
+          {
+            "path": "crates/cli/src/setup.rs",
+            "start_line": 50,
+            "end_line": 65,
+            "reason": "Direct selection and per-agent installer dispatch during setup."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 175,
+            "end_line": 245,
+            "reason": "Direct installer behavior for each integration and dry-run write suppression/reporting."
+          },
+          {
+            "path": "crates/cli/tests/setup.rs",
+            "start_line": 5,
+            "end_line": 35,
+            "reason": "Test evidence that dry-run plans setup successfully without writing config or integration directories."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 362,
+            "end_line": 385,
+            "reason": "Direct uninstall behavior for MCP entries, Codex config, skills, and rules."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 37647,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 58540,
+          "cached_prompt_tokens": 36096,
+          "completion_tokens": 1715,
+          "reasoning_output_tokens": 757
+        },
+        "raw_final": "{\"answer\":\"`grephound setup` detects Claude Code, Codex, Cursor, and GitHub Copilot by checking their executable or config-directory presence; it separately marks an integration configured when its config contains Grephound. It always exposes generic MCP as a fallback. [crates/cli/src/agents.rs:57](crates/cli/src/agents.rs:57)\\n\\nIt selects all detected integrations (or all non-generic integrations during `--dry-run`), then dispatches per-agent installers. Installers write the appropriate MCP config plus agent-specific skill, rule, or routing-instruction files; dry-run skips writes and reports \u201cwould configure.\u201d [crates/cli/src/setup.rs:171](crates/cli/src/setup.rs:171) [crates/cli/src/agents.rs:175](crates/cli/src/agents.rs:175)\\n\\nSetup also validates/selects the GPT scout, writes the local config only outside dry-run, and the tests verify dry-run leaves config and integration directories absent. [crates/cli/src/setup.rs:31](crates/cli/src/setup.rs:31) [crates/cli/tests/setup.rs:5](crates/cli/tests/setup.rs:5)\\n\\n`uninstall --yes` removes Grephound\u2019s agent integrations and local config; without `--yes` it only prints the confirmation requirement. Removal covers JSON MCP entries, the Codex TOML section, managed skills/rules, and related instruction files. [crates/cli/src/setup.rs:179](crates/cli/src/setup.rs:179) [crates/cli/src/agents.rs:362](crates/cli/src/agents.rs:362)\",\"citations\":[{\"end_line\":86,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Direct detection logic for supported agents, generic MCP fallback, and configured-state checks.\",\"start_line\":57},{\"end_line\":65,\"path\":\"crates/cli/src/setup.rs\",\"reason\":\"Direct selection and per-agent installer dispatch during setup.\",\"start_line\":50},{\"end_line\":245,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Direct installer behavior for each integration and dry-run write suppression/reporting.\",\"start_line\":175},{\"end_line\":35,\"path\":\"crates/cli/tests/setup.rs\",\"reason\":\"Test evidence that dry-run plans setup successfully without writing config or integration directories.\",\"start_line\":5},{\"end_line\":385,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Direct uninstall behavior for MCP entries, Codex config, skills, and rules.\",\"start_line\":362}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00726872
+    },
+    {
+      "task": "setup-integrations",
+      "repeat": 2,
+      "arm": "native_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 47.433,
+      "provider_cost_usd": 0.00953052,
+      "expected_path_hits": [
+        "crates/cli/src/agents.rs",
+        "crates/cli/src/setup.rs",
+        "crates/cli/tests/setup.rs"
+      ],
+      "expected_path_recall": 1.0,
+      "result": {
+        "summary": "`grephound setup` first detects Claude Code, Codex, Cursor, and Copilot by checking whether each CLI exists or its expected config directory exists; it also records whether the config already contains \u201cgrephound.\u201d Normal setup selects only detected integrations, while `--dry-run` selects every supported integration (excluding generic MCP) so it can preview all actions. [crates/cli/src/agents.rs:52](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:52) [crates/cli/src/setup.rs:171](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:171)\n\nIt normalizes the scout configuration to the Codex CLI and GPT-5.6 Luna by default, or accepts an OpenAI-compatible endpoint only when the model name starts with `gpt-`. For live Codex setup it verifies the executable and `codex login status`; dry-run only reports the planned provider/login usage. [crates/cli/src/setup.rs:106](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:106) [crates/cli/src/setup.rs:142](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:142)\n\nEach selected integration gets an MCP `grephound serve` entry plus host-specific routing: Claude gets a skill, Codex gets TOML MCP config and managed `AGENTS.md` instructions, Cursor gets a project rule, and Copilot gets project instructions. Dry-run skips all writes, reports \u201cwould configure/would write,\u201d and ends with an explicit no-changes message. [crates/cli/src/agents.rs:175](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:175) [crates/cli/src/agents.rs:189](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:189) [crates/cli/src/agents.rs:255](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:255) [crates/cli/src/setup.rs:84](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:84)\n\n`grephound uninstall` requires `--yes`; it removes Grephound MCP entries, managed skills/rules/instruction blocks, and the local Grephound config, while preserving provider logins and the Grephound binary. [crates/cli/src/setup.rs:179](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:179) [crates/cli/src/agents.rs:362](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:362) [crates/cli/src/agents.rs:419](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:419)\n\nTests verify dry-run performs no writes, GPT-only endpoint validation, existing Codex-login setup, and installation of Codex MCP/routing configuration. [crates/cli/tests/setup.rs:5](/Users/mac/Documents/projects/tools/tool/crates/cli/tests/setup.rs:5) [crates/cli/tests/setup.rs:38](/Users/mac/Documents/projects/tools/tool/crates/cli/tests/setup.rs:38) [crates/cli/tests/setup.rs:76](/Users/mac/Documents/projects/tools/tool/crates/cli/tests/setup.rs:76)",
+        "citations": [
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 52,
+            "end_line": 109,
+            "reason": "Direct detection implementation for supported coding-agent integrations."
+          },
+          {
+            "path": "crates/cli/src/setup.rs",
+            "start_line": 106,
+            "end_line": 177,
+            "reason": "Direct selection, configuration normalization, and Codex verification implementation."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 175,
+            "end_line": 242,
+            "reason": "Direct per-agent installation implementations and dry-run behavior."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 362,
+            "end_line": 405,
+            "reason": "Direct uninstall implementation for MCP entries and managed files."
+          },
+          {
+            "path": "crates/cli/tests/setup.rs",
+            "start_line": 5,
+            "end_line": 121,
+            "reason": "Setup integration tests covering dry-run, model validation, Codex login, and writes."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 47408,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 71511,
+          "cached_prompt_tokens": 37376,
+          "completion_tokens": 1630,
+          "reasoning_output_tokens": 340
+        },
+        "raw_final": "{\"answer\":\"`grephound setup` first detects Claude Code, Codex, Cursor, and Copilot by checking whether each CLI exists or its expected config directory exists; it also records whether the config already contains \u201cgrephound.\u201d Normal setup selects only detected integrations, while `--dry-run` selects every supported integration (excluding generic MCP) so it can preview all actions. [crates/cli/src/agents.rs:52](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:52) [crates/cli/src/setup.rs:171](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:171)\\n\\nIt normalizes the scout configuration to the Codex CLI and GPT-5.6 Luna by default, or accepts an OpenAI-compatible endpoint only when the model name starts with `gpt-`. For live Codex setup it verifies the executable and `codex login status`; dry-run only reports the planned provider/login usage. [crates/cli/src/setup.rs:106](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:106) [crates/cli/src/setup.rs:142](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:142)\\n\\nEach selected integration gets an MCP `grephound serve` entry plus host-specific routing: Claude gets a skill, Codex gets TOML MCP config and managed `AGENTS.md` instructions, Cursor gets a project rule, and Copilot gets project instructions. Dry-run skips all writes, reports \u201cwould configure/would write,\u201d and ends with an explicit no-changes message. [crates/cli/src/agents.rs:175](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:175) [crates/cli/src/agents.rs:189](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:189) [crates/cli/src/agents.rs:255](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:255) [crates/cli/src/setup.rs:84](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:84)\\n\\n`grephound uninstall` requires `--yes`; it removes Grephound MCP entries, managed skills/rules/instruction blocks, and the local Grephound config, while preserving provider logins and the Grephound binary. [crates/cli/src/setup.rs:179](/Users/mac/Documents/projects/tools/tool/crates/cli/src/setup.rs:179) [crates/cli/src/agents.rs:362](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:362) [crates/cli/src/agents.rs:419](/Users/mac/Documents/projects/tools/tool/crates/cli/src/agents.rs:419)\\n\\nTests verify dry-run performs no writes, GPT-only endpoint validation, existing Codex-login setup, and installation of Codex MCP/routing configuration. [crates/cli/tests/setup.rs:5](/Users/mac/Documents/projects/tools/tool/crates/cli/tests/setup.rs:5) [crates/cli/tests/setup.rs:38](/Users/mac/Documents/projects/tools/tool/crates/cli/tests/setup.rs:38) [crates/cli/tests/setup.rs:76](/Users/mac/Documents/projects/tools/tool/crates/cli/tests/setup.rs:76)\",\"citations\":[{\"end_line\":109,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Direct detection implementation for supported coding-agent integrations.\" ,\"start_line\":52},{\"end_line\":177,\"path\":\"crates/cli/src/setup.rs\",\"reason\":\"Direct selection, configuration normalization, and Codex verification implementation.\",\"start_line\":106},{\"end_line\":242,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Direct per-agent installation implementations and dry-run behavior.\",\"start_line\":175},{\"end_line\":405,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Direct uninstall implementation for MCP entries and managed files.\",\"start_line\":362},{\"end_line\":121,\"path\":\"crates/cli/tests/setup.rs\",\"reason\":\"Setup integration tests covering dry-run, model validation, Codex login, and writes.\",\"start_line\":5}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00953052
+    },
+    {
+      "task": "setup-integrations",
+      "repeat": 3,
+      "arm": "native_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 30.264,
+      "provider_cost_usd": 0.00740204,
+      "expected_path_hits": [
+        "crates/cli/src/agents.rs",
+        "crates/cli/src/setup.rs"
+      ],
+      "expected_path_recall": 0.6667,
+      "result": {
+        "summary": "`grephound setup` detects Claude Code, Codex, Cursor, and GitHub Copilot by checking each executable or its expected config directory; it separately marks an integration configured when its config contains `grephound`. Generic MCP is always available but excluded from host selection. [agents.rs](crates/cli/src/agents.rs:57)\n\nSelection installs only detected hosts during normal setup; `--dry-run` selects all known hosts so it can display the complete plan. Each host gets an MCP registration plus native routing: Claude gets a skill, Codex gets config and `AGENTS.md`, Cursor gets a project rule, and Copilot gets project instructions. [setup.rs](crates/cli/src/setup.rs:50)\n\nDry-run branches avoid writes and report planned actions, including the main config write, ending with an explicit \u201cno files or services changed\u201d result. The focused test verifies that no config, Codex home, or Copilot directory is created. [setup.rs](crates/cli/src/setup.rs:83)\n[agents.rs](crates/cli/src/agents.rs:175)\n[setup.rs](crates/cli/src/setup.rs:171)\n\n`uninstall --yes` removes host MCP entries, Codex\u2019s Grephound TOML section, generated skills/rules, managed instruction blocks, and the local Grephound config; it preserves provider logins and the binary. Without `--yes`, it only prints the confirmation requirement. [agents.rs](crates/cli/src/agents.rs:362)\n[setup.rs](crates/cli/src/setup.rs:179)",
+        "citations": [
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 57,
+            "end_line": 110,
+            "reason": "Detection and configured-state implementation for all supported agents."
+          },
+          {
+            "path": "crates/cli/src/setup.rs",
+            "start_line": 50,
+            "end_line": 80,
+            "reason": "Selection, per-agent dispatch, and configuration write/dry-run flow."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 175,
+            "end_line": 247,
+            "reason": "Leaf installation behavior and dry-run write suppression for each integration."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 362,
+            "end_line": 407,
+            "reason": "Leaf uninstall implementation removing MCP entries, generated files, and managed instructions."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 30257,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 65131,
+          "cached_prompt_tokens": 40192,
+          "completion_tokens": 1342,
+          "reasoning_output_tokens": 360
+        },
+        "raw_final": "{\"answer\":\"`grephound setup` detects Claude Code, Codex, Cursor, and GitHub Copilot by checking each executable or its expected config directory; it separately marks an integration configured when its config contains `grephound`. Generic MCP is always available but excluded from host selection. [agents.rs](crates/cli/src/agents.rs:57)\\n\\nSelection installs only detected hosts during normal setup; `--dry-run` selects all known hosts so it can display the complete plan. Each host gets an MCP registration plus native routing: Claude gets a skill, Codex gets config and `AGENTS.md`, Cursor gets a project rule, and Copilot gets project instructions. [setup.rs](crates/cli/src/setup.rs:50)\\n\\nDry-run branches avoid writes and report planned actions, including the main config write, ending with an explicit \u201cno files or services changed\u201d result. The focused test verifies that no config, Codex home, or Copilot directory is created. [setup.rs](crates/cli/src/setup.rs:83)\\n[agents.rs](crates/cli/src/agents.rs:175)\\n[setup.rs](crates/cli/src/setup.rs:171)\\n\\n`uninstall --yes` removes host MCP entries, Codex\u2019s Grephound TOML section, generated skills/rules, managed instruction blocks, and the local Grephound config; it preserves provider logins and the binary. Without `--yes`, it only prints the confirmation requirement. [agents.rs](crates/cli/src/agents.rs:362)\\n[setup.rs](crates/cli/src/setup.rs:179)\",\"citations\":[{\"end_line\":110,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Detection and configured-state implementation for all supported agents.\" ,\"start_line\":57},{\"end_line\":80,\"path\":\"crates/cli/src/setup.rs\",\"reason\":\"Selection, per-agent dispatch, and configuration write/dry-run flow.\",\"start_line\":50},{\"end_line\":247,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Leaf installation behavior and dry-run write suppression for each integration.\",\"start_line\":175},{\"end_line\":407,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Leaf uninstall implementation removing MCP entries, generated files, and managed instructions.\",\"start_line\":362}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00740204
+    },
+    {
+      "task": "setup-integrations",
+      "repeat": 3,
+      "arm": "baseline_no_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 54.188,
+      "provider_cost_usd": 0.00972464,
+      "expected_path_hits": [
+        "crates/cli/src/agents.rs",
+        "crates/cli/src/setup.rs",
+        "crates/cli/tests/setup.rs"
+      ],
+      "expected_path_recall": 1.0,
+      "result": {
+        "summary": "`setup` detects Claude Code, Codex, Cursor, and GitHub Copilot when their executable or expected config directory exists; it separately checks whether Grephound is already configured. Generic MCP is always represented but excluded from automatic host selection. [crates/cli/src/agents.rs:57-96]\n\nNormal setup selects detected hosts; `--dry-run` selects all non-generic hosts to preview the complete plan, then dispatches host-specific installers. Installers add native MCP configuration and routing assets (Claude skill, Codex instructions, Cursor rule, or Copilot instructions), while skipping writes in dry-run mode. [crates/cli/src/setup.rs:50-65] [crates/cli/src/setup.rs:171-176] [crates/cli/src/agents.rs:175-238]\n\nDry-run only reports the planned Grephound config write and ends with an explicit no-change message; tests verify it creates neither config nor integration directories. [crates/cli/src/setup.rs:83-99] [crates/cli/tests/setup.rs:5-35]\n\n`uninstall` requires `--yes`; confirmed removal deletes host MCP entries, backs up and edits Codex TOML, removes generated files and managed instruction blocks, deletes Grephound\u2019s config, and preserves provider logins and the binary. [crates/cli/src/setup.rs:179-193] [crates/cli/src/agents.rs:362-416]",
+        "citations": [
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 57,
+            "end_line": 96,
+            "reason": "Direct detection and configured-state checks for supported integrations."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 175,
+            "end_line": 238,
+            "reason": "Leaf host-specific installation behavior and dry-run write guards."
+          },
+          {
+            "path": "crates/cli/src/setup.rs",
+            "start_line": 50,
+            "end_line": 99,
+            "reason": "Selection, installer dispatch, dry-run config handling, and completion message."
+          },
+          {
+            "path": "crates/cli/tests/setup.rs",
+            "start_line": 5,
+            "end_line": 35,
+            "reason": "Focused test proving dry-run output and absence of writes."
+          },
+          {
+            "path": "crates/cli/src/agents.rs",
+            "start_line": 362,
+            "end_line": 416,
+            "reason": "Leaf uninstall implementation for MCP entries, backups, generated files, and managed instructions."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 54157,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 65650,
+          "cached_prompt_tokens": 31232,
+          "completion_tokens": 1847,
+          "reasoning_output_tokens": 697
+        },
+        "raw_final": "{\"answer\":\"`setup` detects Claude Code, Codex, Cursor, and GitHub Copilot when their executable or expected config directory exists; it separately checks whether Grephound is already configured. Generic MCP is always represented but excluded from automatic host selection. [crates/cli/src/agents.rs:57-96]\\n\\nNormal setup selects detected hosts; `--dry-run` selects all non-generic hosts to preview the complete plan, then dispatches host-specific installers. Installers add native MCP configuration and routing assets (Claude skill, Codex instructions, Cursor rule, or Copilot instructions), while skipping writes in dry-run mode. [crates/cli/src/setup.rs:50-65] [crates/cli/src/setup.rs:171-176] [crates/cli/src/agents.rs:175-238]\\n\\nDry-run only reports the planned Grephound config write and ends with an explicit no-change message; tests verify it creates neither config nor integration directories. [crates/cli/src/setup.rs:83-99] [crates/cli/tests/setup.rs:5-35]\\n\\n`uninstall` requires `--yes`; confirmed removal deletes host MCP entries, backs up and edits Codex TOML, removes generated files and managed instruction blocks, deletes Grephound\u2019s config, and preserves provider logins and the binary. [crates/cli/src/setup.rs:179-193] [crates/cli/src/agents.rs:362-416]\",\"citations\":[{\"end_line\":96,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Direct detection and configured-state checks for supported integrations.\",\"start_line\":57},{\"end_line\":238,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Leaf host-specific installation behavior and dry-run write guards.\",\"start_line\":175},{\"end_line\":99,\"path\":\"crates/cli/src/setup.rs\",\"reason\":\"Selection, installer dispatch, dry-run config handling, and completion message.\",\"start_line\":50},{\"end_line\":35,\"path\":\"crates/cli/tests/setup.rs\",\"reason\":\"Focused test proving dry-run output and absence of writes.\",\"start_line\":5},{\"end_line\":416,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Leaf uninstall implementation for MCP entries, backups, generated files, and managed instructions.\",\"start_line\":362}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00972464
+    },
+    {
+      "task": "mcp-request-flow",
+      "repeat": 1,
+      "arm": "baseline_no_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 40.8,
+      "provider_cost_usd": 0.00788476,
+      "expected_path_hits": [
+        "crates/mcp/src/lib.rs"
+      ],
+      "expected_path_recall": 0.3333,
+      "result": {
+        "summary": "`tools/call` accepts only `repo_scout`, extracts and trims `arguments.query`, then the backend\u2019s `scout` path runs with turn and total-timeout limits. During execution, tool-call results are fed back into the conversation; the final assistant message is parsed into a summary and raw citations, then citations are validated against the repository before constructing `ScoutResult`. [crates/mcp/src/lib.rs:112-124](crates/mcp/src/lib.rs:112) [crates/core/src/engine.rs:35-55](crates/core/src/engine.rs:35) [crates/core/src/engine.rs:181-196](crates/core/src/engine.rs:181)\n\nIf the backend times out, it returns a successful `ScoutResult` containing a timeout summary and no citations. If the final answer has missing or invalid citations, the engine permits one correction turn; otherwise it returns the validated citation list, which may be empty. [crates/core/src/engine.rs:43-55](crates/core/src/engine.rs:43) [crates/core/src/engine.rs:193-212](crates/core/src/engine.rs:193)\n\nThe MCP handoff truncates citations to five, chooses a successful versus empty-evidence next action, appends compact text plus bounded evidence excerpts, and returns structured `summary`, `citations`, `evidence`, `next_action`, and `stats`. Empty evidence yields the explicit fallback action: normal repository exploration. [crates/mcp/src/lib.rs:156-179](crates/mcp/src/lib.rs:156)",
+        "citations": [
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 112,
+            "end_line": 124,
+            "reason": "MCP tools/call validation and query extraction for repo_scout."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 35,
+            "end_line": 55,
+            "reason": "Backend scout execution, timeout handling, and empty-citation timeout result."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 193,
+            "end_line": 212,
+            "reason": "Final-message parsing, citation validation, correction behavior, and ScoutResult construction."
+          },
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 156,
+            "end_line": 179,
+            "reason": "Returned text, empty-evidence branching, citation cap, excerpts, and structured evidence payload."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 40791,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 68735,
+          "cached_prompt_tokens": 44288,
+          "completion_tokens": 1758,
+          "reasoning_output_tokens": 819
+        },
+        "raw_final": "{\"answer\":\"`tools/call` accepts only `repo_scout`, extracts and trims `arguments.query`, then the backend\u2019s `scout` path runs with turn and total-timeout limits. During execution, tool-call results are fed back into the conversation; the final assistant message is parsed into a summary and raw citations, then citations are validated against the repository before constructing `ScoutResult`. [crates/mcp/src/lib.rs:112-124](crates/mcp/src/lib.rs:112) [crates/core/src/engine.rs:35-55](crates/core/src/engine.rs:35) [crates/core/src/engine.rs:181-196](crates/core/src/engine.rs:181)\\n\\nIf the backend times out, it returns a successful `ScoutResult` containing a timeout summary and no citations. If the final answer has missing or invalid citations, the engine permits one correction turn; otherwise it returns the validated citation list, which may be empty. [crates/core/src/engine.rs:43-55](crates/core/src/engine.rs:43) [crates/core/src/engine.rs:193-212](crates/core/src/engine.rs:193)\\n\\nThe MCP handoff truncates citations to five, chooses a successful versus empty-evidence next action, appends compact text plus bounded evidence excerpts, and returns structured `summary`, `citations`, `evidence`, `next_action`, and `stats`. Empty evidence yields the explicit fallback action: normal repository exploration. [crates/mcp/src/lib.rs:156-179](crates/mcp/src/lib.rs:156)\",\"citations\":[{\"end_line\":124,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"MCP tools/call validation and query extraction for repo_scout.\" ,\"start_line\":112},{\"end_line\":55,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Backend scout execution, timeout handling, and empty-citation timeout result.\",\"start_line\":35},{\"end_line\":212,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Final-message parsing, citation validation, correction behavior, and ScoutResult construction.\",\"start_line\":193},{\"end_line\":179,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"Returned text, empty-evidence branching, citation cap, excerpts, and structured evidence payload.\",\"start_line\":156}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00788476
+    },
+    {
+      "task": "mcp-request-flow",
+      "repeat": 1,
+      "arm": "native_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 161.773,
+      "provider_cost_usd": 0.01264788,
+      "expected_path_hits": [
+        "crates/mcp/src/lib.rs",
+        "crates/core/src/citations.rs"
+      ],
+      "expected_path_recall": 0.6667,
+      "result": {
+        "summary": "`tools/call` dispatches to `McpServer::tools_call`; the `repo_scout` handler builds a `ScoutRequest` and awaits the configured `ScoutBackend`. The core engine then exposes repository tools, executes model tool calls concurrently, feeds their outputs back, and parses the final assistant message. [1][2]\n\nThe final text is split into a summary plus citation entries, then each citation is validated against the repository: line ordering, canonical path containment, file existence/type, UTF-8-like content, and line bounds. Only validated citations are returned. Invalid claimed citations trigger one correction turn; after that, the result can contain the summary with an empty evidence list. [2][3]\n\nThe MCP handoff returns the summary as text and bounded citation excerpts as structured evidence; if the backend fails or times out, it returns an error/timeout result, and timeout specifically produces an empty citation vector. Missing final answers or exhausted turns likewise produce an empty result. [4][5]",
+        "citations": [
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 80,
+            "end_line": 108,
+            "reason": "MCP request dispatch and repo_scout tools/call handling."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 137,
+            "end_line": 218,
+            "reason": "Backend execution, repository-tool calls, final text parsing, citation validation, correction, and returned ScoutResult."
+          },
+          {
+            "path": "crates/core/src/citations.rs",
+            "start_line": 31,
+            "end_line": 128,
+            "reason": "Citation parsing and leaf validation rules."
+          },
+          {
+            "path": "crates/cli/src/subscription.rs",
+            "start_line": 158,
+            "end_line": 256,
+            "reason": "CLI backend execution, structured output decoding, citation validation, and ScoutResult construction."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 44,
+            "end_line": 306,
+            "reason": "Timeout, turn exhaustion, and empty-result behavior."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 161745,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 72969,
+          "cached_prompt_tokens": 20224,
+          "completion_tokens": 1412,
+          "reasoning_output_tokens": 629
+        },
+        "raw_final": "{\"answer\":\"`tools/call` dispatches to `McpServer::tools_call`; the `repo_scout` handler builds a `ScoutRequest` and awaits the configured `ScoutBackend`. The core engine then exposes repository tools, executes model tool calls concurrently, feeds their outputs back, and parses the final assistant message. [1][2]\\n\\nThe final text is split into a summary plus citation entries, then each citation is validated against the repository: line ordering, canonical path containment, file existence/type, UTF-8-like content, and line bounds. Only validated citations are returned. Invalid claimed citations trigger one correction turn; after that, the result can contain the summary with an empty evidence list. [2][3]\\n\\nThe MCP handoff returns the summary as text and bounded citation excerpts as structured evidence; if the backend fails or times out, it returns an error/timeout result, and timeout specifically produces an empty citation vector. Missing final answers or exhausted turns likewise produce an empty result. [4][5]\",\"citations\":[{\"end_line\":108,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"MCP request dispatch and repo_scout tools/call handling.\" ,\"start_line\":80},{\"end_line\":218,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Backend execution, repository-tool calls, final text parsing, citation validation, correction, and returned ScoutResult.\" ,\"start_line\":137},{\"end_line\":128,\"path\":\"crates/core/src/citations.rs\",\"reason\":\"Citation parsing and leaf validation rules.\" ,\"start_line\":31},{\"end_line\":256,\"path\":\"crates/cli/src/subscription.rs\",\"reason\":\"CLI backend execution, structured output decoding, citation validation, and ScoutResult construction.\" ,\"start_line\":158},{\"end_line\":306,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Timeout, turn exhaustion, and empty-result behavior.\" ,\"start_line\":44}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.01264788
+    },
+    {
+      "task": "mcp-request-flow",
+      "repeat": 2,
+      "arm": "native_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 52.492,
+      "provider_cost_usd": 0.00764276,
+      "expected_path_hits": [
+        "crates/mcp/src/lib.rs",
+        "crates/core/src/citations.rs"
+      ],
+      "expected_path_recall": 0.6667,
+      "result": {
+        "summary": "`tools/call` dispatches to `tools_call`; it accepts only `repo_scout`, requires a query, validates `focus`, constructs `ScoutRequest`, awaits backend scouting, and maps backend errors to JSON-RPC `-32000` errors. [crates/mcp/src/lib.rs:84-115](crates/mcp/src/lib.rs:84)\n\nThe backend parses the model\u2019s final text into a summary and raw citations, validates them, and permits one correction turn when citations are missing or invalid. It then returns a `ScoutResult` containing the summary and validated citations. [crates/core/src/engine.rs:193-212](crates/core/src/engine.rs:193)\n\nValidation rejects invalid ranges, paths escaping the repository, non-files, binary/empty files, and out-of-range starts; valid end lines are clamped to the file length. [crates/core/src/citations.rs:80-113](crates/core/src/citations.rs:80)\n\nThe MCP handoff truncates citations to five, selects a successful or empty next-action message, renders bounded source excerpts into the returned text, and separately returns `structuredContent` with `summary`, `citations`, `evidence`, `next_action`, and `stats`. [crates/mcp/src/lib.rs:156-185](crates/mcp/src/lib.rs:156)\n\nIf no citations validate, the compact text says \u201cNo validated citations\u201d and the handoff explicitly instructs normal exploration; the MCP test verifies this empty-evidence behavior. [crates/mcp/src/lib.rs:529-537](crates/mcp/src/lib.rs:529)",
+        "citations": [
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 84,
+            "end_line": 115,
+            "reason": "MCP method dispatch and repo_scout entry validation."
+          },
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 118,
+            "end_line": 152,
+            "reason": "Request construction, backend execution, and backend-error mapping."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 193,
+            "end_line": 212,
+            "reason": "Final-text parsing, citation validation, correction turn, and ScoutResult construction."
+          },
+          {
+            "path": "crates/core/src/citations.rs",
+            "start_line": 80,
+            "end_line": 113,
+            "reason": "Leaf citation validation rules and line-range handling."
+          },
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 529,
+            "end_line": 537,
+            "reason": "Empty validated-citation handoff behavior and test coverage."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 52486,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 62827,
+          "cached_prompt_tokens": 39168,
+          "completion_tokens": 1773,
+          "reasoning_output_tokens": 810
+        },
+        "raw_final": "{\"answer\":\"`tools/call` dispatches to `tools_call`; it accepts only `repo_scout`, requires a query, validates `focus`, constructs `ScoutRequest`, awaits backend scouting, and maps backend errors to JSON-RPC `-32000` errors. [crates/mcp/src/lib.rs:84-115](crates/mcp/src/lib.rs:84)\\n\\nThe backend parses the model\u2019s final text into a summary and raw citations, validates them, and permits one correction turn when citations are missing or invalid. It then returns a `ScoutResult` containing the summary and validated citations. [crates/core/src/engine.rs:193-212](crates/core/src/engine.rs:193)\\n\\nValidation rejects invalid ranges, paths escaping the repository, non-files, binary/empty files, and out-of-range starts; valid end lines are clamped to the file length. [crates/core/src/citations.rs:80-113](crates/core/src/citations.rs:80)\\n\\nThe MCP handoff truncates citations to five, selects a successful or empty next-action message, renders bounded source excerpts into the returned text, and separately returns `structuredContent` with `summary`, `citations`, `evidence`, `next_action`, and `stats`. [crates/mcp/src/lib.rs:156-185](crates/mcp/src/lib.rs:156)\\n\\nIf no citations validate, the compact text says \u201cNo validated citations\u201d and the handoff explicitly instructs normal exploration; the MCP test verifies this empty-evidence behavior. [crates/mcp/src/lib.rs:529-537](crates/mcp/src/lib.rs:529)\",\"citations\":[{\"end_line\":115,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"MCP method dispatch and repo_scout entry validation.\",\"start_line\":84},{\"end_line\":152,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"Request construction, backend execution, and backend-error mapping.\",\"start_line\":118},{\"end_line\":212,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Final-text parsing, citation validation, correction turn, and ScoutResult construction.\",\"start_line\":193},{\"end_line\":113,\"path\":\"crates/core/src/citations.rs\",\"reason\":\"Leaf citation validation rules and line-range handling.\",\"start_line\":80},{\"end_line\":537,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"Empty validated-citation handoff behavior and test coverage.\",\"start_line\":529}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00764276
+    },
+    {
+      "task": "mcp-request-flow",
+      "repeat": 2,
+      "arm": "baseline_no_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 52.082,
+      "provider_cost_usd": 0.00634108,
+      "expected_path_hits": [
+        "crates/mcp/src/lib.rs"
+      ],
+      "expected_path_recall": 0.3333,
+      "result": {
+        "summary": "`tools/call` accepts only `repo_scout`, extracts and trims `arguments.query`, validates optional repository-relative `focus`, then invokes `ScoutBackend::scout(ScoutRequest { query, root, focus, \u2026 })`. Invalid tool names return JSON-RPC `-32602`; missing queries return an MCP text error; backend failures become JSON-RPC `-32000`. [crates/mcp/src/lib.rs:113](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:113) [crates/mcp/src/lib.rs:135](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:135)\n\nThe backend\u2019s returned final text is parsed into citations and revalidated against repository paths and line ranges before becoming `ScoutResult`; the documented pipeline is \u201cfinal text \u2192 parse `<final_answer>` \u2192 validate citations \u2192 ScoutResult.\u201d [docs/ARCHITECTURE.md:55](/Users/mac/Documents/projects/tools/tool/docs/ARCHITECTURE.md:55)\n\nThe MCP handoff truncates citations to five, chooses a success versus empty-evidence instruction, and returns both human-readable text (`summary` plus evidence excerpts) and `structuredContent` containing `summary`, citations, evidence, `next_action`, and stats. [crates/mcp/src/lib.rs:155](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:155)\n\nWhen no validated citations remain, the text says \u201cNo validated evidence was returned. Fall back to normal repository exploration.\u201d Missing citation files or empty excerpts are silently skipped, so they do not enter either evidence representation. [crates/mcp/src/lib.rs:16](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:16) [crates/mcp/src/lib.rs:195](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:195)",
+        "citations": [
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 113,
+            "end_line": 153,
+            "reason": "MCP tools/call dispatch, argument validation, backend invocation, and backend-error mapping."
+          },
+          {
+            "path": "docs/ARCHITECTURE.md",
+            "start_line": 48,
+            "end_line": 72,
+            "reason": "Direct pipeline description covering backend final-text parsing and citation validation."
+          },
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 155,
+            "end_line": 194,
+            "reason": "Leaf handoff implementation for truncation, returned text, and structured evidence."
+          },
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 16,
+            "end_line": 220,
+            "reason": "Empty-evidence behavior and file/excerpt filtering during evidence construction."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 52074,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 52133,
+          "cached_prompt_tokens": 33024,
+          "completion_tokens": 1549,
+          "reasoning_output_tokens": 570
+        },
+        "raw_final": "{\"answer\":\"`tools/call` accepts only `repo_scout`, extracts and trims `arguments.query`, validates optional repository-relative `focus`, then invokes `ScoutBackend::scout(ScoutRequest { query, root, focus, \u2026 })`. Invalid tool names return JSON-RPC `-32602`; missing queries return an MCP text error; backend failures become JSON-RPC `-32000`. [crates/mcp/src/lib.rs:113](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:113) [crates/mcp/src/lib.rs:135](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:135)\\n\\nThe backend\u2019s returned final text is parsed into citations and revalidated against repository paths and line ranges before becoming `ScoutResult`; the documented pipeline is \u201cfinal text \u2192 parse `<final_answer>` \u2192 validate citations \u2192 ScoutResult.\u201d [docs/ARCHITECTURE.md:55](/Users/mac/Documents/projects/tools/tool/docs/ARCHITECTURE.md:55)\\n\\nThe MCP handoff truncates citations to five, chooses a success versus empty-evidence instruction, and returns both human-readable text (`summary` plus evidence excerpts) and `structuredContent` containing `summary`, citations, evidence, `next_action`, and stats. [crates/mcp/src/lib.rs:155](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:155)\\n\\nWhen no validated citations remain, the text says \u201cNo validated evidence was returned. Fall back to normal repository exploration.\u201d Missing citation files or empty excerpts are silently skipped, so they do not enter either evidence representation. [crates/mcp/src/lib.rs:16](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:16) [crates/mcp/src/lib.rs:195](/Users/mac/Documents/projects/tools/tool/crates/mcp/src/lib.rs:195)\",\"citations\":[{\"end_line\":153,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"MCP tools/call dispatch, argument validation, backend invocation, and backend-error mapping.\" ,\"start_line\":113},{\"end_line\":72,\"path\":\"docs/ARCHITECTURE.md\",\"reason\":\"Direct pipeline description covering backend final-text parsing and citation validation.\",\"start_line\":48},{\"end_line\":194,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"Leaf handoff implementation for truncation, returned text, and structured evidence.\",\"start_line\":155},{\"end_line\":220,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"Empty-evidence behavior and file/excerpt filtering during evidence construction.\",\"start_line\":16}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00634108
+    },
+    {
+      "task": "mcp-request-flow",
+      "repeat": 3,
+      "arm": "baseline_no_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 35.997,
+      "provider_cost_usd": 0.00763208,
+      "expected_path_hits": [
+        "crates/mcp/src/lib.rs",
+        "crates/core/src/citations.rs"
+      ],
+      "expected_path_recall": 0.6667,
+      "result": {
+        "summary": "`tools/call` accepts only `repo_scout`, requires a non-empty trimmed `arguments.query`, validates optional `focus`, then calls the backend scout; backend errors become JSON-RPC errors. [crates/mcp/src/lib.rs:112-154]\n\nThe backend runs with turn/total-timeout limits. Tool results are appended to the model conversation; the final assistant message is parsed into summary plus citation entries, then each citation is repository/path/line validated. Invalid or missing citations receive one correction turn; after that, the validated list is returned even if empty. [crates/core/src/engine.rs:35-65] [crates/core/src/engine.rs:193-212] [crates/core/src/citations.rs:80-134]\n\nA timeout is represented as a successful result with `Scout timed out after \u2026`, no citations, and stats. Citation validation rejects invalid ranges, paths outside the repository, non-files, binary/empty files, and starts beyond EOF; end lines are clamped. [crates/core/src/engine.rs:43-62] [crates/core/src/citations.rs:80-126]\n\nThe MCP handoff caps citations at five, selects a successful or empty-evidence next action, builds returned text from `next_action`, compact summary, and bounded source excerpts, and returns structured `summary`, `citations`, `evidence`, `next_action`, and `stats`. With no usable evidence, the excerpt text/list remain empty and the explicit empty-evidence fallback action is selected. [crates/mcp/src/lib.rs:156-185] [crates/mcp/src/lib.rs:188-225]",
+        "citations": [
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 112,
+            "end_line": 154,
+            "reason": "MCP tools/call dispatch, query/focus validation, backend invocation, and error mapping."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 35,
+            "end_line": 65,
+            "reason": "Backend timeout behavior and empty-citation timeout result."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 193,
+            "end_line": 212,
+            "reason": "Tool-result conversation loop, final parsing, correction turn, and ScoutResult construction."
+          },
+          {
+            "path": "crates/core/src/citations.rs",
+            "start_line": 80,
+            "end_line": 134,
+            "reason": "Leaf citation parsing/validation and filtering of invalid evidence."
+          },
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 156,
+            "end_line": 225,
+            "reason": "Handoff text, citation cap, structured evidence payload, and bounded excerpt behavior."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 35990,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 67702,
+          "cached_prompt_tokens": 43264,
+          "completion_tokens": 1566,
+          "reasoning_output_tokens": 518
+        },
+        "raw_final": "{\"answer\":\"`tools/call` accepts only `repo_scout`, requires a non-empty trimmed `arguments.query`, validates optional `focus`, then calls the backend scout; backend errors become JSON-RPC errors. [crates/mcp/src/lib.rs:112-154]\\n\\nThe backend runs with turn/total-timeout limits. Tool results are appended to the model conversation; the final assistant message is parsed into summary plus citation entries, then each citation is repository/path/line validated. Invalid or missing citations receive one correction turn; after that, the validated list is returned even if empty. [crates/core/src/engine.rs:35-65] [crates/core/src/engine.rs:193-212] [crates/core/src/citations.rs:80-134]\\n\\nA timeout is represented as a successful result with `Scout timed out after \u2026`, no citations, and stats. Citation validation rejects invalid ranges, paths outside the repository, non-files, binary/empty files, and starts beyond EOF; end lines are clamped. [crates/core/src/engine.rs:43-62] [crates/core/src/citations.rs:80-126]\\n\\nThe MCP handoff caps citations at five, selects a successful or empty-evidence next action, builds returned text from `next_action`, compact summary, and bounded source excerpts, and returns structured `summary`, `citations`, `evidence`, `next_action`, and `stats`. With no usable evidence, the excerpt text/list remain empty and the explicit empty-evidence fallback action is selected. [crates/mcp/src/lib.rs:156-185] [crates/mcp/src/lib.rs:188-225]\",\"citations\":[{\"end_line\":154,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"MCP tools/call dispatch, query/focus validation, backend invocation, and error mapping.\" ,\"start_line\":112},{\"end_line\":65,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Backend timeout behavior and empty-citation timeout result.\" ,\"start_line\":35},{\"end_line\":212,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Tool-result conversation loop, final parsing, correction turn, and ScoutResult construction.\" ,\"start_line\":193},{\"end_line\":134,\"path\":\"crates/core/src/citations.rs\",\"reason\":\"Leaf citation parsing/validation and filtering of invalid evidence.\" ,\"start_line\":80},{\"end_line\":225,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"Handoff text, citation cap, structured evidence payload, and bounded excerpt behavior.\" ,\"start_line\":156}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00763208
+    },
+    {
+      "task": "mcp-request-flow",
+      "repeat": 3,
+      "arm": "native_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 55.177,
+      "provider_cost_usd": 0.00895364,
+      "expected_path_hits": [
+        "crates/mcp/src/lib.rs",
+        "crates/core/src/citations.rs"
+      ],
+      "expected_path_recall": 0.6667,
+      "result": {
+        "summary": "`tools/call` accepts only `repo_scout`, validates the required query/focus, constructs `ScoutRequest`, invokes the backend, and converts the result through `handoff_response`. Backend turns model tool calls into repository-tool calls via `call_many`; after the final model message it parses `<final_answer>` citations, validates them against the repository, and permits one correction turn when citations are missing/invalid. The returned MCP value contains both a text block (summary plus rendered evidence excerpts) and `structuredContent` with summary, validated citations, evidence metadata, next action, and stats. [crates/mcp/src/lib.rs:124](crates/mcp/src/lib.rs:124) [crates/core/src/engine.rs:139](crates/core/src/engine.rs:139) [crates/core/src/engine.rs:193](crates/core/src/engine.rs:193) [crates/mcp/src/lib.rs:166](crates/mcp/src/lib.rs:166)\n\nFailure and empty-evidence behavior: an empty query or invalid focus returns an MCP text error; backend timeout returns a successful empty `ScoutResult` with a timeout summary and no citations; exhausted turns return an empty result; invalid citations trigger one correction attempt, then the result can still contain no citations. When handoff citations are empty, the text says \u201cNo validated evidence was returned\u201d and structured `next_action` instructs fallback exploration. Invalid paths, ranges, escapes, non-files, binary files, and out-of-range starts are rejected by validation. Parsing and validation tests cover tagged/untagged citations, clamping, existing files, and path escape rejection. [crates/mcp/src/lib.rs:136](crates/mcp/src/lib.rs:136) [crates/core/src/engine.rs:40](crates/core/src/engine.rs:40) [crates/core/src/engine.rs:98](crates/core/src/engine.rs:98) [crates/core/src/citations.rs:40](crates/core/src/citations.rs:40)",
+        "citations": [
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 124,
+            "end_line": 163,
+            "reason": "Direct MCP tools/call validation, ScoutRequest construction, backend invocation, and handoff dispatch."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 139,
+            "end_line": 187,
+            "reason": "Direct backend execution of model tool calls through repository tools and tool-result message handling."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 193,
+            "end_line": 228,
+            "reason": "Direct final-answer parsing, citation validation, correction behavior, and returned ScoutResult."
+          },
+          {
+            "path": "crates/mcp/src/lib.rs",
+            "start_line": 166,
+            "end_line": 220,
+            "reason": "Direct text and structured handoff construction, empty-evidence next action, citation truncation, and evidence excerpt generation."
+          },
+          {
+            "path": "crates/core/src/citations.rs",
+            "start_line": 40,
+            "end_line": 123,
+            "reason": "Direct citation parsing/validation rules and associated tests, including path escape rejection."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 55169,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 50761,
+          "cached_prompt_tokens": 20992,
+          "completion_tokens": 2150,
+          "reasoning_output_tokens": 1123
+        },
+        "raw_final": "{\"answer\":\"`tools/call` accepts only `repo_scout`, validates the required query/focus, constructs `ScoutRequest`, invokes the backend, and converts the result through `handoff_response`. Backend turns model tool calls into repository-tool calls via `call_many`; after the final model message it parses `<final_answer>` citations, validates them against the repository, and permits one correction turn when citations are missing/invalid. The returned MCP value contains both a text block (summary plus rendered evidence excerpts) and `structuredContent` with summary, validated citations, evidence metadata, next action, and stats. [crates/mcp/src/lib.rs:124](crates/mcp/src/lib.rs:124) [crates/core/src/engine.rs:139](crates/core/src/engine.rs:139) [crates/core/src/engine.rs:193](crates/core/src/engine.rs:193) [crates/mcp/src/lib.rs:166](crates/mcp/src/lib.rs:166)\\n\\nFailure and empty-evidence behavior: an empty query or invalid focus returns an MCP text error; backend timeout returns a successful empty `ScoutResult` with a timeout summary and no citations; exhausted turns return an empty result; invalid citations trigger one correction attempt, then the result can still contain no citations. When handoff citations are empty, the text says \u201cNo validated evidence was returned\u201d and structured `next_action` instructs fallback exploration. Invalid paths, ranges, escapes, non-files, binary files, and out-of-range starts are rejected by validation. Parsing and validation tests cover tagged/untagged citations, clamping, existing files, and path escape rejection. [crates/mcp/src/lib.rs:136](crates/mcp/src/lib.rs:136) [crates/core/src/engine.rs:40](crates/core/src/engine.rs:40) [crates/core/src/engine.rs:98](crates/core/src/engine.rs:98) [crates/core/src/citations.rs:40](crates/core/src/citations.rs:40)\",\"citations\":[{\"end_line\":163,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"Direct MCP tools/call validation, ScoutRequest construction, backend invocation, and handoff dispatch.\" ,\"start_line\":124},{\"end_line\":187,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Direct backend execution of model tool calls through repository tools and tool-result message handling.\",\"start_line\":139},{\"end_line\":228,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Direct final-answer parsing, citation validation, correction behavior, and returned ScoutResult.\" ,\"start_line\":193},{\"end_line\":220,\"path\":\"crates/mcp/src/lib.rs\",\"reason\":\"Direct text and structured handoff construction, empty-evidence next action, citation truncation, and evidence excerpt generation.\",\"start_line\":166},{\"end_line\":123,\"path\":\"crates/core/src/citations.rs\",\"reason\":\"Direct citation parsing/validation rules and associated tests, including path escape rejection.\",\"start_line\":40}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00895364
+    },
+    {
+      "task": "repository-tools",
+      "repeat": 1,
+      "arm": "native_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 53.447,
+      "provider_cost_usd": 0.01088716,
+      "expected_path_hits": [
+        "crates/repo-tools/src/exec.rs",
+        "crates/repo-tools/src/read.rs",
+        "crates/repo-tools/src/glob_tool.rs",
+        "crates/repo-tools/src/grep.rs"
+      ],
+      "expected_path_recall": 0.8,
+      "result": {
+        "summary": "Read, Glob, and Grep are repository-scoped through `resolve_in_root`: relative inputs are joined to the configured root, lexical `..` escapes are rejected, and existing symlink targets are canonicalized and rechecked. Grep additionally runs `rg` with the repository as its working directory and passes only the validated relative path.\n\n`RepoTools::call_many` delegates to `execute_tools`. It schedules calls in a `FuturesUnordered`, starts at most `concurrency` calls at once (default 8), and wraps every call in a per-call timeout (default 10 seconds). A timeout becomes a failed `ToolResult` with a deterministic error message.\n\nResults complete concurrently but are stored by original index and collected in input order. Glob\u2019s own result order is deterministic too: newest modification time first, then path as a tie-breaker.\n\nOutputs are bounded: Read limits files to 10 MiB, reads to 2,000 lines and 2,000 characters per line, and final output to 32 KiB; Glob limits results to 100 paths/32 KiB; Grep limits output to 100 lines/32 KiB. Regression tests cover root and symlink escapes, concurrent execution/order, and truncation/continuation behavior for all three tools.",
+        "citations": [
+          {
+            "path": "crates/repo-tools/src/pathutil.rs",
+            "start_line": 29,
+            "end_line": 59,
+            "reason": "Root containment, lexical escape rejection, and symlink canonicalization."
+          },
+          {
+            "path": "crates/repo-tools/src/exec.rs",
+            "start_line": 15,
+            "end_line": 127,
+            "reason": "Bounded concurrent scheduler, per-call timeout handling, indexed result ordering, and concurrency/order regression test."
+          },
+          {
+            "path": "crates/repo-tools/src/read.rs",
+            "start_line": 8,
+            "end_line": 292,
+            "reason": "Read size/line/output bounds and regression tests for truncation, continuation, and escape rejection."
+          },
+          {
+            "path": "crates/repo-tools/src/glob_tool.rs",
+            "start_line": 97,
+            "end_line": 243,
+            "reason": "Glob traversal, deterministic sorting, output caps, and bounded-output regression test."
+          },
+          {
+            "path": "crates/repo-tools/src/grep.rs",
+            "start_line": 125,
+            "end_line": 350,
+            "reason": "Validated search path and repository-constrained rg execution, output caps, and Grep regression tests."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 53441,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 74057,
+          "cached_prompt_tokens": 39168,
+          "completion_tokens": 2605,
+          "reasoning_output_tokens": 1511
+        },
+        "raw_final": "{\"answer\":\"Read, Glob, and Grep are repository-scoped through `resolve_in_root`: relative inputs are joined to the configured root, lexical `..` escapes are rejected, and existing symlink targets are canonicalized and rechecked. Grep additionally runs `rg` with the repository as its working directory and passes only the validated relative path.\\n\\n`RepoTools::call_many` delegates to `execute_tools`. It schedules calls in a `FuturesUnordered`, starts at most `concurrency` calls at once (default 8), and wraps every call in a per-call timeout (default 10 seconds). A timeout becomes a failed `ToolResult` with a deterministic error message.\\n\\nResults complete concurrently but are stored by original index and collected in input order. Glob\u2019s own result order is deterministic too: newest modification time first, then path as a tie-breaker.\\n\\nOutputs are bounded: Read limits files to 10 MiB, reads to 2,000 lines and 2,000 characters per line, and final output to 32 KiB; Glob limits results to 100 paths/32 KiB; Grep limits output to 100 lines/32 KiB. Regression tests cover root and symlink escapes, concurrent execution/order, and truncation/continuation behavior for all three tools.\",\"citations\":[{\"end_line\":59,\"path\":\"crates/repo-tools/src/pathutil.rs\",\"reason\":\"Root containment, lexical escape rejection, and symlink canonicalization.\" ,\"start_line\":29},{\"end_line\":127,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Bounded concurrent scheduler, per-call timeout handling, indexed result ordering, and concurrency/order regression test.\",\"start_line\":15},{\"end_line\":292,\"path\":\"crates/repo-tools/src/read.rs\",\"reason\":\"Read size/line/output bounds and regression tests for truncation, continuation, and escape rejection.\",\"start_line\":8},{\"end_line\":243,\"path\":\"crates/repo-tools/src/glob_tool.rs\",\"reason\":\"Glob traversal, deterministic sorting, output caps, and bounded-output regression test.\",\"start_line\":97},{\"end_line\":350,\"path\":\"crates/repo-tools/src/grep.rs\",\"reason\":\"Validated search path and repository-constrained rg execution, output caps, and Grep regression tests.\",\"start_line\":125}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.01088716
+    },
+    {
+      "task": "repository-tools",
+      "repeat": 1,
+      "arm": "baseline_no_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 169.873,
+      "provider_cost_usd": 0.0073198,
+      "expected_path_hits": [
+        "crates/repo-tools/src/exec.rs",
+        "crates/repo-tools/src/glob_tool.rs",
+        "crates/repo-tools/src/grep.rs"
+      ],
+      "expected_path_recall": 0.6,
+      "result": {
+        "summary": "Read, Glob, and Grep are repository-scoped: each resolves its user-supplied path through `resolve_in_root`; Grep also runs `rg` with the repository as its working directory. Read rejects files over 10 MiB and caps output at 2,000 lines/2,000 characters per line/32 KiB; Glob and Grep cap results at 100 entries/lines and 32 KiB, returning continuation guidance when truncated. Glob additionally excludes common generated/dependency directories and sorts matches deterministically (newest first, then path).\n\n`RepoTools::call_many` sends calls to `execute_tools`, which maintains at most the configured number in flight (default 8), starts additional calls only as slots free, and wraps every call in a per-tool timeout (default 10 seconds). Completed futures may arrive in any order, but each result is stored by its input index and collected in input order; timeouts become failed `ToolResult`s with a deterministic timeout reminder.\n\nRegression tests cover concurrent execution and input-order preservation, plus bounded Glob and Grep output with continuation notices. The repository has no dedicated timeout test in the inspected tool-test module; timeout behavior is implemented directly in the executor.",
+        "citations": [
+          {
+            "path": "crates/repo-tools/src/glob_tool.rs",
+            "start_line": 59,
+            "end_line": 91,
+            "reason": "Glob resolves the directory inside the repository and executes filesystem traversal in a blocking task."
+          },
+          {
+            "path": "crates/repo-tools/src/grep.rs",
+            "start_line": 118,
+            "end_line": 220,
+            "reason": "Grep resolves the search path, constrains rg to the repository, and applies bounded output handling."
+          },
+          {
+            "path": "crates/repo-tools/src/exec.rs",
+            "start_line": 7,
+            "end_line": 71,
+            "reason": "Defines concurrency and timeout defaults, bounded in-flight scheduling, timeout conversion, and index-based deterministic result collection."
+          },
+          {
+            "path": "crates/repo-tools/src/exec.rs",
+            "start_line": 77,
+            "end_line": 127,
+            "reason": "Regression test verifies parallel execution and preservation of call order; Glob/Grep tests separately verify output bounds and continuation guidance."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 169866,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 56471,
+          "cached_prompt_tokens": 32000,
+          "completion_tokens": 1488,
+          "reasoning_output_tokens": 637
+        },
+        "raw_final": "{\"answer\":\"Read, Glob, and Grep are repository-scoped: each resolves its user-supplied path through `resolve_in_root`; Grep also runs `rg` with the repository as its working directory. Read rejects files over 10 MiB and caps output at 2,000 lines/2,000 characters per line/32 KiB; Glob and Grep cap results at 100 entries/lines and 32 KiB, returning continuation guidance when truncated. Glob additionally excludes common generated/dependency directories and sorts matches deterministically (newest first, then path).\\n\\n`RepoTools::call_many` sends calls to `execute_tools`, which maintains at most the configured number in flight (default 8), starts additional calls only as slots free, and wraps every call in a per-tool timeout (default 10 seconds). Completed futures may arrive in any order, but each result is stored by its input index and collected in input order; timeouts become failed `ToolResult`s with a deterministic timeout reminder.\\n\\nRegression tests cover concurrent execution and input-order preservation, plus bounded Glob and Grep output with continuation notices. The repository has no dedicated timeout test in the inspected tool-test module; timeout behavior is implemented directly in the executor.\",\"citations\":[{\"end_line\":91,\"path\":\"crates/repo-tools/src/glob_tool.rs\",\"reason\":\"Glob resolves the directory inside the repository and executes filesystem traversal in a blocking task.\" ,\"start_line\":59},{\"end_line\":220,\"path\":\"crates/repo-tools/src/grep.rs\",\"reason\":\"Grep resolves the search path, constrains rg to the repository, and applies bounded output handling.\" ,\"start_line\":118},{\"end_line\":71,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Defines concurrency and timeout defaults, bounded in-flight scheduling, timeout conversion, and index-based deterministic result collection.\" ,\"start_line\":7},{\"end_line\":127,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Regression test verifies parallel execution and preservation of call order; Glob/Grep tests separately verify output bounds and continuation guidance.\" ,\"start_line\":77}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.0073198
+    },
+    {
+      "task": "repository-tools",
+      "repeat": 2,
+      "arm": "baseline_no_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 54.366,
+      "provider_cost_usd": 0.0071934,
+      "expected_path_hits": [
+        "crates/repo-tools/src/lib.rs",
+        "crates/repo-tools/src/exec.rs",
+        "crates/repo-tools/src/read.rs",
+        "crates/repo-tools/src/glob_tool.rs"
+      ],
+      "expected_path_recall": 0.8,
+      "result": {
+        "summary": "`RepoTools` constructs Read, Glob, and Grep with one repository root and dispatches calls only to those tools. Each tool resolves its requested path/directory through `resolve_in_root`; Grep also runs `rg` with the repository as its working directory and explicitly prevents glob traversal outside it. Read rejects oversized files, while Glob caps returned matches with `DEFAULT_LIMIT`.\n\n`call_many` delegates to `execute_tools`: it maintains a bounded in-flight set (`concurrency`, default 8), starts calls concurrently, wraps every call in `tokio::time::timeout`, and returns a synthetic failed result on expiry. Although completions arrive through `FuturesUnordered`, each result is stored by its original index and collected in input order, making output deterministic.\n\nThe regression test verifies genuine overlap (four 500-ms calls complete under 1.2 s with peak concurrency \u22652) and verifies returned IDs retain input order.",
+        "citations": [
+          {
+            "path": "crates/repo-tools/src/lib.rs",
+            "start_line": 38,
+            "end_line": 107,
+            "reason": "Shows repository-root construction, Read/Glob/Grep dispatch, and call_many delegation."
+          },
+          {
+            "path": "crates/repo-tools/src/read.rs",
+            "start_line": 103,
+            "end_line": 145,
+            "reason": "Shows Read path sandboxing and file-size bound."
+          },
+          {
+            "path": "crates/repo-tools/src/glob_tool.rs",
+            "start_line": 71,
+            "end_line": 180,
+            "reason": "Shows Glob directory sandboxing, repository walk, deterministic sorting, and result limit."
+          },
+          {
+            "path": "crates/repo-tools/src/exec.rs",
+            "start_line": 15,
+            "end_line": 63,
+            "reason": "Shows bounded concurrency, per-call timeout handling, indexed result storage, and deterministic collection."
+          },
+          {
+            "path": "crates/repo-tools/src/exec.rs",
+            "start_line": 93,
+            "end_line": 128,
+            "reason": "Regression test verifies concurrent execution, bounded elapsed time, and input-order results."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 54359,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 53559,
+          "cached_prompt_tokens": 32000,
+          "completion_tokens": 1868,
+          "reasoning_output_tokens": 1041
+        },
+        "raw_final": "{\"answer\":\"`RepoTools` constructs Read, Glob, and Grep with one repository root and dispatches calls only to those tools. Each tool resolves its requested path/directory through `resolve_in_root`; Grep also runs `rg` with the repository as its working directory and explicitly prevents glob traversal outside it. Read rejects oversized files, while Glob caps returned matches with `DEFAULT_LIMIT`.\\n\\n`call_many` delegates to `execute_tools`: it maintains a bounded in-flight set (`concurrency`, default 8), starts calls concurrently, wraps every call in `tokio::time::timeout`, and returns a synthetic failed result on expiry. Although completions arrive through `FuturesUnordered`, each result is stored by its original index and collected in input order, making output deterministic.\\n\\nThe regression test verifies genuine overlap (four 500-ms calls complete under 1.2 s with peak concurrency \u22652) and verifies returned IDs retain input order.\",\"citations\":[{\"end_line\":107,\"path\":\"crates/repo-tools/src/lib.rs\",\"reason\":\"Shows repository-root construction, Read/Glob/Grep dispatch, and call_many delegation.\" ,\"start_line\":38},{\"end_line\":145,\"path\":\"crates/repo-tools/src/read.rs\",\"reason\":\"Shows Read path sandboxing and file-size bound.\" ,\"start_line\":103},{\"end_line\":180,\"path\":\"crates/repo-tools/src/glob_tool.rs\",\"reason\":\"Shows Glob directory sandboxing, repository walk, deterministic sorting, and result limit.\" ,\"start_line\":71},{\"end_line\":63,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Shows bounded concurrency, per-call timeout handling, indexed result storage, and deterministic collection.\" ,\"start_line\":15},{\"end_line\":128,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Regression test verifies concurrent execution, bounded elapsed time, and input-order results.\" ,\"start_line\":93}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.0071934
+    },
+    {
+      "task": "repository-tools",
+      "repeat": 2,
+      "arm": "native_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 32.73,
+      "provider_cost_usd": 0.00719616,
+      "expected_path_hits": [
+        "crates/repo-tools/src/exec.rs",
+        "crates/repo-tools/src/read.rs",
+        "crates/repo-tools/src/glob_tool.rs",
+        "crates/repo-tools/src/grep.rs"
+      ],
+      "expected_path_recall": 0.8,
+      "result": {
+        "summary": "Read, Glob, and Grep are sandboxed by resolving user paths through the repository root; Read and Glob reject escapes, while Grep runs `rg` from the root and passes only the root-relative search path. Read additionally rejects non-files, oversized files, and binary data, and caps returned lines. Glob ignores common generated/dependency directories, sorts matches newest-first with path tie-breaking, and applies a fixed result limit. Grep applies fixed ignore globs and supports caller-provided `head_limit` bounds.\n\nCalls execute concurrently through `FuturesUnordered`, with at most the configured concurrency (default 8). Each call is wrapped in a per-tool timeout (default 10 seconds); timed-out calls become failed `ToolResult`s. Completion order does not affect output order: each result is stored under its input index and collected in original call order.\n\nThe regression test verifies genuinely parallel execution by requiring four 500-ms calls to finish under 1.2 seconds, requiring concurrent overlap, and asserting result IDs remain `c0`\u2026`c3` order.",
+        "citations": [
+          {
+            "path": "crates/repo-tools/src/read.rs",
+            "start_line": 103,
+            "end_line": 145,
+            "reason": "Read resolves paths under the repository root and enforces file, size, and binary-content safety checks."
+          },
+          {
+            "path": "crates/repo-tools/src/glob_tool.rs",
+            "start_line": 71,
+            "end_line": 170,
+            "reason": "Glob resolves the directory under the root, walks with ignore/link restrictions, and deterministically sorts matches."
+          },
+          {
+            "path": "crates/repo-tools/src/grep.rs",
+            "start_line": 142,
+            "end_line": 224,
+            "reason": "Grep constrains execution to the repository root/search path and installs default exclusion globs."
+          },
+          {
+            "path": "crates/repo-tools/src/exec.rs",
+            "start_line": 15,
+            "end_line": 127,
+            "reason": "Execution implementation and regression test cover bounded concurrency, per-call timeout conversion, and deterministic input ordering."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 32706,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 57888,
+          "cached_prompt_tokens": 34048,
+          "completion_tokens": 1456,
+          "reasoning_output_tokens": 647
+        },
+        "raw_final": "{\"answer\":\"Read, Glob, and Grep are sandboxed by resolving user paths through the repository root; Read and Glob reject escapes, while Grep runs `rg` from the root and passes only the root-relative search path. Read additionally rejects non-files, oversized files, and binary data, and caps returned lines. Glob ignores common generated/dependency directories, sorts matches newest-first with path tie-breaking, and applies a fixed result limit. Grep applies fixed ignore globs and supports caller-provided `head_limit` bounds.\\n\\nCalls execute concurrently through `FuturesUnordered`, with at most the configured concurrency (default 8). Each call is wrapped in a per-tool timeout (default 10 seconds); timed-out calls become failed `ToolResult`s. Completion order does not affect output order: each result is stored under its input index and collected in original call order.\\n\\nThe regression test verifies genuinely parallel execution by requiring four 500-ms calls to finish under 1.2 seconds, requiring concurrent overlap, and asserting result IDs remain `c0`\u2026`c3` order.\",\"citations\":[{\"end_line\":145,\"path\":\"crates/repo-tools/src/read.rs\",\"reason\":\"Read resolves paths under the repository root and enforces file, size, and binary-content safety checks.\" ,\"start_line\":103},{\"end_line\":170,\"path\":\"crates/repo-tools/src/glob_tool.rs\",\"reason\":\"Glob resolves the directory under the root, walks with ignore/link restrictions, and deterministically sorts matches.\" ,\"start_line\":71},{\"end_line\":224,\"path\":\"crates/repo-tools/src/grep.rs\",\"reason\":\"Grep constrains execution to the repository root/search path and installs default exclusion globs.\" ,\"start_line\":142},{\"end_line\":127,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Execution implementation and regression test cover bounded concurrency, per-call timeout conversion, and deterministic input ordering.\" ,\"start_line\":15}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00719616
+    },
+    {
+      "task": "repository-tools",
+      "repeat": 3,
+      "arm": "native_map",
+      "order_position": 1,
+      "returncode": 0,
+      "wall_seconds": 41.07,
+      "provider_cost_usd": 0.00973984,
+      "expected_path_hits": [
+        "crates/repo-tools/src/exec.rs",
+        "crates/repo-tools/src/read.rs",
+        "crates/repo-tools/src/glob_tool.rs",
+        "crates/repo-tools/src/grep.rs"
+      ],
+      "expected_path_recall": 0.8,
+      "result": {
+        "summary": "Read, Glob, and Grep are repository-rooted: each resolves its requested path/directory through `resolve_in_root`; Read rejects escapes, while Glob/Grep return permission errors. The engine also normalizes model-supplied absolute/prefixed paths: escaped searches broaden to the repository root, whereas escaped Reads are kept as repository-relative paths. [crates/repo-tools/src/read.rs:103](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/read.rs:103) [crates/repo-tools/src/glob_tool.rs:71](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/glob_tool.rs:71) [crates/repo-tools/src/grep.rs:125](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/grep.rs:125) [crates/core/src/engine.rs:244](/Users/mac/Documents/projects/tools/tool/crates/core/src/engine.rs:244)\n\n`call_many` runs calls concurrently with a configurable cap (default 8), launches at most `concurrency` futures, applies a per-call timeout (default 10 seconds), records timed-out calls as failed results, and stores completions by original index before returning the input order. The regression test verifies parallel execution, bounded elapsed time, and stable call IDs. [crates/repo-tools/src/exec.rs:8](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/exec.rs:8) [crates/repo-tools/src/exec.rs:27](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/exec.rs:27) [crates/repo-tools/src/exec.rs:93](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/exec.rs:93)\n\nOutputs are bounded independently: Read caps files at 10 MiB, reads at 2,000 lines, lines at 2,000 characters, and output at 32 KiB; Glob caps results at 100 and 32 KiB; Grep caps output at its line limit and 32 KiB. Regression tests cover Read and Glob truncation/continuation guidance and Grep\u2019s bounded content output. [crates/repo-tools/src/read.rs:266](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/read.rs:266) [crates/repo-tools/src/glob_tool.rs:230](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/glob_tool.rs:230) [crates/repo-tools/src/grep.rs:332](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/grep.rs:332)",
+        "citations": [
+          {
+            "path": "crates/repo-tools/src/read.rs",
+            "start_line": 103,
+            "end_line": 145,
+            "reason": "Read\u2019s repository-root resolution, permission handling, and file-size bound."
+          },
+          {
+            "path": "crates/repo-tools/src/glob_tool.rs",
+            "start_line": 71,
+            "end_line": 94,
+            "reason": "Glob\u2019s repository-root directory resolution and sandbox error handling."
+          },
+          {
+            "path": "crates/repo-tools/src/grep.rs",
+            "start_line": 125,
+            "end_line": 133,
+            "reason": "Grep\u2019s repository-root path resolution and sandbox error handling."
+          },
+          {
+            "path": "crates/core/src/engine.rs",
+            "start_line": 244,
+            "end_line": 289,
+            "reason": "Model-path normalization and fallback behavior for Read, Glob, and Grep."
+          },
+          {
+            "path": "crates/repo-tools/src/exec.rs",
+            "start_line": 15,
+            "end_line": 127,
+            "reason": "Bounded concurrent executor, per-tool timeout, deterministic indexed result collection, and concurrency regression test."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 41063,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 77768,
+          "cached_prompt_tokens": 45312,
+          "completion_tokens": 1952,
+          "reasoning_output_tokens": 679
+        },
+        "raw_final": "{\"answer\":\"Read, Glob, and Grep are repository-rooted: each resolves its requested path/directory through `resolve_in_root`; Read rejects escapes, while Glob/Grep return permission errors. The engine also normalizes model-supplied absolute/prefixed paths: escaped searches broaden to the repository root, whereas escaped Reads are kept as repository-relative paths. [crates/repo-tools/src/read.rs:103](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/read.rs:103) [crates/repo-tools/src/glob_tool.rs:71](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/glob_tool.rs:71) [crates/repo-tools/src/grep.rs:125](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/grep.rs:125) [crates/core/src/engine.rs:244](/Users/mac/Documents/projects/tools/tool/crates/core/src/engine.rs:244)\\n\\n`call_many` runs calls concurrently with a configurable cap (default 8), launches at most `concurrency` futures, applies a per-call timeout (default 10 seconds), records timed-out calls as failed results, and stores completions by original index before returning the input order. The regression test verifies parallel execution, bounded elapsed time, and stable call IDs. [crates/repo-tools/src/exec.rs:8](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/exec.rs:8) [crates/repo-tools/src/exec.rs:27](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/exec.rs:27) [crates/repo-tools/src/exec.rs:93](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/exec.rs:93)\\n\\nOutputs are bounded independently: Read caps files at 10 MiB, reads at 2,000 lines, lines at 2,000 characters, and output at 32 KiB; Glob caps results at 100 and 32 KiB; Grep caps output at its line limit and 32 KiB. Regression tests cover Read and Glob truncation/continuation guidance and Grep\u2019s bounded content output. [crates/repo-tools/src/read.rs:266](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/read.rs:266) [crates/repo-tools/src/glob_tool.rs:230](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/glob_tool.rs:230) [crates/repo-tools/src/grep.rs:332](/Users/mac/Documents/projects/tools/tool/crates/repo-tools/src/grep.rs:332)\",\"citations\":[{\"end_line\":145,\"path\":\"crates/repo-tools/src/read.rs\",\"reason\":\"Read\u2019s repository-root resolution, permission handling, and file-size bound.\" ,\"start_line\":103},{\"end_line\":94,\"path\":\"crates/repo-tools/src/glob_tool.rs\",\"reason\":\"Glob\u2019s repository-root directory resolution and sandbox error handling.\",\"start_line\":71},{\"end_line\":133,\"path\":\"crates/repo-tools/src/grep.rs\",\"reason\":\"Grep\u2019s repository-root path resolution and sandbox error handling.\",\"start_line\":125},{\"end_line\":289,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Model-path normalization and fallback behavior for Read, Glob, and Grep.\",\"start_line\":244},{\"end_line\":127,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Bounded concurrent executor, per-tool timeout, deterministic indexed result collection, and concurrency regression test.\",\"start_line\":15}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.00973984
+    },
+    {
+      "task": "repository-tools",
+      "repeat": 3,
+      "arm": "baseline_no_map",
+      "order_position": 2,
+      "returncode": 0,
+      "wall_seconds": 44.125,
+      "provider_cost_usd": 0.0056876,
+      "expected_path_hits": [],
+      "expected_path_recall": 0.0,
+      "result": {
+        "summary": "The repository search located the leaf implementations in `crates/repo-tools/src/{read,glob_tool,grep}.rs`, but the three-call limit was exhausted before their source and regression-test bodies could be read. The available evidence confirms only that Read/Glob/Grep are read-only and concurrent, and that repository-tool results are bounded/truncated; it does not safely establish their exact sandboxing, timeout, execution-order, or test assertions. I won\u2019t invent those details.",
+        "citations": [
+          {
+            "path": "README.backup.md",
+            "start_line": 59,
+            "end_line": 59,
+            "reason": "Directly states Read/Grep/Glob are concurrent and read-only."
+          },
+          {
+            "path": "SECURITY.md",
+            "start_line": 18,
+            "end_line": 18,
+            "reason": "Directly mentions timeout/cap mitigation for malicious repository searches."
+          },
+          {
+            "path": "BENCHMARKS.md",
+            "start_line": 254,
+            "end_line": 257,
+            "reason": "Directly states the repository-tool output cap and truncation behavior."
+          }
+        ],
+        "stats": {
+          "turns": 4,
+          "tool_calls": 3,
+          "duration_ms": 44098,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 48916,
+          "cached_prompt_tokens": 32000,
+          "completion_tokens": 1387,
+          "reasoning_output_tokens": 762
+        },
+        "raw_final": "{\"answer\":\"The repository search located the leaf implementations in `crates/repo-tools/src/{read,glob_tool,grep}.rs`, but the three-call limit was exhausted before their source and regression-test bodies could be read. The available evidence confirms only that Read/Glob/Grep are read-only and concurrent, and that repository-tool results are bounded/truncated; it does not safely establish their exact sandboxing, timeout, execution-order, or test assertions. I won\u2019t invent those details.\",\"citations\":[{\"end_line\":59,\"path\":\"README.backup.md\",\"reason\":\"Directly states Read/Grep/Glob are concurrent and read-only.\" ,\"start_line\":59},{\"end_line\":18,\"path\":\"SECURITY.md\",\"reason\":\"Directly mentions timeout/cap mitigation for malicious repository searches.\",\"start_line\":18},{\"end_line\":257,\"path\":\"BENCHMARKS.md\",\"reason\":\"Directly states the repository-tool output cap and truncation behavior.\",\"start_line\":254}]}"
+      },
+      "parse_error": null,
+      "stderr_tail": "",
+      "recalculated_cost_usd": 0.0056876
+    }
+  ],
+  "completed_at": "2026-08-11T17:50:39.545902+00:00",
+  "pricing_note": "Repriced 2026-08-11 using Luna subscription-equivalent rates: $0.20/M uncached input, $0.02/M cached reads, and $1.20/M output including reasoning. Cache writes are not billed. The all-noncached-as-writes bound is retained only as a historical sensitivity calculation, not a subscription bill.",
+  "aggregate": {
+    "baseline_no_map": {
+      "runs": 9,
+      "median_provider_cost_usd": 0.0073198,
+      "median_wall_seconds": 52.082,
+      "mean_expected_path_recall": 0.637
+    },
+    "native_map": {
+      "runs": 9,
+      "median_provider_cost_usd": 0.00895364,
+      "median_wall_seconds": 52.492,
+      "mean_expected_path_recall": 0.7852
+    },
+    "paired": {
+      "pairs": 9,
+      "native_map_cost_wins": 2,
+      "median_provider_cost_delta_percent": 20.5277,
+      "median_wall_delta_percent": -3.9288,
+      "median_prompt_token_delta_percent": 8.0827,
+      "median_completion_token_delta_percent": -4.9563
+    },
+    "by_task": [
+      {
+        "task": "setup-integrations",
+        "baseline_median_cost": 0.00972464,
+        "map_median_cost": 0.00740204,
+        "median_paired_delta_pct": -23.883660474835054,
+        "baseline_median_wall": 54.188,
+        "map_median_wall": 47.433,
+        "baseline_mean_recall": 1.0,
+        "map_mean_recall": 0.8889
+      },
+      {
+        "task": "mcp-request-flow",
+        "baseline_median_cost": 0.00763208,
+        "map_median_cost": 0.00895364,
+        "median_paired_delta_pct": 20.5277334460376,
+        "baseline_median_wall": 40.8,
+        "map_median_wall": 55.177,
+        "baseline_mean_recall": 0.4444333333333333,
+        "map_mean_recall": 0.6667
+      },
+      {
+        "task": "repository-tools",
+        "baseline_median_cost": 0.0071934,
+        "map_median_cost": 0.00973984,
+        "median_paired_delta_pct": 48.73575780759039,
+        "baseline_median_wall": 54.366,
+        "map_median_wall": 41.07,
+        "baseline_mean_recall": 0.4666666666666666,
+        "map_mean_recall": 0.8000000000000002
+      }
+    ],
+    "cost_bounds_usd": {
+      "baseline_no_map_median": {
+        "median_zero_writes": 0.0073198,
+        "median_all_noncached_writes": 0.00854335
+      },
+      "native_map_median": {
+        "median_zero_writes": 0.00895364,
+        "median_all_noncached_writes": 0.01044209
+      },
+      "median_paired_delta_zero_writes_percent": 20.5277,
+      "median_paired_delta_all_noncached_writes_percent": 20.9576
+    }
+  },
+  "blind_quality": {
+    "rubric": "0-6: requested behavior completeness 0-3, direct citation relevance 0-2, concision/clarity 0-1",
+    "grader": "independent reviewer, arm labels hidden",
+    "baseline_no_map": {
+      "scores": [
+        6,
+        5,
+        6,
+        4,
+        5,
+        6,
+        6,
+        4,
+        2
+      ],
+      "mean": 4.888888888888889,
+      "median": 5,
+      "six_of_six": 4
+    },
+    "native_map": {
+      "scores": [
+        6,
+        4,
+        6,
+        5,
+        5,
+        5,
+        5,
+        6,
+        6
+      ],
+      "mean": 5.333333333333333,
+      "median": 5,
+      "six_of_six": 4
+    },
+    "paired": {
+      "map_wins": 4,
+      "ties": 2,
+      "map_losses": 3
+    },
+    "grades": [
+      {
+        "id": "bb99c47e04",
+        "task": "setup-integrations",
+        "repeat": 2,
+        "arm": "baseline_no_map",
+        "score": 6,
+        "reason": "Covers detection, normal versus dry-run selection, host-specific configuration, no-write dry-run behavior, and confirmed uninstall, with focused implementation and dry-run-test citations."
+      },
+      {
+        "id": "59fca350d6",
+        "task": "mcp-request-flow",
+        "repeat": 1,
+        "arm": "baseline_no_map",
+        "score": 5,
+        "reason": "Clearly traces execution, citation correction, timeout, and structured/empty-evidence handoff with direct citations, but does not explain invalid-input or backend-error failure behavior."
+      },
+      {
+        "id": "dca75b05e0",
+        "task": "mcp-request-flow",
+        "repeat": 3,
+        "arm": "baseline_no_map",
+        "score": 6,
+        "reason": "Fully traces request validation, backend execution limits, citation validation/correction, timeout and backend errors, and both textual and structured handoff behavior with directly supporting ranges."
+      },
+      {
+        "id": "2460bae51c",
+        "task": "mcp-request-flow",
+        "repeat": 2,
+        "arm": "baseline_no_map",
+        "score": 4,
+        "reason": "Covers MCP validation, broad parsing/validation, and handoff shape, but omits the backend tool-call loop, correction-turn behavior, timeout/turn-exhaustion failures, and relies partly on architecture prose plus an overbroad citation."
+      },
+      {
+        "id": "d7c03acec0",
+        "task": "setup-integrations",
+        "repeat": 2,
+        "arm": "native_map",
+        "score": 6,
+        "reason": "Comprehensively explains detection, selection, GPT/Codex setup, per-host artifacts, no-write dry-run, uninstall, and test coverage with direct implementation citations."
+      },
+      {
+        "id": "0704a66b10",
+        "task": "mcp-request-flow",
+        "repeat": 1,
+        "arm": "native_map",
+        "score": 4,
+        "reason": "Describes the broad request and validation flow, but underspecifies structured-content fields and failure semantics while using an alternate CLI-backend citation and very broad engine ranges instead of focused MCP evidence."
+      },
+      {
+        "id": "80fb5efae1",
+        "task": "repository-tools",
+        "repeat": 3,
+        "arm": "native_map",
+        "score": 6,
+        "reason": "Fully covers root sandboxing and normalization, bounded concurrent execution, timeout conversion, stable input ordering, per-tool output limits, and regression coverage with direct cited ranges."
+      },
+      {
+        "id": "c7e508676b",
+        "task": "repository-tools",
+        "repeat": 1,
+        "arm": "baseline_no_map",
+        "score": 5,
+        "reason": "The explanation covers every requested mechanism and relevant regressions, but all detailed Read limits are uncited because the evidence includes only Glob, Grep, and executor files."
+      },
+      {
+        "id": "0d3c05ce88",
+        "task": "setup-integrations",
+        "repeat": 1,
+        "arm": "native_map",
+        "score": 5,
+        "reason": "Covers configuration, dry-run, uninstall, and tests thoroughly, but inaccurately says dry-run selects detected integrations rather than all supported non-generic integrations."
+      },
+      {
+        "id": "ffdefe7ee0",
+        "task": "mcp-request-flow",
+        "repeat": 2,
+        "arm": "native_map",
+        "score": 5,
+        "reason": "Directly supports request validation, citation rules/correction, structured handoff, and empty evidence, but omits backend tool execution plus timeout and turn-exhaustion behavior requested under failures."
+      },
+      {
+        "id": "df854a3cf3",
+        "task": "setup-integrations",
+        "repeat": 3,
+        "arm": "baseline_no_map",
+        "score": 6,
+        "reason": "Concise and complete across detection, selection, installation, no-write dry-run, regression proof, and uninstall, with focused citations for each behavior."
+      },
+      {
+        "id": "550ef456e7",
+        "task": "setup-integrations",
+        "repeat": 3,
+        "arm": "native_map",
+        "score": 5,
+        "reason": "Explains all requested setup and uninstall behavior clearly, but its asserted focused dry-run test has no test-file citation in either the answer or evidence list."
+      },
+      {
+        "id": "d2b4fc956e",
+        "task": "repository-tools",
+        "repeat": 2,
+        "arm": "native_map",
+        "score": 5,
+        "reason": "Correctly covers sandboxing, concurrency, timeouts, stable ordering, and the executor regression, but gives only partial per-tool bounds and cites no Read/Glob/Grep truncation regressions."
+      },
+      {
+        "id": "687e977604",
+        "task": "repository-tools",
+        "repeat": 1,
+        "arm": "native_map",
+        "score": 6,
+        "reason": "Completely explains containment including symlinks, bounded parallel scheduling, timeout handling, deterministic ordering, exact output caps, and regressions for all mechanisms with directly relevant citations."
+      },
+      {
+        "id": "cf1d9391c0",
+        "task": "setup-integrations",
+        "repeat": 1,
+        "arm": "baseline_no_map",
+        "score": 6,
+        "reason": "Concise bullets cover detection, selection, host-native configuration, dry-run no-writes, confirmed uninstall, and regression behavior with focused direct citations."
+      },
+      {
+        "id": "f5ae002a0f",
+        "task": "repository-tools",
+        "repeat": 2,
+        "arm": "baseline_no_map",
+        "score": 4,
+        "reason": "Explains executor concurrency, timeout, ordering, and its regression well, but only partially covers tool bounds and supplies no Grep implementation or tool-specific truncation-test citation."
+      },
+      {
+        "id": "82d0e8ebb3",
+        "task": "repository-tools",
+        "repeat": 3,
+        "arm": "baseline_no_map",
+        "score": 2,
+        "reason": "Candidly states uncertainty and is clear, but omits the requested sandboxing, timeout, deterministic-order, and regression details and cites only high-level documentation rather than implementation or tests."
+      },
+      {
+        "id": "a5ba138443",
+        "task": "mcp-request-flow",
+        "repeat": 3,
+        "arm": "native_map",
+        "score": 6,
+        "reason": "Fully traces MCP validation through concurrent backend tools, parsing and correction, textual and structured handoff, all major failure/empty-result cases, and citation validation with focused implementation evidence."
+      }
+    ]
+  },
+  "decision": "Reject and remove native orientation map. It raised paired median Luna subscription-equivalent cost 20.53%, did not reduce turns or tool calls, and had effectively neutral latency. Blind median quality tied 5/6; the map mean rose 4.89 to 5.33 but won only 4/9 pairs, tied 2, and lost 3, which is not robust enough to buy the cost regression."
+}

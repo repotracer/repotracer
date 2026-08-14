@@ -1,0 +1,10 @@
+{
+  "id": "route-cli-03",
+  "prompt": "If configuring one coding agent fails after others were written, onboarding leaves a half-installed system. Make the operation atomic: restore every touched agent file on failure, keep previews write-free, and preserve the user's pre-existing content and backups.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/cli/src/agents.rs",
+    "crates/cli/src/setup.rs",
+    "crates/cli/tests/setup.rs"
+  ]
+}

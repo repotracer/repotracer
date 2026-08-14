@@ -11,14 +11,30 @@ pub fn build_system_prompt(work_dir: &Path) -> String {
             "sh".into()
         }
     });
-    let work = work_dir.display().to_string();
+    let work = work_dir
+        .canonicalize()
+        .unwrap_or_else(|_| work_dir.to_path_buf())
+        .display()
+        .to_string();
     let listing = list_top(work_dir, 40);
+    let project_hint = if work_dir.join("Cargo.toml").is_file() {
+        "Rust; search .rs files"
+    } else if work_dir.join("go.mod").is_file() {
+        "Go; search .go files"
+    } else if work_dir.join("pyproject.toml").is_file() {
+        "Python; search .py files"
+    } else if work_dir.join("package.json").is_file() {
+        "JavaScript/TypeScript; search .js, .jsx, .ts, and .tsx files"
+    } else {
+        "Unknown; infer it from the authoritative directory listing"
+    };
 
     SYSTEM_TEMPLATE
         .replace("${OS_KIND}", os_kind)
         .replace("${SHELL_NAME}", &shell)
         .replace("${WORK_DIR}", &work)
         .replace("${WORK_DIR_LS}", &listing)
+        .replace("${PROJECT_HINT}", project_hint)
 }
 
 fn list_top(dir: &Path, limit: usize) -> String {
@@ -52,4 +68,28 @@ fn list_top(dir: &Path, limit: usize) -> String {
 
 pub fn user_query_prompt(query: &str) -> String {
     format!("<query>\n{query}\n</query>")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn system_prompt_requests_a_ranked_bounded_handoff() {
+        let prompt = build_system_prompt(Path::new("."));
+        assert!(prompt.contains("normally 3-6"));
+        assert!(prompt.contains("never more than 8"));
+        assert!(prompt.contains("Order files to modify and tests first"));
+        assert!(prompt.contains("Prefer tight ranges"));
+        assert!(prompt.contains("split separate regions"));
+        assert!(prompt.contains("omit low-value documentation"));
+        assert!(prompt.contains("A failed search"));
+    }
+
+    #[test]
+    fn system_prompt_identifies_rust_workspace() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Cargo.toml"), "[workspace]\n").unwrap();
+        assert!(build_system_prompt(dir.path()).contains("Rust; search .rs files"));
+    }
 }

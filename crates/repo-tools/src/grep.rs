@@ -1,4 +1,5 @@
 use crate::pathutil::resolve_in_root;
+use crate::read::{finish_output, MAX_OUTPUT_BYTES};
 use crate::types::{ToolError, ToolSchema};
 use serde::Deserialize;
 use serde_json::json;
@@ -157,7 +158,7 @@ impl GrepTool {
                 if let Some(a) = args.after_context {
                     cmd.arg("-A").arg(a.to_string());
                 }
-                // FastContext defaulted -C to 3 when unset; only apply if no B/A.
+                // Default to three context lines only when before/after are unset.
                 if args.before_context.is_none() && args.after_context.is_none() {
                     let c = args.context.unwrap_or(3);
                     if c > 0 {
@@ -248,7 +249,7 @@ impl GrepTool {
             ));
         }
 
-        let mut text = if stdout.is_empty() { stderr } else { stdout };
+        let text = if stdout.is_empty() { stderr } else { stdout };
         let mut limit = DEFAULT_LIMIT;
         if let Some(h) = args.head_limit {
             if h > 0 && h < limit {
@@ -256,14 +257,34 @@ impl GrepTool {
             }
         }
         let line_count = text.lines().count();
-        if line_count > limit {
-            let truncated: String = text.lines().take(limit).collect::<Vec<_>>().join("\n");
-            text = format!(
-                "{truncated}\nShowing first {limit} of at least {line_count} results. Narrow the pattern or path to continue."
-            );
-        }
+        let line_truncated = line_count > limit;
+        let evidence = if line_truncated {
+            text.lines().take(limit).collect::<Vec<_>>().join("\n")
+        } else {
+            text
+        };
 
-        Ok(text)
+        let line_notice = line_truncated.then(|| {
+            format!(
+                "[Output truncated: showing first {limit} of at least {line_count} output lines. Narrow the pattern or path to continue.]"
+            )
+        });
+        let separator = usize::from(!evidence.is_empty() && !evidence.ends_with('\n'));
+        let byte_truncated =
+            evidence.len() + separator + line_notice.as_ref().map_or(0, String::len)
+                > MAX_OUTPUT_BYTES;
+        let notice = match (line_truncated, byte_truncated) {
+            (true, true) => Some(format!(
+                "[Output truncated: matched at least {line_count} output lines and exceeded the {limit}-line / 32 KiB cap. Narrow the pattern or path to continue.]"
+            )),
+            (true, false) => line_notice,
+            (false, true) => Some(
+                "[Output truncated at 32 KiB. Narrow the pattern or path to continue.]".into(),
+            ),
+            (false, false) => None,
+        };
+
+        Ok(finish_output(&evidence, notice.as_deref()))
     }
 }
 
@@ -306,6 +327,27 @@ mod tests {
             .await
             .unwrap();
         assert!(out.contains("refresh_token"), "{out}");
+    }
+
+    #[tokio::test]
+    async fn bounds_content_output_with_continuation_guidance() {
+        if which::which("rg").is_err() {
+            return;
+        }
+        let dir = tempdir().unwrap();
+        let content = (0..140)
+            .map(|line| format!("needle-{line}-{}\n", "x".repeat(500)))
+            .collect::<String>();
+        fs::write(dir.path().join("large.txt"), content).unwrap();
+        let tool = GrepTool::new(dir.path());
+        let out = tool
+            .call(r#"{"pattern":"needle","output_mode":"content","-C":0}"#)
+            .await
+            .unwrap();
+
+        assert!(out.len() <= MAX_OUTPUT_BYTES, "{} bytes", out.len());
+        assert!(out.contains("Output truncated"), "{out}");
+        assert!(out.contains("Narrow the pattern or path"), "{out}");
     }
 
     #[tokio::test]

@@ -1,0 +1,11 @@
+{
+  "id": "route-protocol-02",
+  "prompt": "Add optional progress reporting for long repository-scout calls so MCP clients can display model-turn and tool-call progress while waiting, without writing non-protocol output to stdout.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/core/src/types.rs",
+    "crates/core/src/engine.rs",
+    "crates/mcp/src/lib.rs",
+    "crates/cli/src/main.rs"
+  ]
+}

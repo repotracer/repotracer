@@ -70,35 +70,29 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
                     scout.executable().is_file() || which::which(scout.executable()).is_ok();
                 checks.push(if installed {
                     Check::ok(
-                        "subscription CLI",
-                        &format!(
-                            "{} ({})",
-                            scout.provider().label(),
-                            scout.executable().display()
-                        ),
+                        "GPT scout CLI",
+                        &format!("{} ({})", scout.label(), scout.executable().display()),
                     )
                 } else {
                     Check::fail(
-                        "subscription CLI",
+                        "GPT scout CLI",
                         &format!("{} not found", scout.executable().display()),
                     )
                 });
                 if installed {
                     checks.push(match scout.probe(root).await {
-                        Ok(()) => {
-                            Check::ok("model", &format!("{} ready", scout.provider().label()))
-                        }
+                        Ok(()) => Check::ok("model", &format!("{} ready", scout.label())),
                         Err(error) => Check::fail("model", &error.to_string()),
                     });
                 }
             }
-            Err(error) => checks.push(Check::fail("subscription CLI", &error.to_string())),
+            Err(error) => checks.push(Check::fail("GPT scout CLI", &error.to_string())),
         }
     } else {
         let backend = OpenAiCompatBackend::new(ModelConfig {
             base_url: cfg.model.base_url.clone(),
             model: cfg.model.model.clone(),
-            api_key: cfg.model.api_key.clone(),
+            api_key: cfg.model.resolved_api_key(),
             timeout_ms: cfg.model.timeout_ms.min(10_000),
             temperature: 0.0,
             max_tokens: Some(16),

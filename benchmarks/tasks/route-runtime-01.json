@@ -1,0 +1,11 @@
+{
+  "id": "route-runtime-01",
+  "prompt": "Focused scout runs still wander across the whole repository and return unrelated evidence. Make a supplied focus directory shape orientation and all searches while keeping path containment rooted at the repository and citations repository-relative.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/core/src/types.rs",
+    "crates/core/src/engine.rs",
+    "crates/core/src/prompt.rs",
+    "crates/repo-tools/src/pathutil.rs"
+  ]
+}

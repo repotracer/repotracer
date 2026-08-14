@@ -1,0 +1,10 @@
+{
+  "id": "gemini-setup",
+  "prompt": "Add Gemini CLI to `grephound setup` so it is detected and configured like the other supported coding agents, including dry-run and uninstall behavior.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/cli/src/agents.rs",
+    "crates/cli/src/setup.rs",
+    "crates/cli/tests/setup.rs"
+  ]
+}

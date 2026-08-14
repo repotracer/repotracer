@@ -126,9 +126,9 @@ pub struct ModelConfig {
 impl Default for ModelConfig {
     fn default() -> Self {
         Self {
-            base_url: "http://127.0.0.1:11434/v1".into(),
-            model: "hf.co/mitkox/FastContext-1.0-4B-RL-Q4_K_M-GGUF:latest".into(),
-            api_key: Some("ollama".into()),
+            base_url: "https://api.openai.com/v1".into(),
+            model: "gpt-5.6-luna".into(),
+            api_key: None,
             timeout_ms: 120_000,
             temperature: 0.0,
             max_tokens: None,
@@ -153,5 +153,8 @@ pub enum ModelError {
 #[async_trait]
 pub trait ModelBackend: Send + Sync {
     fn name(&self) -> &str;
+    fn temperature(&self) -> f32 {
+        0.0
+    }
     async fn complete(&self, request: ModelRequest) -> Result<ModelResponse, ModelError>;
 }

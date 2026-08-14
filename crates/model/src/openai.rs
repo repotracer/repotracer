@@ -32,6 +32,10 @@ impl ModelBackend for OpenAiCompatBackend {
         &self.config.model
     }
 
+    fn temperature(&self) -> f32 {
+        self.config.temperature
+    }
+
     async fn complete(&self, request: ModelRequest) -> Result<ModelResponse, ModelError> {
         let url = format!(
             "{}/chat/completions",
@@ -65,8 +69,8 @@ impl ModelBackend for OpenAiCompatBackend {
                 ModelError::Timeout
             } else {
                 ModelError::Request(format!(
-                    "Could not reach model at {}.\n\nFor Ollama:\n  ollama serve\n  ollama pull {}\n\nThen: grephound doctor",
-                    self.config.base_url, self.config.model
+                    "Could not reach GPT endpoint at {}",
+                    self.config.base_url
                 ))
             }
         })?;
@@ -158,7 +162,7 @@ fn to_openai_message(m: &ChatMessage) -> Value {
 }
 
 fn from_openai_message(m: OpenAiMessage) -> Result<ChatMessage, ModelError> {
-    let tool_calls = m.tool_calls.map(|calls| {
+    let tool_calls = m.tool_calls.filter(|calls| !calls.is_empty()).map(|calls| {
         calls
             .into_iter()
             .map(|c| FunctionCall {
@@ -171,7 +175,7 @@ fn from_openai_message(m: OpenAiMessage) -> Result<ChatMessage, ModelError> {
 
     Ok(ChatMessage {
         role: MessageRole::Assistant,
-        content: m.content,
+        content: m.content.filter(|content| !content.is_empty()),
         tool_calls,
         tool_call_id: None,
         name: None,

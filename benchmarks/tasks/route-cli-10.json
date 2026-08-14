@@ -1,0 +1,8 @@
+{
+  "id": "route-cli-10",
+  "prompt": "In `.github/workflows/release.yml`, set the build matrix to keep running the other platform jobs when one target fails.",
+  "expected_scout": false,
+  "expected_paths": [
+    ".github/workflows/release.yml"
+  ]
+}

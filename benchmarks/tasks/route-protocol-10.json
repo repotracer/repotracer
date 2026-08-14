@@ -1,0 +1,8 @@
+{
+  "id": "route-protocol-10",
+  "prompt": "In `.github/workflows/ci.yml`, pin every `dtolnay/rust-toolchain` step to Rust 1.80 instead of `stable`, leaving the job matrix and commands unchanged.",
+  "expected_scout": false,
+  "expected_paths": [
+    ".github/workflows/ci.yml"
+  ]
+}

@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-09",
+  "status": "single-run diagnostic; not headline evidence",
+  "conclusion": "No defensible savings claim: all three repo_scout calls completed but returned zero validated citations, so the frontier agent performed fallback exploration. Frontier API-equivalent cost fell 2.10%, wall time rose 102.70%, quality was unchanged, and total explorer tokens are incomplete because the Gigo scout timed out.",
+  "protocol": {
+    "mode": "forced",
+    "normal_arm": "GPT-5.6 Luna explores and answers with native read-only repository tools.",
+    "grephound_arm": "The same GPT-5.6 Luna must call repo_scout once before native exploration, then may fall back to native read-only tools if scout evidence is insufficient.",
+    "held_constant": [
+      "gpt-5.6-luna",
+      "medium reasoning",
+      "Codex CLI subscription route",
+      "repository working tree",
+      "task prompt",
+      "read-only sandbox",
+      "structured answer schema"
+    ],
+    "quality_gate": "At least one structurally valid citation and at least 80% expected-path recall.",
+    "runs_per_task_per_arm": 1
+  },
+  "pricing": {
+    "method": "(input - cached_input) * input_rate + cached_input * cache_read_rate + output * output_rate",
+    "input_usd_per_token": 0.0000002,
+    "cache_read_usd_per_token": 0.00000002,
+    "output_usd_per_token": 0.0000012,
+    "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+    "note": "API-equivalent estimate, not an actual subscription charge. Local Ollama provider cost is zero; hardware and electricity are excluded."
+  },
+  "tasks": [
+    {
+      "repository": "grephound",
+      "query": "Trace a local Ollama scout request from CLI setup and configuration through the OpenAI-compatible model call, concurrent repository tool execution, final-answer parsing, and citation validation. Identify failure handling at each boundary.",
+      "expected_paths": [
+        "crates/cli/src/setup.rs",
+        "crates/cli/src/main.rs",
+        "crates/model/src/openai.rs",
+        "crates/core/src/engine.rs",
+        "crates/core/src/citations.rs"
+      ]
+    },
+    {
+      "repository": "gigo",
+      "query": "Trace an authenticated POST /v1/chat/completions request from the HTTP entrypoint through route selection and fallback to provider execution, then explain how usage and cost are added to the response. Include the key error paths.",
+      "expected_paths": [
+        "internal/server/server.go",
+        "internal/server/provider_router.go",
+        "internal/server/request_fallback.go",
+        "internal/server/cost_reporting.go",
+        "internal/routing/routing.go",
+        "internal/cost/usage.go",
+        "internal/cost/pricing.go"
+      ]
+    },
+    {
+      "repository": "brandscope",
+      "query": "Trace a brand-name generation request from its API route through the current pipeline stages and LLM client calls to persistence, audit recording, and response construction. Include stage failure and retry handling.",
+      "expected_paths": [
+        "backend/routers/pipeline.py",
+        "backend/services/current_pipeline.py",
+        "backend/services/pipeline_llm_stages.py",
+        "backend/services/llm_client.py",
+        "backend/repositories.py",
+        "backend/services/pipeline_audit.py"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "repository": "grephound",
+      "normal": {
+        "wall_ms": 65502,
+        "input_tokens": 317048,
+        "cached_input_tokens": 256000,
+        "output_tokens": 2856,
+        "reasoning_output_tokens": 354,
+        "estimated_api_cost_usd": 0.0207568,
+        "expected_path_recall_pct": 100.0,
+        "valid_citations": 16,
+        "usable": true
+      },
+      "grephound_forced": {
+        "wall_ms": 63421,
+        "input_tokens": 145581,
+        "cached_input_tokens": 100608,
+        "output_tokens": 2137,
+        "reasoning_output_tokens": 280,
+        "estimated_api_cost_usd": 0.01357116,
+        "expected_path_recall_pct": 100.0,
+        "valid_citations": 13,
+        "usable": true,
+        "repo_scout": {
+          "status": "completed",
+          "useful": false,
+          "summary": "Error: ollama-scout/crates/**/* does not match any files",
+          "prompt_tokens": 8126,
+          "output_tokens": 270,
+          "total_tokens": 8396,
+          "duration_ms": 15265,
+          "turns": 4,
+          "tool_calls": 6,
+          "citations": 0,
+          "provider_cost_usd": 0
+        }
+      },
+      "delta": {
+        "wall_time_pct": -3.18,
+        "frontier_total_tokens_pct": -53.82,
+        "estimated_api_cost_pct": -34.62,
+        "expected_path_recall_points": 0.0
+      }
+    },
+    {
+      "repository": "gigo",
+      "normal": {
+        "wall_ms": 80219,
+        "input_tokens": 422738,
+        "cached_input_tokens": 355840,
+        "output_tokens": 2659,
+        "reasoning_output_tokens": 373,
+        "estimated_api_cost_usd": 0.0236872,
+        "expected_path_recall_pct": 85.7,
+        "valid_citations": 14,
+        "usable": true
+      },
+      "grephound_forced": {
+        "wall_ms": 256347,
+        "input_tokens": 455741,
+        "cached_input_tokens": 384000,
+        "output_tokens": 3153,
+        "reasoning_output_tokens": 314,
+        "estimated_api_cost_usd": 0.0258118,
+        "expected_path_recall_pct": 85.7,
+        "valid_citations": 18,
+        "usable": true,
+        "repo_scout": {
+          "status": "completed",
+          "useful": false,
+          "summary": "Scout timed out after 180s.",
+          "prompt_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null,
+          "duration_ms": 180008,
+          "turns": 0,
+          "tool_calls": 0,
+          "citations": 0,
+          "provider_cost_usd": 0
+        }
+      },
+      "delta": {
+        "wall_time_pct": 219.56,
+        "frontier_total_tokens_pct": 7.87,
+        "estimated_api_cost_pct": 8.97,
+        "expected_path_recall_points": 0.0
+      }
+    },
+    {
+      "repository": "brandscope",
+      "normal": {
+        "wall_ms": 76916,
+        "input_tokens": 265544,
+        "cached_input_tokens": 202240,
+        "output_tokens": 2669,
+        "reasoning_output_tokens": 475,
+        "estimated_api_cost_usd": 0.0199084,
+        "expected_path_recall_pct": 100.0,
+        "valid_citations": 16,
+        "usable": true
+      },
+      "grephound_forced": {
+        "wall_ms": 131512,
+        "input_tokens": 328085,
+        "cached_input_tokens": 250368,
+        "output_tokens": 2557,
+        "reasoning_output_tokens": 362,
+        "estimated_api_cost_usd": 0.02361916,
+        "expected_path_recall_pct": 100.0,
+        "valid_citations": 15,
+        "usable": true,
+        "repo_scout": {
+          "status": "completed",
+          "useful": false,
+          "summary": "Returned irrelevant docs/research content instead of implementation evidence.",
+          "prompt_tokens": 30591,
+          "output_tokens": 972,
+          "total_tokens": 31563,
+          "duration_ms": 63392,
+          "turns": 4,
+          "tool_calls": 4,
+          "citations": 0,
+          "provider_cost_usd": 0
+        }
+      },
+      "delta": {
+        "wall_time_pct": 70.98,
+        "frontier_total_tokens_pct": 23.28,
+        "estimated_api_cost_pct": 18.64,
+        "expected_path_recall_points": 0.0
+      }
+    }
+  ],
+  "aggregate": {
+    "normal": {
+      "wall_ms": 222637,
+      "input_tokens": 1005330,
+      "cached_input_tokens": 814080,
+      "output_tokens": 8184,
+      "reasoning_output_tokens": 1202,
+      "estimated_api_cost_usd": 0.0643524,
+      "usable_tasks": 3,
+      "expected_paths_recalled": 17,
+      "expected_paths_total": 18
+    },
+    "grephound_forced": {
+      "wall_ms": 451280,
+      "input_tokens": 929407,
+      "cached_input_tokens": 734976,
+      "output_tokens": 7847,
+      "reasoning_output_tokens": 956,
+      "estimated_api_cost_usd": 0.06300212,
+      "usable_tasks": 3,
+      "expected_paths_recalled": 17,
+      "expected_paths_total": 18,
+      "repo_scout_calls_completed": 3,
+      "repo_scout_calls_useful": 0,
+      "repo_scout_calls_timed_out": 1,
+      "reported_explorer_tokens": 39959,
+      "explorer_tokens_complete": false,
+      "explorer_provider_cost_usd": 0
+    },
+    "delta": {
+      "wall_time_pct": 102.70,
+      "frontier_input_tokens_pct": -7.55,
+      "frontier_total_tokens_pct": -7.52,
+      "estimated_api_cost_pct": -2.10,
+      "expected_path_recall_points": 0.0
+    }
+  },
+  "limitations": [
+    "One run per task per arm; this cannot support a public headline.",
+    "All repo_scout calls completed, but none returned validated citations; the assisted agent performed fallback exploration.",
+    "Gigo timed out before Grephound emitted explorer usage, so complete all-model token consumption is unknown.",
+    "The 2.10% frontier cost reduction cannot be attributed to Grephound because no scout evidence reached the frontier agent.",
+    "Repositories were measured at their current local working-tree state, not pinned clean revisions.",
+    "The local scout was the community Q4_K_M GGUF FastContext conversion served by Ollama."
+  ],
+  "local_raw_artifacts": "/tmp/grephound-bench-20260809"
+}

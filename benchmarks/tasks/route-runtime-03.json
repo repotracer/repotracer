@@ -1,0 +1,11 @@
+{
+  "id": "route-runtime-03",
+  "prompt": "When a scout deadline expires during a batch of repository searches, completed sibling results are lost and slow subprocesses may keep running. Cancel outstanding work at the deadline, retain results that already completed when possible, and report failure and duration metadata consistently.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/core/src/engine.rs",
+    "crates/repo-tools/src/exec.rs",
+    "crates/repo-tools/src/grep.rs",
+    "crates/repo-tools/src/types.rs"
+  ]
+}

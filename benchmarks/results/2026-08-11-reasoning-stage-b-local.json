@@ -1,0 +1,551 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-11",
+  "status": "optimization-stage diagnostics; one repeated read-only question; not launch evidence",
+  "capability_interpretation_corrected_by": "benchmarks/results/2026-08-11-extended-timeout-diagnostics.json",
+  "question": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "changes_evaluated": {
+    "stage_a": "cost-aware immediate routing (rejected and separately recorded)",
+    "reasoning_levels": "restored routing, forced exactly one scout call to isolate low/medium/high, 120-second scout timeout",
+    "stage_b": "medium reasoning plus prompt-led two-operation default, optional third operation, adaptive 3/3KiB to 5/6KiB handoff (rejected and reverted)",
+    "stage_c": "FastContext 4B Q4 through Grephound native Read/Glob/Grep after benchmark-only Ollama reasoning/tool compatibility fixes"
+  },
+  "reasoning_ablation": {
+    "protocol": {
+      "main_model": "gpt-5.6-sol high",
+      "scout_model": "gpt-5.6-luna",
+      "routing": "forced exactly one repo_scout for isolation; no main repository fallback",
+      "runs_per_level": 3,
+      "quality_rubric": "same six setup behavior checks",
+      "timeout_seconds": 120
+    },
+    "runs": [
+      {
+        "name": "r3-medium-isolated",
+        "effort": "medium",
+        "success": true,
+        "quality": "6/6",
+        "wall": 111.905,
+        "main": {
+          "requests": 6,
+          "input": 60023,
+          "cached": 17920,
+          "output": 2070,
+          "reasoning": 742,
+          "latency_ms": 45185,
+          "cost": 0.281575,
+          "started": "2026-08-11 13:28:08.144015",
+          "ended": "2026-08-11 13:29:58.301494"
+        },
+        "scout": {
+          "conversation_id": "019ff102-754d-7a00-ba97-7652ff8192b7",
+          "requests": 6,
+          "input": 84099,
+          "cached": 44288,
+          "output": 2476,
+          "reasoning": 755,
+          "latency_ms": 70328,
+          "cost": 0.01181916,
+          "started": "2026-08-11 13:28:19.527724",
+          "ended": "2026-08-11 13:29:28.770969"
+        },
+        "cites": 5,
+        "tools": 3,
+        "complete_cost": 0.29339416,
+        "complete_input": 144122
+      },
+      {
+        "name": "r4-high-isolated",
+        "effort": "high",
+        "success": false,
+        "quality": "0/6",
+        "wall": 140.446,
+        "main": {
+          "requests": 8,
+          "input": 77219,
+          "cached": 35840,
+          "output": 891,
+          "reasoning": 372,
+          "latency_ms": 30492,
+          "cost": 0.25154499999999996,
+          "started": "2026-08-11 13:30:28.780940",
+          "ended": "2026-08-11 13:32:46.819705"
+        },
+        "scout": {
+          "conversation_id": "019ff104-9d3e-7073-8019-2cd08822070b",
+          "requests": 5,
+          "input": 50805,
+          "cached": 19968,
+          "output": 3292,
+          "reasoning": 2660,
+          "latency_ms": 121599,
+          "cost": 0.01051716,
+          "started": "2026-08-11 13:30:41.503357",
+          "ended": "2026-08-11 13:32:41.354439"
+        },
+        "cites": 0,
+        "tools": null,
+        "complete_cost": 0.26206216,
+        "complete_input": 128024
+      },
+      {
+        "name": "r5-low-isolated",
+        "effort": "low",
+        "success": false,
+        "quality": "0/6",
+        "wall": 143.14,
+        "main": {
+          "requests": 8,
+          "input": 76999,
+          "cached": 35840,
+          "output": 814,
+          "reasoning": 305,
+          "latency_ms": 38529,
+          "cost": 0.248135,
+          "started": "2026-08-11 13:32:58.265067",
+          "ended": "2026-08-11 13:35:16.602810"
+        },
+        "scout": {
+          "conversation_id": "019ff108-b852-7a60-bab2-558c4067ae68",
+          "requests": 1,
+          "input": 8251,
+          "cached": 0,
+          "output": 0,
+          "reasoning": 0,
+          "latency_ms": 3390,
+          "cost": 0.0016502,
+          "started": "2026-08-11 13:35:13.272284",
+          "ended": "2026-08-11 13:35:13.272284"
+        },
+        "cites": 0,
+        "tools": null,
+        "complete_cost": 0.2497852,
+        "complete_input": 85250
+      },
+      {
+        "name": "r6-low-isolated",
+        "effort": "low",
+        "success": false,
+        "quality": "0/6",
+        "wall": 140.636,
+        "main": {
+          "requests": 7,
+          "input": 66646,
+          "cached": 26880,
+          "output": 1011,
+          "reasoning": 576,
+          "latency_ms": 37142,
+          "cost": 0.2426,
+          "started": "2026-08-11 13:35:57.966181",
+          "ended": "2026-08-11 13:38:16.656853"
+        },
+        "scout": {
+          "conversation_id": "019ff109-a2c2-7022-86aa-59d82789b0c2",
+          "requests": 2,
+          "input": 6050,
+          "cached": 0,
+          "output": 0,
+          "reasoning": 0,
+          "latency_ms": 3056,
+          "cost": 0.00121,
+          "started": "2026-08-11 13:36:09.831040",
+          "ended": "2026-08-11 13:36:11.764387"
+        },
+        "cites": 0,
+        "tools": null,
+        "complete_cost": 0.24381,
+        "complete_input": 72696
+      },
+      {
+        "name": "r7-medium-isolated",
+        "effort": "medium",
+        "success": true,
+        "quality": "6/6",
+        "wall": 88.312,
+        "main": {
+          "requests": 6,
+          "input": 60040,
+          "cached": 24832,
+          "output": 1806,
+          "reasoning": 588,
+          "latency_ms": 44114,
+          "cost": 0.242636,
+          "started": "2026-08-11 13:38:22.891730",
+          "ended": "2026-08-11 13:39:49.206033"
+        },
+        "scout": {
+          "conversation_id": "019ff10b-de01-7fa1-be5c-76070d632e1f",
+          "requests": 5,
+          "input": 71654,
+          "cached": 38144,
+          "output": 2008,
+          "reasoning": 588,
+          "latency_ms": 48871,
+          "cost": 0.00987448,
+          "started": "2026-08-11 13:38:36.788462",
+          "ended": "2026-08-11 13:39:23.884440"
+        },
+        "cites": 5,
+        "tools": 3,
+        "complete_cost": 0.25251048,
+        "complete_input": 131694
+      },
+      {
+        "name": "r8-high-isolated",
+        "effort": "high",
+        "success": false,
+        "quality": "0/6",
+        "wall": 144.069,
+        "main": {
+          "requests": 6,
+          "input": 56869,
+          "cached": 17920,
+          "output": 942,
+          "reasoning": 556,
+          "latency_ms": 40070,
+          "cost": 0.231965,
+          "started": "2026-08-11 13:40:06.462974",
+          "ended": "2026-08-11 13:42:28.575498"
+        },
+        "scout": {
+          "conversation_id": "019ff10d-6b11-7321-9aa0-4f3810d80f9d",
+          "requests": 5,
+          "input": 41808,
+          "cached": 19968,
+          "output": 3031,
+          "reasoning": 2419,
+          "latency_ms": 121580,
+          "cost": 0.00840456,
+          "started": "2026-08-11 13:40:17.537895",
+          "ended": "2026-08-11 13:42:18.336048"
+        },
+        "cites": 0,
+        "tools": null,
+        "complete_cost": 0.24036956,
+        "complete_input": 98677
+      },
+      {
+        "name": "r9-low-isolated",
+        "effort": "low",
+        "success": false,
+        "quality": "0/6",
+        "wall": 136.962,
+        "main": {
+          "requests": 8,
+          "input": 76994,
+          "cached": 44800,
+          "output": 782,
+          "reasoning": 280,
+          "latency_ms": 27268,
+          "cost": 0.20682999999999999,
+          "started": "2026-08-11 13:42:35.112349",
+          "ended": "2026-08-11 13:44:49.739218"
+        },
+        "scout": {
+          "conversation_id": "019ff10f-abc0-7f31-87c3-c8f3878d06c9",
+          "requests": 5,
+          "input": 44615,
+          "cached": 18944,
+          "output": 395,
+          "reasoning": 46,
+          "latency_ms": 24605,
+          "cost": 0.00598708,
+          "started": "2026-08-11 13:42:45.035370",
+          "ended": "2026-08-11 13:43:08.861288"
+        },
+        "cites": 0,
+        "tools": null,
+        "complete_cost": 0.21281708,
+        "complete_input": 121609
+      },
+      {
+        "name": "r10-high-isolated",
+        "effort": "high",
+        "success": false,
+        "quality": "0/6",
+        "wall": 145.017,
+        "main": {
+          "requests": 8,
+          "input": 77246,
+          "cached": 35840,
+          "output": 1045,
+          "reasoning": 513,
+          "latency_ms": 41447,
+          "cost": 0.2563,
+          "started": "2026-08-11 13:45:57.537139",
+          "ended": "2026-08-11 13:48:20.921317"
+        },
+        "scout": {
+          "conversation_id": "019ff112-d05e-71e3-9a89-3ebff2a8eae3",
+          "requests": 2,
+          "input": 6050,
+          "cached": 0,
+          "output": 0,
+          "reasoning": 0,
+          "latency_ms": 2747,
+          "cost": 0.00121,
+          "started": "2026-08-11 13:46:11.518049",
+          "ended": "2026-08-11 13:46:12.900207"
+        },
+        "cites": 0,
+        "tools": null,
+        "complete_cost": 0.25751,
+        "complete_input": 83296
+      },
+      {
+        "name": "r11-medium-isolated",
+        "effort": "medium",
+        "success": true,
+        "quality": "6/6",
+        "wall": 110.232,
+        "main": {
+          "requests": 6,
+          "input": 60013,
+          "cached": 26880,
+          "output": 1785,
+          "reasoning": 638,
+          "latency_ms": 63066,
+          "cost": 0.232655,
+          "started": "2026-08-11 13:48:27.673110",
+          "ended": "2026-08-11 13:50:15.640391"
+        },
+        "scout": {
+          "conversation_id": "019ff115-28c9-7451-8871-1e35430cf884",
+          "requests": 5,
+          "input": 81250,
+          "cached": 42240,
+          "output": 2953,
+          "reasoning": 1643,
+          "latency_ms": 60623,
+          "cost": 0.0121904,
+          "started": "2026-08-11 13:48:44.922912",
+          "ended": "2026-08-11 13:49:44.655069"
+        },
+        "cites": 5,
+        "tools": 3,
+        "complete_cost": 0.2448454,
+        "complete_input": 141263
+      }
+    ],
+    "summary": {
+      "low": {
+        "quality_passes": "0/3",
+        "median_wall_seconds": 140.636,
+        "median_complete_provider_cost_usd": 0.24381,
+        "median_scout_provider_cost_usd": 0.0016502
+      },
+      "medium": {
+        "quality_passes": "3/3",
+        "median_wall_seconds": 110.232,
+        "median_complete_provider_cost_usd": 0.25251048,
+        "median_scout_provider_cost_usd": 0.01181916
+      },
+      "high": {
+        "quality_passes": "0/3",
+        "median_wall_seconds": 144.069,
+        "median_complete_provider_cost_usd": 0.25751,
+        "median_scout_provider_cost_usd": 0.00840456
+      }
+    },
+    "decision": "Select medium provisionally. Medium was the only level with 3/3 valid handoffs and 6/6 answer quality. Its corrected median complete cost is $0.252510; selection remains quality-led because low and high timed out 3/3 in this strict cohort."
+  },
+  "stage_b": {
+    "runs": [
+      {
+        "name": "b1-medium-adaptive",
+        "success": false,
+        "quality": "0/6",
+        "wall": 144.31,
+        "main": {
+          "requests": 8,
+          "input": 77639,
+          "cached": 52736,
+          "output": 1048,
+          "reasoning": 524,
+          "latency_ms": 36527,
+          "cost": 0.182323,
+          "started": "2026-08-11 13:53:00.954459",
+          "ended": "2026-08-11 13:55:21.138775"
+        },
+        "scout": {
+          "conversation_id": "019ff119-472d-7402-a786-007bf0c4166c",
+          "requests": 4,
+          "input": 26964,
+          "cached": 8960,
+          "output": 463,
+          "reasoning": 105,
+          "latency_ms": 20009,
+          "cost": 0.0043356,
+          "started": "2026-08-11 13:53:15.179000",
+          "ended": "2026-08-11 13:53:33.856468"
+        },
+        "complete_cost": 0.1866586
+      },
+      {
+        "name": "b2-medium-adaptive",
+        "success": false,
+        "quality": "0/6",
+        "wall": 141.109,
+        "main": {
+          "requests": 8,
+          "input": 77082,
+          "cached": 59648,
+          "output": 892,
+          "reasoning": 382,
+          "latency_ms": 29985,
+          "cost": 0.143754,
+          "started": "2026-08-11 13:55:27.242971",
+          "ended": "2026-08-11 13:57:46.460800"
+        },
+        "scout": {
+          "conversation_id": "019ff11b-84bd-75d1-ad85-59552bf19507",
+          "requests": 4,
+          "input": 27520,
+          "cached": 0,
+          "output": 501,
+          "reasoning": 69,
+          "latency_ms": 21860,
+          "cost": 0.0061052,
+          "started": "2026-08-11 13:55:41.763930",
+          "ended": "2026-08-11 13:56:02.628123"
+        },
+        "complete_cost": 0.1498592
+      },
+      {
+        "name": "b3-medium-adaptive",
+        "success": false,
+        "quality": "0/6",
+        "wall": 144.554,
+        "main": {
+          "requests": 8,
+          "input": 77974,
+          "cached": 35840,
+          "output": 1070,
+          "reasoning": 548,
+          "latency_ms": 33719,
+          "cost": 0.26069000000000003,
+          "started": "2026-08-11 13:57:53.570403",
+          "ended": "2026-08-11 14:00:15.446117"
+        },
+        "scout": {
+          "conversation_id": "019ff11d-c63a-7332-936d-ae567ec1f3ac",
+          "requests": 2,
+          "input": 6050,
+          "cached": 0,
+          "output": 0,
+          "reasoning": 0,
+          "latency_ms": 2392,
+          "cost": 0.00121,
+          "started": "2026-08-11 13:58:09.509396",
+          "ended": "2026-08-11 13:58:10.817472"
+        },
+        "complete_cost": 0.2619
+      }
+    ],
+    "summary": {
+      "quality_passes": "0/3",
+      "failure": "all repo_scout calls hit the 120-second timeout",
+      "median_wall_seconds": 144.31,
+      "median_failed_complete_provider_cost_usd": 0.1866586
+    },
+    "decision": "Reject and revert. No quality-passing handoff."
+  },
+  "stage_c_local": {
+    "runtime": "Ollama",
+    "model": "hf.co/mitkox/FastContext-1.0-4B-RL-Q4_K_M-GGUF:latest",
+    "model_size_gb": 2.5,
+    "config": {
+      "temperature": 0.7,
+      "max_turns": 8,
+      "timeout_seconds": 300
+    },
+    "compatibility_findings": [
+      "Ollama emits FastContext tool calls in message.reasoning instead of standard message.tool_calls",
+      "FastContext sometimes serializes numeric tool arguments as strings",
+      "temporary compatibility parsing made native Read/Glob/Grep execute, but quality remained inconsistent"
+    ],
+    "runs": [
+      {
+        "run": "local1",
+        "wall_seconds": 250.703,
+        "turns": 5,
+        "repository_tool_calls": 8,
+        "prompt_tokens": 49472,
+        "completion_tokens": 1317,
+        "validated_citations": 9,
+        "quality": "6/6 evidence map; no prose summary",
+        "citation_paths": [
+          "crates/cli/src/agents.rs",
+          "crates/cli/src/agents.rs",
+          "crates/cli/src/agents.rs",
+          "crates/cli/src/agents.rs",
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs"
+        ],
+        "provider_cost_usd": 0.0
+      },
+      {
+        "run": "local2",
+        "wall_seconds": 53.918,
+        "turns": 3,
+        "repository_tool_calls": 4,
+        "prompt_tokens": 10894,
+        "completion_tokens": 794,
+        "validated_citations": 6,
+        "quality": "4/6; valid citations but false selection/install claims",
+        "citation_paths": [
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs",
+          "crates/cli/src/setup.rs"
+        ],
+        "provider_cost_usd": 0.0
+      },
+      {
+        "run": "local3",
+        "wall_seconds": 162.594,
+        "turns": 7,
+        "repository_tool_calls": 6,
+        "prompt_tokens": 54035,
+        "completion_tokens": 946,
+        "validated_citations": 0,
+        "quality": "0/6; citations invalid after workspace-name prefix",
+        "citation_paths": [],
+        "provider_cost_usd": 0.0
+      }
+    ],
+    "summary": {
+      "fully_usable_handoffs": "1/3",
+      "median_wall_seconds": 162.594,
+      "median_prompt_tokens": 49472,
+      "median_repository_tool_calls": 6,
+      "provider_cost_usd": 0.0
+    },
+    "fallback_assessment": "A local-first then Luna fallback retains Luna provider cost on at least 2/3 runs and adds the failed local attempt latency. Worse, local2 returned valid citations with incorrect prose, so citation validity alone cannot safely trigger fallback.",
+    "decision": "Reject production local and local-first fallback. It missed the 95% usable-handoff gate (1/3) and median local scout wall time was 162.594 seconds."
+  },
+  "overall_decision": {
+    "keep": [
+      "configurable Luna reasoning effort with medium default",
+      "Codex scout project_doc_max_bytes=0 instruction isolation"
+    ],
+    "reject_and_revert": [
+      "Stage A immediate routing",
+      "Stage B adaptive two-operation budget",
+      "Stage C local FastContext backend and compatibility parser"
+    ],
+    "headline": "No stage established a launch-ready overall improvement. Medium reasoning is the only retained candidate because it passed quality 3/3; it requires broader natural-task validation."
+  },
+  "limitations": [
+    "Reasoning and Stage B were forced-routing ablations, not natural-routing product headlines.",
+    "Each condition used one repeated read-only question.",
+    "Provider latency varied materially during the sequence.",
+    "Local compute, energy, and dollar-equivalent cost were not measured."
+  ],
+  "repricing_note": "Repriced 2026-08-11 using Luna subscription-equivalent rates: $0.20/M uncached input, $0.02/M cached reads, and $1.20/M output including reasoning. Cache writes are not billed and are excluded by definition."
+}

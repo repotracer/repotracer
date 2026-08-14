@@ -1,0 +1,10 @@
+{
+  "id": "route-runtime-04",
+  "prompt": "Large repository reads and searches should never return more than 32 KiB, split a UTF-8 character, or end without actionable continuation guidance. Apply that contract consistently across file reads, content search, and file discovery.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/repo-tools/src/read.rs",
+    "crates/repo-tools/src/grep.rs",
+    "crates/repo-tools/src/glob_tool.rs"
+  ]
+}

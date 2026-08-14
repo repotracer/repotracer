@@ -1,0 +1,8 @@
+{
+  "id": "route-protocol-07",
+  "prompt": "In `crates/mcp/src/lib.rs`, change `PROTOCOL_VERSION` to `2025-06-18` and add an initialize-response test in the existing test module.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/mcp/src/lib.rs"
+  ]
+}

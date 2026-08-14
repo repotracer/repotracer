@@ -1,0 +1,11 @@
+{
+  "id": "route-cli-01",
+  "prompt": "Teams need to automate onboarding on workstations where several coding agents are installed. Add a non-interactive way to select which integrations are configured, while preserving today's zero-question default, dry-run output, and matching uninstall behavior.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/cli/src/main.rs",
+    "crates/cli/src/setup.rs",
+    "crates/cli/src/agents.rs",
+    "crates/cli/tests/setup.rs"
+  ]
+}

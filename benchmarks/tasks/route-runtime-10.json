@@ -1,0 +1,8 @@
+{
+  "id": "route-runtime-10",
+  "prompt": "Change `OpenAiCompatBackend::complete` in `crates/model/src/openai.rs` to omit `tools` and `tool_choice` from the request body when no tools are supplied; do not change message serialization.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/model/src/openai.rs"
+  ]
+}

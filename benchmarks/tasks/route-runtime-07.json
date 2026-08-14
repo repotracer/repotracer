@@ -1,0 +1,8 @@
+{
+  "id": "route-runtime-07",
+  "prompt": "In `crates/repo-tools/src/pathutil.rs`, explain whether `resolve_in_root` permits a nonexistent path whose parent is a symlink outside the repository, and identify the exact branch that decides it.",
+  "expected_scout": false,
+  "expected_paths": [
+    "crates/repo-tools/src/pathutil.rs"
+  ]
+}

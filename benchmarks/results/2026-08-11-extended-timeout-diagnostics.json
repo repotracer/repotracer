@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-11",
+  "status": "timeout correction and optimization diagnostics; one repeated read-only question; not launch evidence",
+  "question": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "correction": {
+    "original_scout_process_ceiling_seconds": 120,
+    "outer_mcp_client_ceiling_seconds_observed": 300,
+    "extended_scout_process_ceiling_seconds": 600,
+    "extended_outer_mcp_client_ceiling_seconds": 700,
+    "finding": "The original 0/3 results for low, high, and Stage B established production-timeout failure, not model incapability. With both ceilings raised, every extended run completed."
+  },
+  "reasoning_extended": {
+    "protocol": "One forced scout per run; restored three-operation prompt; one extended run per level; same six behavior/evidence checks.",
+    "runs": [
+      {
+        "effort": "low",
+        "quality": "6/6",
+        "wall_seconds": 214.035,
+        "citations": 5,
+        "tool_calls": 3,
+        "scout_duration_ms": 174992,
+        "main": {
+          "requests": 8,
+          "input": 80016,
+          "cached": 59648,
+          "output": 2181,
+          "reasoning": 642,
+          "latency_ms": 59561,
+          "cost_usd": 0.197094
+        },
+        "scout": {
+          "conversation_id": "019ff13c-f667-7d50-8b05-5b1158d29f44",
+          "requests": 6,
+          "input": 79836,
+          "cached": 35328,
+          "output": 1637,
+          "reasoning": 124,
+          "latency_ms": 53258,
+          "cost_usd": 0.01157256
+        },
+        "complete_cost_usd": 0.20866656,
+        "complete_input": 159852
+      },
+      {
+        "effort": "medium",
+        "quality": "6/6",
+        "wall_seconds": 135.845,
+        "citations": 5,
+        "tool_calls": 3,
+        "scout_duration_ms": 95281,
+        "main": {
+          "requests": 7,
+          "input": 69527,
+          "cached": 32512,
+          "output": 1942,
+          "reasoning": 542,
+          "latency_ms": 50468,
+          "cost_usd": 0.259591
+        },
+        "scout": {
+          "conversation_id": "019ff140-f0c6-7202-bf2d-b6947f793164",
+          "requests": 5,
+          "input": 66345,
+          "cached": 35072,
+          "output": 4173,
+          "reasoning": 2845,
+          "latency_ms": 94388,
+          "cost_usd": 0.01196364
+        },
+        "complete_cost_usd": 0.27155464,
+        "complete_input": 135872
+      },
+      {
+        "effort": "high",
+        "quality": "5/6",
+        "wall_seconds": 144.663,
+        "citations": 4,
+        "tool_calls": 3,
+        "scout_duration_ms": 101852,
+        "main": {
+          "requests": 7,
+          "input": 69102,
+          "cached": 50688,
+          "output": 1938,
+          "reasoning": 644,
+          "latency_ms": 49240,
+          "cost_usd": 0.175554
+        },
+        "scout": {
+          "conversation_id": "019ff143-2aae-7072-ab3f-5d62fa2cb8c9",
+          "requests": 5,
+          "input": 56218,
+          "cached": 32000,
+          "output": 4772,
+          "reasoning": 3461,
+          "latency_ms": 101066,
+          "cost_usd": 0.01121
+        },
+        "complete_cost_usd": 0.186764,
+        "complete_input": 125320
+      }
+    ],
+    "decision": "Keep medium as the provisional production default. It has four quality-passing observations across the bounded and extended cohorts; low has one extended pass and the slowest handoff; high missed one evidence check and has one extended completion."
+  },
+  "stage_b_extended": {
+    "protocol": "Medium reasoning; prompt starts with two operations and permits a third only for missing direct evidence; three runs; extended ceilings.",
+    "runs": [
+      {
+        "run": 1,
+        "quality": "5/6",
+        "wall_seconds": 111.685,
+        "citations": 5,
+        "tool_calls": 3,
+        "scout_duration_ms": 67250,
+        "main": {
+          "requests": 6,
+          "input": 60296,
+          "cached": 17920,
+          "output": 2089,
+          "reasoning": 688,
+          "latency_ms": 50948,
+          "cost_usd": 0.28351
+        },
+        "scout": {
+          "conversation_id": "019ff149-3049-70e3-abe1-2280a3516a84",
+          "requests": 5,
+          "input": 71302,
+          "cached": 41216,
+          "output": 3103,
+          "reasoning": 1340,
+          "latency_ms": 66426,
+          "cost_usd": 0.01056512
+        },
+        "complete_cost_usd": 0.29407512,
+        "complete_input": 131598
+      },
+      {
+        "run": 2,
+        "quality": "6/6",
+        "wall_seconds": 118.233,
+        "citations": 5,
+        "tool_calls": 3,
+        "scout_duration_ms": 65901,
+        "main": {
+          "requests": 6,
+          "input": 60186,
+          "cached": 41728,
+          "output": 2192,
+          "reasoning": 713,
+          "latency_ms": 58020,
+          "cost_usd": 0.178914
+        },
+        "scout": {
+          "conversation_id": "019ff14a-fbf9-7bb2-93fe-d16ba1fc4341",
+          "requests": 5,
+          "input": 74817,
+          "cached": 40192,
+          "output": 2495,
+          "reasoning": 836,
+          "latency_ms": 65068,
+          "cost_usd": 0.01072284
+        },
+        "complete_cost_usd": 0.18963684,
+        "complete_input": 135003
+      },
+      {
+        "run": 3,
+        "quality": "5/6",
+        "wall_seconds": 241.2,
+        "citations": 4,
+        "tool_calls": 3,
+        "scout_duration_ms": 198878,
+        "main": {
+          "requests": 9,
+          "input": 91152,
+          "cached": 35840,
+          "output": 1998,
+          "reasoning": 480,
+          "latency_ms": 64394,
+          "cost_usd": 0.35442
+        },
+        "scout": {
+          "conversation_id": "019ff14c-df7e-7c32-9d6d-7e17b3d5a597",
+          "requests": 6,
+          "input": 73953,
+          "cached": 39168,
+          "output": 2885,
+          "reasoning": 1237,
+          "latency_ms": 77358,
+          "cost_usd": 0.01120236
+        },
+        "complete_cost_usd": 0.36562236,
+        "complete_input": 165105
+      }
+    ],
+    "summary": {
+      "quality_passing_runs": "1/3",
+      "median_complete_cost_usd": 0.29407512,
+      "median_wall_seconds": 118.233,
+      "median_scout_duration_ms": 67250,
+      "tool_calls_each": 3
+    },
+    "decision": "Reject and revert. All scouts still used the optional third operation, strict quality passed only 1/3, and the median complete bill exceeded both the previous bounded medium median and the one extended medium control."
+  },
+  "production_timeout_decision": "Do not replace production bounds with benchmark ceilings. Keep the configurable 120-second default for medium; future experiments must report production-timeout viability separately from eventual completion under extended ceilings.",
+  "repricing_note": "Repriced 2026-08-11 using Luna subscription-equivalent rates: $0.20/M uncached input, $0.02/M cached reads, and $1.20/M output including reasoning. Cache writes are not billed and are excluded by definition."
+}

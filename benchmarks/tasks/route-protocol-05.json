@@ -1,0 +1,10 @@
+{
+  "id": "route-protocol-05",
+  "prompt": "Have pull requests run the routing suite in both arms, retain raw per-task artifacts, and fail only on routing or expected-path regressions while still publishing cost metrics for inspection.",
+  "expected_scout": true,
+  "expected_paths": [
+    ".github/workflows/ci.yml",
+    "crates/bench/src/main.rs",
+    "crates/bench/Cargo.toml"
+  ]
+}

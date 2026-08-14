@@ -1,0 +1,11 @@
+{
+  "id": "route-runtime-02",
+  "prompt": "Several OpenAI-compatible gateways return function-call arguments as a JSON object instead of a string and sometimes omit call IDs. Accept both wire shapes, generate collision-free IDs, and ensure the resulting calls and tool results remain valid over multiple turns.",
+  "expected_scout": true,
+  "expected_paths": [
+    "crates/model/src/openai.rs",
+    "crates/model/src/types.rs",
+    "crates/core/src/engine.rs",
+    "crates/repo-tools/src/types.rs"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "route-protocol-06",
+  "prompt": "Ship release assets that npm postinstall can actually fetch and verify on every supported platform, including Windows archives and published checksums.",
+  "expected_scout": true,
+  "expected_paths": [
+    ".github/workflows/release.yml",
+    "packages/npm/scripts/fetch-binary.js",
+    "packages/npm/bin/grephound.js",
+    "packages/npm/package.json"
+  ]
+}
