@@ -5,5 +5,5 @@
 - `results/` — dated paired run artifacts
 
 ```bash
-cargo run -p grephound-bench -- --suite benchmarks
+cargo run -p repotracer-bench -- --suite benchmarks
 ```

@@ -2,14 +2,14 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GrephoundConfig {
+pub struct RepotracerConfig {
     #[serde(default)]
     pub model: ModelSettings,
     #[serde(default)]
     pub explorer: ExplorerBudget,
 }
 
-impl GrephoundConfig {
+impl RepotracerConfig {
     pub fn load_from(path: &std::path::Path) -> anyhow::Result<Self> {
         let text = std::fs::read_to_string(path)?;
         Ok(toml::from_str(&text)?)

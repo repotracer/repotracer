@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Grephound">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Repotracer">
   <rect width="1024" height="1024" fill="#0B0F14"/>
   <g transform="translate(102 94) scale(.8)" fill="#7EE787">
     <path d="M371 253c-65-72-151-81-205-19-56 64-48 201-7 315 20 57 51 109 92 152 59-58 88-127 91-207 3-94 13-172 50-226l-21-15Zm282 0c65-72 151-81 205-19 56 64 48 201 7 315-20 57-51 109-92 152-59-58-88-127-91-207-3-94-13-172-50-226l21-15Z"/>

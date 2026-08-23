@@ -1,4 +1,4 @@
-//! Read / Glob / Grep tools for grephound.
+//! Read / Glob / Grep tools for repotracer.
 //! FastContext-compatible contracts with concurrent execution and fixed count mode.
 
 mod exec;

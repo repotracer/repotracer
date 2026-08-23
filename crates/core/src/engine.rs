@@ -2,8 +2,8 @@ use crate::citations::{parse_citations, validate_citations};
 use crate::config::ExplorerBudget;
 use crate::prompt::{build_system_prompt, user_query_prompt};
 use crate::types::{ScoutRequest, ScoutResult, ScoutStats};
-use grephound_model::{ChatMessage, ModelBackend, ModelRequest, ToolSpec};
-use grephound_repo_tools::{RepoTools, ToolCall};
+use repotracer_model::{ChatMessage, ModelBackend, ModelRequest, ToolSpec};
+use repotracer_repo_tools::{RepoTools, ToolCall};
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, warn};
@@ -245,7 +245,7 @@ fn empty_result(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use grephound_model::{MockModel, MockScript, MockStep};
+    use repotracer_model::{MockModel, MockScript, MockStep};
     use std::fs;
     use std::sync::Arc;
     use tempfile::tempdir;

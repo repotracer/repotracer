@@ -19,9 +19,9 @@ function platformKey() {
 
 function findBinary() {
   const ext = process.platform === 'win32' ? '.exe' : '';
-  const name = `grephound${ext}`;
+  const name = `repotracer${ext}`;
   const candidates = [
-    process.env.GREPHOUND_BIN,
+    process.env.REPOTRACER_BIN,
     path.join(__dirname, '..', 'vendor', platformKey(), name),
     path.join(__dirname, '..', '..', '..', 'target', 'release', name),
     path.join(__dirname, '..', '..', '..', 'target', 'debug', name),
@@ -37,9 +37,9 @@ function findBinary() {
 
 const bin = findBinary();
 if (!bin) {
-  console.error(`grephound: native binary not found for ${platformKey()}.`);
+  console.error(`repotracer: native binary not found for ${platformKey()}.`);
   console.error('Build from source: cargo install --path crates/cli');
-  console.error('Or set GREPHOUND_BIN to the binary path.');
+  console.error('Or set REPOTRACER_BIN to the binary path.');
   process.exit(1);
 }
 

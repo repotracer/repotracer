@@ -9,7 +9,7 @@
 
 ## What we can sell today (attributed)
 
-Until grephound paired product runs land under `benchmarks/results/`, public numbers are **sourced**, not invented:
+Until repotracer paired product runs land under `benchmarks/results/`, public numbers are **sourced**, not invented:
 
 | Number | Meaning | Attribution |
 |--------|---------|-------------|
@@ -20,7 +20,7 @@ Until grephound paired product runs land under `benchmarks/results/`, public num
 
 ![Attributed proof card](./assets/results-proof.png)
 
-**Rule for grephound headlines:** only medians from repeated paired complete-task runs, explorer included, quality counted.
+**Rule for repotracer headlines:** only medians from repeated paired complete-task runs, explorer included, quality counted.
 
 We benchmark complete coding tasks:
 
@@ -46,7 +46,7 @@ See [docs/benchmarks/why-token-counters-lie.md](./docs/benchmarks/why-token-coun
 Paired arms:
 
 - **A** — coding agent alone
-- **B** — same agent + grephound
+- **B** — same agent + repotracer
 
 Hold constant: model, reasoning setting, repo commit, task, agent version, timeout.
 
@@ -58,7 +58,7 @@ Modes (never mixed):
 ## Reproduce
 
 ```bash
-cargo run -p grephound-bench -- --suite benchmarks
+cargo run -p repotracer-bench -- --suite benchmarks
 ```
 
 Raw results live under `benchmarks/results/`.

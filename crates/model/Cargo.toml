@@ -1,9 +1,9 @@
 [package]
-name = "grephound-model"
+name = "repotracer-model"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Model backends for grephound"
+description = "Model backends for repotracer"
 repository.workspace = true
 
 [dependencies]

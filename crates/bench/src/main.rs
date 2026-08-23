@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "grephound-bench",
+    name = "repotracer-bench",
     about = "Benchmark the bill, not imaginary token counters."
 )]
 struct Args {
@@ -37,7 +37,7 @@ struct Aggregate {
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    println!("grephound benchmark\n");
+    println!("repotracer benchmark\n");
     println!("We benchmark complete coding-task economics.");
     println!("Not characters filtered. Not middleware counters.\n");
     println!("Suite root: {}", args.suite.display());

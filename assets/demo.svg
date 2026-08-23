@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
   <rect width="1280" height="640" fill="#0b0f14"/>
-  <text x="64" y="120" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="56" font-weight="700">grephound</text>
+  <text x="64" y="120" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="56" font-weight="700">repotracer</text>
   <text x="64" y="190" fill="#7ee787" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="36">Small models search.</text>
   <text x="64" y="240" fill="#79c0ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="36">Big models solve.</text>
   <rect x="64" y="300" width="520" height="240" rx="16" fill="#161b22" stroke="#30363d"/>
@@ -8,8 +8,8 @@
   <text x="92" y="400" fill="#ffa198" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">grep → read → grep → read</text>
   <text x="92" y="450" fill="#ffa198" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">expensive context fills up</text>
   <rect x="680" y="300" width="520" height="240" rx="16" fill="#161b22" stroke="#238636"/>
-  <text x="708" y="350" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">WITH grephound</text>
+  <text x="708" y="350" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">WITH repotracer</text>
   <text x="708" y="400" fill="#7ee787" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">repo_scout("trace auth")</text>
   <text x="708" y="450" fill="#7ee787" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">3 validated citations</text>
-  <text x="64" y="600" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">npx grephound setup</text>
+  <text x="64" y="600" fill="#8b949e" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">npx repotracer setup</text>
 </svg>
