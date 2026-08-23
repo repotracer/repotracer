@@ -1,6 +1,6 @@
 # We stopped paying frontier models to search the repository
 
-![Grephound demo storyboard](../../assets/demo-storyboard.png)
+![Repotracer demo storyboard](../../assets/demo-storyboard.png)
 
 ## 1. The stupid part of coding-agent economics
 
@@ -45,5 +45,5 @@ Exploration-heavy tasks vs trivial known-file edits.
 ## 12. Install
 
 ```bash
-npx grephound setup
+npx repotracer setup
 ```

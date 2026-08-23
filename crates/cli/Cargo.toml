@@ -1,14 +1,14 @@
 [package]
-name = "grephound"
+name = "repotracer"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Repository scout for AI coding agents"
 repository.workspace = true
-default-run = "grephound"
+default-run = "repotracer"
 
 [[bin]]
-name = "grephound"
+name = "repotracer"
 path = "src/main.rs"
 
 [dependencies]
@@ -17,10 +17,10 @@ async-trait.workspace = true
 chrono.workspace = true
 clap.workspace = true
 dirs.workspace = true
-grephound-core.workspace = true
-grephound-mcp.workspace = true
-grephound-model.workspace = true
-grephound-repo-tools.workspace = true
+repotracer-core.workspace = true
+repotracer-mcp.workspace = true
+repotracer-model.workspace = true
+repotracer-repo-tools.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

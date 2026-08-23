@@ -3,8 +3,8 @@ use crate::config;
 use crate::subscription::{is_subscription_backend, CliScout};
 use anyhow::{bail, Context, Result};
 use clap::ValueEnum;
-use grephound_core::{GrephoundConfig, ModelSettings};
-use grephound_model::{
+use repotracer_core::{RepotracerConfig, ModelSettings};
+use repotracer_model::{
     ChatMessage, ModelBackend, ModelConfig, ModelRequest, OpenAiCompatBackend, ToolSpec,
 };
 use serde_json::json;
@@ -24,7 +24,7 @@ pub enum ProviderChoice {
 pub async fn run(
     root: &Path,
     cfg_path: &Path,
-    cfg: &GrephoundConfig,
+    cfg: &RepotracerConfig,
     yes: bool,
     dry_run: bool,
     requested_provider: ProviderChoice,
@@ -32,7 +32,7 @@ pub async fn run(
     let interactive = io::stdin().is_terminal() && !yes && !dry_run;
     if !interactive && !yes && !dry_run {
         bail!(
-            "setup needs an interactive terminal; use `grephound setup --yes` for unattended setup"
+            "setup needs an interactive terminal; use `repotracer setup --yes` for unattended setup"
         );
     }
 
@@ -85,7 +85,7 @@ pub async fn run(
     if selected.is_empty() {
         item(
             false,
-            "no agent selected; generic MCP command is `grephound serve`",
+            "no agent selected; generic MCP command is `repotracer serve`",
         );
     }
     let mut integration_errors = Vec::new();
@@ -112,7 +112,7 @@ pub async fn run(
         );
     }
 
-    section("4 / 4  Grephound configuration");
+    section("4 / 4  Repotracer configuration");
     if dry_run {
         plan(&format!("would write {}", cfg_path.display()));
     } else {
@@ -136,7 +136,7 @@ pub async fn run(
             style("1;32", "READY — small models search, big models solve")
         );
         println!("\nRestart configured agents, then ask a multi-file repository question.");
-        println!("Verify any time: grephound doctor");
+        println!("Verify any time: repotracer doctor");
     }
     Ok(())
 }
@@ -203,7 +203,7 @@ fn provider_for_auto(capable: bool, codex: bool, claude: bool) -> ProviderChoice
     }
 }
 
-fn configure_provider(cfg: &mut GrephoundConfig, provider: ProviderChoice) -> Result<()> {
+fn configure_provider(cfg: &mut RepotracerConfig, provider: ProviderChoice) -> Result<()> {
     match provider {
         ProviderChoice::Auto => unreachable!("auto provider must be resolved first"),
         ProviderChoice::Ollama => {
@@ -283,7 +283,7 @@ fn physical_memory_bytes() -> Option<u64> {
     }
 }
 
-async fn verify_subscription(root: &Path, cfg: &GrephoundConfig, dry_run: bool) -> Result<()> {
+async fn verify_subscription(root: &Path, cfg: &RepotracerConfig, dry_run: bool) -> Result<()> {
     let scout = CliScout::from_config(cfg)?;
     if dry_run {
         plan(&format!(
@@ -382,7 +382,7 @@ fn select_agents(
 }
 
 async fn ensure_ollama(
-    cfg: &GrephoundConfig,
+    cfg: &RepotracerConfig,
     yes: bool,
     dry_run: bool,
     interactive: bool,
@@ -427,7 +427,7 @@ async fn ensure_ollama(
 
     let binary = binary.ok_or_else(|| {
         anyhow::anyhow!(
-            "Ollama installed but `ollama` was not found. Restart the terminal, then run `grephound setup` again"
+            "Ollama installed but `ollama` was not found. Restart the terminal, then run `repotracer setup` again"
         )
     })?;
     item(true, &format!("Ollama installed ({})", binary.display()));
@@ -468,7 +468,7 @@ async fn ensure_ollama(
     Ok(())
 }
 
-async fn verify_tool_calling(cfg: &GrephoundConfig) -> Result<()> {
+async fn verify_tool_calling(cfg: &RepotracerConfig) -> Result<()> {
     let backend = OpenAiCompatBackend::new(ModelConfig {
         base_url: cfg.model.base_url.clone(),
         model: cfg.model.model.clone(),
@@ -514,7 +514,7 @@ async fn verify_tool_calling(cfg: &GrephoundConfig) -> Result<()> {
     )
 }
 
-fn uses_local_ollama(cfg: &GrephoundConfig) -> bool {
+fn uses_local_ollama(cfg: &RepotracerConfig) -> bool {
     cfg.model.backend.eq_ignore_ascii_case("ollama")
         && (cfg.model.base_url.contains("127.0.0.1:11434")
             || cfg.model.base_url.contains("localhost:11434"))
@@ -628,7 +628,7 @@ fn model_present(binary: &Path, model: &str) -> bool {
 
 pub fn uninstall(root: &Path, yes: bool) -> Result<()> {
     if !yes {
-        println!("This removes Grephound MCP entries, skills, and project routing instructions.");
+        println!("This removes Repotracer MCP entries, skills, and project routing instructions.");
         println!("Re-run with --yes to confirm.");
         return Ok(());
     }
@@ -640,7 +640,7 @@ pub fn uninstall(root: &Path, yes: bool) -> Result<()> {
         std::fs::remove_file(&cfg)?;
         item(true, &format!("removed {}", cfg.display()));
     }
-    println!("Uninstall complete. Ollama, downloaded models, and the Grephound binary were left in place.");
+    println!("Uninstall complete. Ollama, downloaded models, and the Repotracer binary were left in place.");
     Ok(())
 }
 
@@ -716,7 +716,7 @@ mod tests {
 
     #[test]
     fn local_ollama_detection_does_not_capture_custom_endpoints() {
-        let mut config = GrephoundConfig::default();
+        let mut config = RepotracerConfig::default();
         assert!(uses_local_ollama(&config));
         config.model.base_url = "https://models.example.com/v1".into();
         assert!(!uses_local_ollama(&config));

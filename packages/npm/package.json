@@ -1,9 +1,9 @@
 {
-  "name": "grephound",
+  "name": "repotracer",
   "version": "0.1.0",
   "description": "Local repository scout for AI coding agents. Small models search. Big models solve.",
   "bin": {
-    "grephound": "bin/grephound.js"
+    "repotracer": "bin/repotracer.js"
   },
   "files": [
     "bin/",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/grephound/grephound.git"
+    "url": "git+https://github.com/repotracer/repotracer.git"
   },
   "engines": {
     "node": ">=18"

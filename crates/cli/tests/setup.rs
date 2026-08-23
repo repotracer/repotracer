@@ -5,13 +5,13 @@ use predicates::prelude::*;
 fn dry_run_plans_model_and_routing_without_writes() {
     let home = tempfile::tempdir().unwrap();
     let root = tempfile::tempdir().unwrap();
-    let config = home.path().join(".grephound").join("config.toml");
+    let config = home.path().join(".repotracer").join("config.toml");
 
-    let mut command = Command::cargo_bin("grephound").unwrap();
+    let mut command = Command::cargo_bin("repotracer").unwrap();
     command
         .env("HOME", home.path())
         .env("USERPROFILE", home.path())
-        .env("GREPHOUND_CONFIG", &config)
+        .env("REPOTRACER_CONFIG", &config)
         .args([
             "--root",
             root.path().to_str().unwrap(),
@@ -47,7 +47,7 @@ fn dry_run_supports_subscription_and_custom_backends() {
     ] {
         let home = tempfile::tempdir().unwrap();
         let root = tempfile::tempdir().unwrap();
-        let mut command = Command::cargo_bin("grephound").unwrap();
+        let mut command = Command::cargo_bin("repotracer").unwrap();
         command
             .env("HOME", home.path())
             .env("USERPROFILE", home.path())
@@ -67,7 +67,7 @@ fn dry_run_supports_subscription_and_custom_backends() {
 
     let home = tempfile::tempdir().unwrap();
     let root = tempfile::tempdir().unwrap();
-    let mut command = Command::cargo_bin("grephound").unwrap();
+    let mut command = Command::cargo_bin("repotracer").unwrap();
     command
         .env("HOME", home.path())
         .env("USERPROFILE", home.path())
@@ -106,9 +106,9 @@ api_key = "secret-provider-token"
     )
     .unwrap();
 
-    let mut command = Command::cargo_bin("grephound").unwrap();
+    let mut command = Command::cargo_bin("repotracer").unwrap();
     command
-        .env("GREPHOUND_CONFIG", &config)
+        .env("REPOTRACER_CONFIG", &config)
         .args(["--json", "status"])
         .assert()
         .success()

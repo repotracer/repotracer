@@ -65,7 +65,7 @@ impl ModelBackend for OpenAiCompatBackend {
                 ModelError::Timeout
             } else {
                 ModelError::Request(format!(
-                    "Could not reach model at {}.\n\nFor Ollama:\n  ollama serve\n  ollama pull {}\n\nThen: grephound doctor",
+                    "Could not reach model at {}.\n\nFor Ollama:\n  ollama serve\n  ollama pull {}\n\nThen: repotracer doctor",
                     self.config.base_url, self.config.model
                 ))
             }

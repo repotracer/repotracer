@@ -3,24 +3,24 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const MANAGED_START: &str = "<!-- grephound:start -->";
-const MANAGED_END: &str = "<!-- grephound:end -->";
+const MANAGED_START: &str = "<!-- repotracer:start -->";
+const MANAGED_END: &str = "<!-- repotracer:end -->";
 
 pub const ROUTING_SKILL: &str = r#"---
-name: grephound-scout
-description: Delegate unfamiliar or multi-file repository exploration to Grephound. Use for tracing behavior across modules, locating an implementation and its tests, understanding an unfamiliar subsystem, or finding change impact. Skip for trivial known-file reads or when the relevant code is already in context.
+name: repotracer-scout
+description: Delegate unfamiliar or multi-file repository exploration to Repotracer. Use for tracing behavior across modules, locating an implementation and its tests, understanding an unfamiliar subsystem, or finding change impact. Skip for trivial known-file reads or when the relevant code is already in context.
 ---
 
-# Grephound repository scout
+# Repotracer repository scout
 
 Use the `repo_scout` MCP tool before manual Read/Grep/Glob chains when a task requires repository exploration across unknown or multiple files.
 
-Give `repo_scout` one precise semantic question naming the behavior or flow to trace. Grephound selects its configured read-only local, subscription, or custom-endpoint backend internally. Use its validated file:line citations to read only the returned locations, then solve the task with normal coding tools.
+Give `repo_scout` one precise semantic question naming the behavior or flow to trace. Repotracer selects its configured read-only local, subscription, or custom-endpoint backend internally. Use its validated file:line citations to read only the returned locations, then solve the task with normal coding tools.
 
-Do not invoke Grephound's backend CLI directly. Do not use Grephound when the exact relevant file or symbol is already known and one targeted read is enough, or when no repository exploration is needed.
+Do not invoke Repotracer's backend CLI directly. Do not use Repotracer when the exact relevant file or symbol is already known and one targeted read is enough, or when no repository exploration is needed.
 "#;
 
-const ROUTING_INSTRUCTIONS: &str = "Use the Grephound `repo_scout` MCP tool before manual Read/Grep/Glob chains when a coding task requires understanding unfamiliar code, tracing behavior across multiple files, locating implementation plus tests, or assessing multi-module change impact. Ask one precise semantic repository question, then read only the validated file:line citations it returns. Skip Grephound for trivial known-file reads or when the relevant code is already in context.";
+const ROUTING_INSTRUCTIONS: &str = "Use the Repotracer `repo_scout` MCP tool before manual Read/Grep/Glob chains when a coding task requires understanding unfamiliar code, tracing behavior across multiple files, locating implementation plus tests, or assessing multi-module change impact. Ask one precise semantic repository question, then read only the validated file:line citations it returns. Skip Repotracer for trivial known-file reads or when the relevant code is already in context.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInfo {
@@ -40,7 +40,7 @@ pub fn detect(root: &Path) -> Vec<AgentInfo> {
             name: "MCP (generic)".into(),
             detected: true,
             configured: true,
-            path: Some("grephound serve".into()),
+            path: Some("repotracer serve".into()),
         },
     ]
 }
@@ -53,7 +53,7 @@ fn detect_json_agent(name: &str, command: &str, path: Option<PathBuf>) -> AgentI
             .is_some_and(Path::exists);
     let configured = path
         .as_ref()
-        .is_some_and(|p| p.exists() && file_contains_grephound(p));
+        .is_some_and(|p| p.exists() && file_contains_repotracer(p));
     AgentInfo {
         name: name.into(),
         detected,
@@ -71,7 +71,7 @@ fn detect_codex() -> AgentInfo {
             .is_some_and(Path::exists);
     let configured = path
         .as_ref()
-        .is_some_and(|p| p.exists() && file_contains_grephound(p));
+        .is_some_and(|p| p.exists() && file_contains_repotracer(p));
     AgentInfo {
         name: "Codex".into(),
         detected,
@@ -80,9 +80,9 @@ fn detect_codex() -> AgentInfo {
     }
 }
 
-fn file_contains_grephound(path: &Path) -> bool {
+fn file_contains_repotracer(path: &Path) -> bool {
     fs::read_to_string(path)
-        .map(|s| s.contains("grephound"))
+        .map(|s| s.contains("repotracer"))
         .unwrap_or(false)
 }
 
@@ -107,7 +107,7 @@ fn claude_skill_path() -> anyhow::Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("no home dir"))?
         .join(".claude")
         .join("skills")
-        .join("grephound-scout")
+        .join("repotracer-scout")
         .join("SKILL.md"))
 }
 
@@ -116,21 +116,21 @@ fn codex_skill_path() -> anyhow::Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("no home dir"))?
         .join(".codex")
         .join("skills")
-        .join("grephound-scout")
+        .join("repotracer-scout")
         .join("SKILL.md"))
 }
 
 fn cursor_rule_path(root: &Path) -> PathBuf {
     root.join(".cursor")
         .join("rules")
-        .join("grephound-scout.mdc")
+        .join("repotracer-scout.mdc")
 }
 
 fn copilot_instructions_path(root: &Path) -> PathBuf {
     root.join(".github").join("copilot-instructions.md")
 }
 
-pub fn grephound_mcp_entry(binary: &Path) -> Value {
+pub fn repotracer_mcp_entry(binary: &Path) -> Value {
     json!({
         "command": binary.display().to_string(),
         "args": ["serve"],
@@ -173,7 +173,7 @@ pub fn install_cursor(binary: &Path, root: &Path, dry_run: bool) -> anyhow::Resu
         write_managed_file(
             &rule,
             &format!(
-                "---\ndescription: Route multi-file repository exploration through Grephound\nalwaysApply: true\n---\n\n{ROUTING_INSTRUCTIONS}\n"
+                "---\ndescription: Route multi-file repository exploration through Repotracer\nalwaysApply: true\n---\n\n{ROUTING_INSTRUCTIONS}\n"
             ),
         )?;
     }
@@ -222,7 +222,7 @@ fn install_json_mcp(path: &Path, key: &str, binary: &Path) -> anyhow::Result<()>
         .or_insert_with(|| json!({}))
         .as_object_mut()
         .ok_or_else(|| anyhow::anyhow!("`{key}` in {} must be an object", path.display()))?;
-    servers.insert("grephound".into(), grephound_mcp_entry(binary));
+    servers.insert("repotracer".into(), repotracer_mcp_entry(binary));
     fs::write(path, serde_json::to_string_pretty(&root)? + "\n")?;
     Ok(())
 }
@@ -236,10 +236,10 @@ fn install_codex_config(path: &Path, binary: &Path) -> anyhow::Result<()> {
         String::new()
     };
     let command = serde_json::to_string(&binary.display().to_string())?;
-    let block = format!("[mcp_servers.grephound]\ncommand = {command}\nargs = [\"serve\"]\n");
+    let block = format!("[mcp_servers.repotracer]\ncommand = {command}\nargs = [\"serve\"]\n");
     fs::write(
         path,
-        replace_toml_section(&text, "[mcp_servers.grephound]", &block),
+        replace_toml_section(&text, "[mcp_servers.repotracer]", &block),
     )?;
     Ok(())
 }
@@ -327,9 +327,9 @@ pub fn uninstall_all(root: &Path) -> anyhow::Result<Vec<String>> {
 
     if let Some(path) = codex_config_path().filter(|p| p.exists()) {
         backup_file(&path)?;
-        let updated = remove_toml_section(&fs::read_to_string(&path)?, "[mcp_servers.grephound]");
+        let updated = remove_toml_section(&fs::read_to_string(&path)?, "[mcp_servers.repotracer]");
         fs::write(&path, updated)?;
-        messages.push(format!("removed Grephound from {}", path.display()));
+        messages.push(format!("removed Repotracer from {}", path.display()));
     }
 
     for path in [
@@ -355,7 +355,7 @@ pub fn uninstall_all(root: &Path) -> anyhow::Result<Vec<String>> {
             fs::write(&instructions, updated + "\n")?;
         }
         messages.push(format!(
-            "removed Grephound instructions from {}",
+            "removed Repotracer instructions from {}",
             instructions.display()
         ));
     }
@@ -375,12 +375,12 @@ fn remove_json_mcp(
     let removed = root
         .get_mut(key)
         .and_then(Value::as_object_mut)
-        .and_then(|servers| servers.remove("grephound"))
+        .and_then(|servers| servers.remove("repotracer"))
         .is_some();
     if removed {
         backup_file(path)?;
         fs::write(path, serde_json::to_string_pretty(&root)? + "\n")?;
-        messages.push(format!("removed Grephound from {}", path.display()));
+        messages.push(format!("removed Repotracer from {}", path.display()));
     }
     Ok(())
 }
@@ -403,7 +403,7 @@ fn backup_file(path: &Path) -> anyhow::Result<()> {
 }
 
 pub fn current_binary() -> PathBuf {
-    std::env::current_exe().unwrap_or_else(|_| PathBuf::from("grephound"))
+    std::env::current_exe().unwrap_or_else(|_| PathBuf::from("repotracer"))
 }
 
 #[cfg(test)]
@@ -419,25 +419,25 @@ mod tests {
         install_json_mcp(
             &path,
             "mcpServers",
-            Path::new("C:\\Grephound\\grephound.exe"),
+            Path::new("C:\\Repotracer\\repotracer.exe"),
         )
         .unwrap();
         let value: Value = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
         assert_eq!(value["mcpServers"]["other"]["command"], "other");
         assert_eq!(
-            value["mcpServers"]["grephound"]["command"],
-            "C:\\Grephound\\grephound.exe"
+            value["mcpServers"]["repotracer"]["command"],
+            "C:\\Repotracer\\repotracer.exe"
         );
     }
 
     #[test]
     fn codex_section_update_is_idempotent() {
-        let original = "model = \"gpt\"\n\n[mcp_servers.grephound]\ncommand = \"old\"\nargs = [\"serve\"]\n\n[other]\nvalue = 1\n";
-        let block = "[mcp_servers.grephound]\ncommand = \"new\"\nargs = [\"serve\"]\n";
-        let once = replace_toml_section(original, "[mcp_servers.grephound]", block);
-        let twice = replace_toml_section(&once, "[mcp_servers.grephound]", block);
+        let original = "model = \"gpt\"\n\n[mcp_servers.repotracer]\ncommand = \"old\"\nargs = [\"serve\"]\n\n[other]\nvalue = 1\n";
+        let block = "[mcp_servers.repotracer]\ncommand = \"new\"\nargs = [\"serve\"]\n";
+        let once = replace_toml_section(original, "[mcp_servers.repotracer]", block);
+        let twice = replace_toml_section(&once, "[mcp_servers.repotracer]", block);
         assert_eq!(once, twice);
-        assert_eq!(once.matches("[mcp_servers.grephound]").count(), 1);
+        assert_eq!(once.matches("[mcp_servers.repotracer]").count(), 1);
         assert!(once.contains("[other]"));
     }
 
@@ -445,11 +445,11 @@ mod tests {
     fn managed_instructions_preserve_user_content() {
         let first = replace_managed_block(
             "# Existing\n",
-            "<!-- grephound:start -->\none\n<!-- grephound:end -->",
+            "<!-- repotracer:start -->\none\n<!-- repotracer:end -->",
         );
         let second = replace_managed_block(
             &first,
-            "<!-- grephound:start -->\ntwo\n<!-- grephound:end -->",
+            "<!-- repotracer:start -->\ntwo\n<!-- repotracer:end -->",
         );
         assert!(second.contains("# Existing"));
         assert!(!second.contains("\none\n"));
@@ -460,7 +460,7 @@ mod tests {
     #[test]
     fn skill_has_positive_and_negative_routing_rules() {
         assert!(ROUTING_SKILL.contains("multi-file"));
-        assert!(ROUTING_SKILL.contains("Do not use Grephound"));
+        assert!(ROUTING_SKILL.contains("Do not use Repotracer"));
         assert!(ROUTING_SKILL.contains("file:line citations"));
     }
 }

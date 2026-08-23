@@ -12,7 +12,7 @@ Main LLM
  → read
 
 
-grephound
+repotracer
 
 Main LLM
  → repo_scout(question)
@@ -31,12 +31,12 @@ Main LLM
 
 | Crate | Role |
 |-------|------|
-| `grephound-repo-tools` | Read, Glob, Grep + concurrent executor |
-| `grephound-model` | OpenAI-compatible backend + mock |
-| `grephound-core` | Scout engine, citations, config |
-| `grephound-mcp` | stdio MCP server (`repo_scout`) |
-| `grephound` (cli) | setup / doctor / scout / serve + official CLI subscription runners |
-| `grephound-bench` | complete-task benchmark harness |
+| `repotracer-repo-tools` | Read, Glob, Grep + concurrent executor |
+| `repotracer-model` | OpenAI-compatible backend + mock |
+| `repotracer-core` | Scout engine, citations, config |
+| `repotracer-mcp` | stdio MCP server (`repo_scout`) |
+| `repotracer` (cli) | setup / doctor / scout / serve + official CLI subscription runners |
+| `repotracer-bench` | complete-task benchmark harness |
 
 ## Host integration
 
@@ -46,14 +46,14 @@ MCP is the portable capability layer. Setup also installs a compact host-native 
 
 ```text
 repo_scout
-  ├─ ollama / openai-compatible → Grephound tool loop → Read / Glob / Grep
+  ├─ ollama / openai-compatible → Repotracer tool loop → Read / Glob / Grep
   ├─ codex-cli                  → ephemeral `codex exec` → structured result
   └─ claude-cli                 → safe `claude -p` → structured result
                                       ↓
                             shared citation validation
 ```
 
-Subscription mode delegates one complete exploration to the provider's official installed CLI. The CLI retains credential ownership. Grephound passes no tokens, disables inherited agent configuration/MCP recursion, constrains execution to read-only operations, applies a process deadline, parses a strict result schema, and validates citations itself.
+Subscription mode delegates one complete exploration to the provider's official installed CLI. The CLI retains credential ownership. Repotracer passes no tokens, disables inherited agent configuration/MCP recursion, constrains execution to read-only operations, applies a process deadline, parses a strict result schema, and validates citations itself.
 
 ## Local/custom engine loop
 

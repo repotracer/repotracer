@@ -6,10 +6,10 @@ mod subscription;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use grephound_core::{ExplorerBudget, GrephoundConfig, ScoutBackend, ScoutEngine, ScoutRequest};
-use grephound_mcp::McpServer;
-use grephound_model::{MockModel, ModelBackend, ModelConfig, OpenAiCompatBackend};
-use grephound_repo_tools::RepoTools;
+use repotracer_core::{ExplorerBudget, RepotracerConfig, ScoutBackend, ScoutEngine, ScoutRequest};
+use repotracer_mcp::McpServer;
+use repotracer_model::{MockModel, ModelBackend, ModelConfig, OpenAiCompatBackend};
+use repotracer_repo_tools::RepoTools;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -17,7 +17,7 @@ use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "grephound",
+    name = "repotracer",
     version,
     about = "Repository scout for AI coding agents. Small models search. Big models solve.",
     long_about = None
@@ -39,7 +39,7 @@ struct Cli {
     root: Option<PathBuf>,
 
     /// Config file path
-    #[arg(long, global = true, env = "GREPHOUND_CONFIG")]
+    #[arg(long, global = true, env = "REPOTRACER_CONFIG")]
     config: Option<PathBuf>,
 
     /// Override model name
@@ -95,7 +95,7 @@ enum Commands {
         #[arg(long)]
         suite: Option<String>,
     },
-    /// Remove grephound agent integrations and local config
+    /// Remove repotracer agent integrations and local config
     Uninstall {
         #[arg(long)]
         yes: bool,
@@ -135,7 +135,7 @@ async fn run(cli: Cli) -> Result<()> {
         cfg.model.base_url = u.clone();
     }
 
-    // Shorthand: grephound "where is auth?"
+    // Shorthand: repotracer "where is auth?"
     if cli.command.is_none() && !cli.query.is_empty() {
         let q = cli.query.join(" ");
         return cmd_scout(&root, &cfg, &q, None, cli.json, cli.mock).await;
@@ -145,7 +145,7 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Scout { query, max_turns } => {
             let q = query.join(" ");
             if q.trim().is_empty() {
-                bail!("query required. Example: grephound scout \"where is auth handled?\"");
+                bail!("query required. Example: repotracer scout \"where is auth handled?\"");
             }
             cmd_scout(&root, &cfg, &q, max_turns, cli.json, cli.mock).await
         }
@@ -172,15 +172,15 @@ async fn run(cli: Cli) -> Result<()> {
         }
         Commands::Benchmark { suite } => {
             println!(
-                "Benchmark harness: see `grephound-bench` and benchmarks/.\nSuite: {}",
+                "Benchmark harness: see `repotracer-bench` and benchmarks/.\nSuite: {}",
                 suite.as_deref().unwrap_or("default")
             );
-            println!("Run: cargo run -p grephound-bench -- --help");
+            println!("Run: cargo run -p repotracer-bench -- --help");
             Ok(())
         }
         Commands::Uninstall { yes } => setup::uninstall(&root, yes),
         Commands::Version => {
-            println!("grephound {}", env!("CARGO_PKG_VERSION"));
+            println!("repotracer {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
     }
@@ -188,7 +188,7 @@ async fn run(cli: Cli) -> Result<()> {
 
 async fn cmd_scout(
     root: &std::path::Path,
-    cfg: &GrephoundConfig,
+    cfg: &RepotracerConfig,
     query: &str,
     max_turns: Option<u32>,
     json: bool,
@@ -213,7 +213,7 @@ async fn cmd_scout(
     Ok(())
 }
 
-async fn cmd_serve(root: &std::path::Path, cfg: &GrephoundConfig, mock: bool) -> Result<()> {
+async fn cmd_serve(root: &std::path::Path, cfg: &RepotracerConfig, mock: bool) -> Result<()> {
     // Logs must not touch stdout.
     let engine = build_scout(root, cfg, mock)?;
     let server = McpServer::new(engine, root.to_path_buf());
@@ -223,7 +223,7 @@ async fn cmd_serve(root: &std::path::Path, cfg: &GrephoundConfig, mock: bool) ->
 fn cmd_status(
     root: &std::path::Path,
     cfg_path: &std::path::Path,
-    cfg: &GrephoundConfig,
+    cfg: &RepotracerConfig,
     json: bool,
 ) -> Result<()> {
     let agents = agents::detect(root);
@@ -244,7 +244,7 @@ fn cmd_status(
             }))?
         );
     } else {
-        println!("grephound status\n");
+        println!("repotracer status\n");
         println!("Root     {}", root.display());
         println!("Config   {}", cfg_path.display());
         if subscription::is_subscription_backend(cfg) {
@@ -272,7 +272,7 @@ fn cmd_status(
 
 fn build_scout(
     root: &std::path::Path,
-    cfg: &GrephoundConfig,
+    cfg: &RepotracerConfig,
     mock: bool,
 ) -> Result<Arc<dyn ScoutBackend>> {
     if !mock && subscription::is_subscription_backend(cfg) {
@@ -308,7 +308,7 @@ fn build_scout(
 
 fn init_tracing(verbose: bool) {
     let filter = if verbose {
-        EnvFilter::new("info,grephound=debug,grephound_core=debug")
+        EnvFilter::new("info,repotracer=debug,repotracer_core=debug")
     } else {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"))
     };

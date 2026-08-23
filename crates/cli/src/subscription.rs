@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use grephound_core::{
-    validate_citations, Citation, GrephoundConfig, ScoutBackend, ScoutRequest, ScoutResult,
+use repotracer_core::{
+    validate_citations, Citation, RepotracerConfig, ScoutBackend, ScoutRequest, ScoutResult,
     ScoutStats,
 };
 use serde::Deserialize;
@@ -47,7 +47,7 @@ impl CliProvider {
     }
 }
 
-pub fn is_subscription_backend(cfg: &GrephoundConfig) -> bool {
+pub fn is_subscription_backend(cfg: &RepotracerConfig) -> bool {
     CliProvider::from_backend(&cfg.model.backend).is_some()
 }
 
@@ -60,7 +60,7 @@ pub struct CliScout {
 }
 
 impl CliScout {
-    pub fn from_config(cfg: &GrephoundConfig) -> Result<Self> {
+    pub fn from_config(cfg: &RepotracerConfig) -> Result<Self> {
         let provider = CliProvider::from_backend(&cfg.model.backend)
             .with_context(|| format!("unsupported subscription backend `{}`", cfg.model.backend))?;
         let executable = cfg
@@ -120,7 +120,7 @@ impl CliScout {
             })
             .unwrap_or_default();
         format!(
-            "You are Grephound, a read-only repository scout. Autonomously search and read the repository to answer the question. Do not edit files, run network requests, or delegate to another agent. Return a concise answer and only repository-relative citations with exact line ranges.{}\n\nQuestion: {}",
+            "You are Repotracer, a read-only repository scout. Autonomously search and read the repository to answer the question. Do not edit files, run network requests, or delegate to another agent. Return a concise answer and only repository-relative citations with exact line ranges.{}\n\nQuestion: {}",
             focus, request.query
         )
     }
@@ -271,7 +271,7 @@ impl CliScout {
         command
             .args(args)
             .current_dir(cwd)
-            .env("GREPHOUND_SUBPROCESS", "1")
+            .env("REPOTRACER_SUBPROCESS", "1")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -439,7 +439,7 @@ impl TempRunDir {
     fn create() -> Result<Self> {
         for _ in 0..10 {
             let id = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!("grephound-{}-{id}", std::process::id()));
+            let path = std::env::temp_dir().join(format!("repotracer-{}-{id}", std::process::id()));
             match std::fs::create_dir(&path) {
                 Ok(()) => return Ok(Self { path }),
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -459,10 +459,10 @@ impl Drop for TempRunDir {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use grephound_core::ModelSettings;
+    use repotracer_core::ModelSettings;
 
-    fn config(provider: &str, executable: &Path) -> GrephoundConfig {
-        GrephoundConfig {
+    fn config(provider: &str, executable: &Path) -> RepotracerConfig {
+        RepotracerConfig {
             model: ModelSettings {
                 backend: provider.into(),
                 executable: Some(executable.display().to_string()),
@@ -470,7 +470,7 @@ mod tests {
                 timeout_ms: 2_000,
                 ..ModelSettings::default()
             },
-            ..GrephoundConfig::default()
+            ..RepotracerConfig::default()
         }
     }
 

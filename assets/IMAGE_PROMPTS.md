@@ -1,4 +1,4 @@
-# Grephound image generation prompts
+# Repotracer image generation prompts
 
 Feed these to GPT Image / ChatGPT image gen one at a time.
 
@@ -15,9 +15,9 @@ Save outputs into `assets/` with the filenames below.
 ## 1. `hero.png` — above-the-fold hero (1280×720)
 
 ```text
-Create a GitHub README hero graphic for grephound, a local repository scout for AI coding agents.
+Create a GitHub README hero graphic for repotracer, a local repository scout for AI coding agents.
 
-Left third: large wordmark "grephound" in white, subtitle "Stop paying frontier models to grep." in muted gray, accent line "Small models search. Big models solve." in electric green.
+Left third: large wordmark "repotracer" in white, subtitle "Stop paying frontier models to grep." in muted gray, accent line "Small models search. Big models solve." in electric green.
 
 Right two-thirds: clean architecture flow diagram.
 Top box: "Frontier model (Claude / Codex)"
@@ -27,7 +27,7 @@ Three small parallel arrows to Read, Grep, Glob chips
 Arrows merge into "3 validated citations"
 Arrow back up-right to "Frontier solves"
 
-Tiny footer: "npx grephound setup"
+Tiny footer: "npx repotracer setup"
 
 Square-ish composition safe for 16:9 crop. No fake charts. No photographs.
 ```
@@ -39,12 +39,12 @@ Square-ish composition safe for 16:9 crop. No fake charts. No photographs.
 ```text
 Split-panel technical comparison diagram titled "Your frontier model should not own repository exploration."
 
-LEFT panel, red-tinted border, header "WITHOUT grephound":
+LEFT panel, red-tinted border, header "WITHOUT repotracer":
 Vertical chain of expensive steps from "Frontier model" through many boxes: grep → read → glob → grep → read → read → solve.
 Annotation in red: "All exploration enters expensive context."
 Small caption: "More turns. More cache. Higher bill."
 
-RIGHT panel, green-tinted border, header "WITH grephound":
+RIGHT panel, green-tinted border, header "WITH repotracer":
 "Frontier model" → single green call repo_scout(query) → "Local 4B scout" with concurrent Read/Grep/Glob → "Validated citations" → "Frontier solves on focus only."
 Annotation in green: "Scout searches. Frontier solves."
 
@@ -68,13 +68,13 @@ Middle section three columns with red X icons:
 3. "Invoice unchanged (or up)"
 
 Lower section green check row:
-"grephound measures complete-task provider cost · explorer included · quality counted"
+"repotracer measures complete-task provider cost · explorer included · quality counted"
 
 Small citation line at bottom:
 "JetBrains RTK paired trial: advertised 60–90% savings → measured +7.6% cost at low effort"
 
 Include a simple empty results table silhouette with headers:
-Vanilla | grephound | Δ
+Vanilla | repotracer | Δ
 and cells filled with "—" or "TBD after paired runs" — do NOT invent percentages.
 
 Footer: "If the invoice didn’t shrink, you didn’t save tokens."
@@ -109,11 +109,11 @@ Six cards:
    Tag: "Better local tools"
    Verdict: "Nicer grep/read — still frontier-driven."
 
-6. grephound (highlighted green border)
+6. repotracer (highlighted green border)
    Tag: "Delegated scout"
    Verdict in green: "One call. Specialist explores. Validated citations."
 
-Center bottom arrow into grephound: "Architecture, not middleware cosplay."
+Center bottom arrow into repotracer: "Architecture, not middleware cosplay."
 
 No stolen logos. Text labels only.
 ```
@@ -151,15 +151,15 @@ Subtitle: "The small model’s text is not truth. Citations are the trust layer.
 ```text
 Bold Open Graph image.
 
-Left: grephound avatar-style green hound mark (simple geometric hound + branch motif) and huge type:
-grephound
+Left: repotracer avatar-style green hound mark (simple geometric hound + branch motif) and huge type:
+repotracer
 
 Right stacked lines:
 Small models search.
 Big models solve.
 
 Bottom bar:
-Stop paying frontier models to grep.   ·   npx grephound setup
+Stop paying frontier models to grep.   ·   npx repotracer setup
 
 Minimal. Memetic. High contrast. No paragraph text.
 ```
@@ -171,7 +171,7 @@ Minimal. Memetic. High contrast. No paragraph text.
 ```text
 4-panel storyboard on one canvas for a terminal demo GIF (not an animated GIF — static frames).
 
-Panel 1: terminal running `npx grephound setup` with green checkmarks Claude Code / Ollama / MCP.
+Panel 1: terminal running `npx repotracer setup` with green checkmarks Claude Code / Ollama / MCP.
 Panel 2: Claude-like agent UI bubble: user asks "Trace refresh-token rotation".
 Panel 3: tool call repo_scout(...) then "Scout searched 31 files in 0.9s" with 3 file:line citations.
 Panel 4: agent answers from those citations only; tiny footer "frontier never grepped".
@@ -210,7 +210,7 @@ Footer: "rtk scoreboard: 96M tokens saved. Measured bill: +7.6%."
 ```text
 Simple left-to-right trust flow on dark background.
 
-your repository → local grephound scout (lock icon) → citations only → your coding agent
+your repository → local repotracer scout (lock icon) → citations only → your coding agent
 
 Annotations:
 - scout: read-only
@@ -246,4 +246,4 @@ Dark background, green accents, monospaced labels.
 ## Ollama note (for humans, not the image model)
 
 Ollama default is **from FastContext docs** (easiest local OpenAI-compatible path + their client’s `api_key or "ollama"`).  
-grephound kept it as the zero-friction local backend. The product interface is still any OpenAI-compatible endpoint.
+repotracer kept it as the zero-friction local backend. The product interface is still any OpenAI-compatible endpoint.

@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="assets/grephound-avatar.svg" width="128" alt="Grephound logo">
+  <img src="assets/repotracer-avatar.svg" width="128" alt="Repotracer logo">
 </p>
 
-<h1 align="center">grephound</h1>
+<h1 align="center">repotracer</h1>
 
 <p align="center"><strong>Stop paying frontier models to search your repo.</strong></p>
 
-**grephound** gives Claude Code, Codex, Cursor and other coding agents a small dedicated repository scout.
+**repotracer** gives Claude Code, Codex, Cursor and other coding agents a small dedicated repository scout.
 
 **Small models search. Big models solve.**
 
 ```bash
-npx grephound setup
+npx repotracer setup
 ```
 
 Works with: **Claude Code · Codex · Cursor · OpenCode · MCP**
@@ -26,16 +26,16 @@ Works with: **Claude Code · Codex · Cursor · OpenCode · MCP**
 | Same class of tool on a **paired complete-task bill** | **+7.6% more expensive** | [JetBrains RTK trial](https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/) · 80 pairs |
 
 FastContext proved the **architecture**. JetBrains proved **middleware counters lie**.  
-grephound is the production scout runtime that takes the first seriously and refuses the second.
+repotracer is the production scout runtime that takes the first seriously and refuses the second.
 
 <p align="center">
-  <img src="assets/results-proof.png" alt="Attributed research baseline vs middleware counters vs grephound bill metric" width="920">
+  <img src="assets/results-proof.png" alt="Attributed research baseline vs middleware counters vs repotracer bill metric" width="920">
 </p>
 
-> grephound’s own paired product Δ ships only from raw `benchmarks/results/` artifacts. No invented savings.
+> repotracer’s own paired product Δ ships only from raw `benchmarks/results/` artifacts. No invented savings.
 
 <p align="center">
-  <img src="assets/hero.png" alt="grephound — small models search, big models solve" width="920">
+  <img src="assets/hero.png" alt="repotracer — small models search, big models solve" width="920">
 </p>
 
 ---
@@ -43,7 +43,7 @@ grephound is the production scout runtime that takes the first seriously and ref
 ## The problem
 
 <p align="center">
-  <img src="assets/architecture.png" alt="Without grephound versus delegated repository exploration" width="920">
+  <img src="assets/architecture.png" alt="Without repotracer versus delegated repository exploration" width="920">
 </p>
 
 ---
@@ -55,13 +55,13 @@ grephound is the production scout runtime that takes the first seriously and ref
 cargo install --path crates/cli
 
 # or
-npx grephound setup
+npx repotracer setup
 ```
 
 ```bash
-grephound setup
-grephound doctor
-grephound scout "where is authentication handled?"
+repotracer setup
+repotracer doctor
+repotracer scout "where is authentication handled?"
 ```
 
 ---
@@ -110,14 +110,14 @@ The scout can search your code. **It cannot change it.**
 ## CLI
 
 ```bash
-grephound "where is auth handled?"          # shorthand
-grephound scout "trace refresh token rotation"
-grephound serve                             # MCP stdio
-grephound setup
-grephound doctor
-grephound status
-grephound config --init
-grephound uninstall --yes
+repotracer "where is auth handled?"          # shorthand
+repotracer scout "trace refresh token rotation"
+repotracer serve                             # MCP stdio
+repotracer setup
+repotracer doctor
+repotracer status
+repotracer config --init
+repotracer uninstall --yes
 ```
 
 Example output:
@@ -152,7 +152,7 @@ Primary tool:
 Tool description is tuned so agents call it for exploration-heavy work and skip it for trivial edits.
 
 ```bash
-grephound serve   # stdio MCP — never writes non-protocol text to stdout
+repotracer serve   # stdio MCP — never writes non-protocol text to stdout
 ```
 
 ---
@@ -167,7 +167,7 @@ ollama serve
 ollama pull <your-explorer-model>
 ```
 
-Config (`~/.grephound/config.toml`):
+Config (`~/.repotracer/config.toml`):
 
 ```toml
 [model]
@@ -187,10 +187,10 @@ Official specialist model: [microsoft/FastContext-1.0-4B-RL](https://huggingface
 ## Examples
 
 ```bash
-grephound scout "Trace how refresh-token reuse is detected and where sessions are revoked."
-grephound scout "Find the full request path from POST /checkout to Stripe and identify rollback behavior."
-grephound scout "Which code paths invalidate the build cache after package metadata changes?"
-grephound scout "Find the implementation, tests, and configuration involved in retry backoff."
+repotracer scout "Trace how refresh-token reuse is detected and where sessions are revoked."
+repotracer scout "Find the full request path from POST /checkout to Stripe and identify rollback behavior."
+repotracer scout "Which code paths invalidate the build cache after package metadata changes?"
+repotracer scout "Find the implementation, tests, and configuration involved in retry backoff."
 ```
 
 ---
@@ -208,7 +208,7 @@ No telemetry by default. No source code leaves the machine for the scout when us
 If you point the scout at a remote model endpoint, code snippets may reach that provider.
 
 <p align="center">
-  <img src="assets/local-privacy.png" alt="Local grephound privacy flow" width="920">
+  <img src="assets/local-privacy.png" alt="Local repotracer privacy flow" width="920">
 </p>
 
 ---
@@ -225,7 +225,7 @@ No.
 No. Trivial tasks may gain nothing. That's why agents should use the scout for exploration-heavy work — and why we benchmark complete tasks.
 
 **Why not Serena / jCodeMunch / Context Mode / RTK?**  
-Different layers. grephound delegates the entire exploration loop to a specialist model and returns validated citations. See the comparison notes in the docs.
+Different layers. repotracer delegates the entire exploration loop to a specialist model and returns validated citations. See the comparison notes in the docs.
 
 ---
 
@@ -233,8 +233,8 @@ Different layers. grephound delegates the entire exploration loop to a specialis
 
 ```bash
 cargo test --workspace
-cargo run -p grephound -- scout "where is config loaded?" --mock
-cargo run -p grephound -- doctor
+cargo run -p repotracer -- scout "where is config loaded?" --mock
+cargo run -p repotracer -- doctor
 ```
 
 Architecture: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
@@ -245,7 +245,7 @@ Architecture: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
 
 Built on insights from Microsoft **FastContext** ([paper](https://arxiv.org/abs/2606.14066), [model](https://huggingface.co/microsoft/FastContext-1.0-4B-RL), [source](https://github.com/Cirius1792/fastcontext)).
 
-Production runtime, concurrent tools, packaging, MCP product surface, and complete-task benchmarks are grephound's.
+Production runtime, concurrent tools, packaging, MCP product surface, and complete-task benchmarks are repotracer's.
 
 Not affiliated with or endorsed by Microsoft. See [NOTICE](./NOTICE).
 

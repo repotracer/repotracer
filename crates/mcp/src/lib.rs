@@ -1,7 +1,7 @@
-//! Minimal MCP JSON-RPC server over stdio for grephound.
+//! Minimal MCP JSON-RPC server over stdio for repotracer.
 //! NEVER write non-protocol text to stdout.
 
-use grephound_core::{ScoutBackend, ScoutRequest};
+use repotracer_core::{ScoutBackend, ScoutRequest};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tracing::{debug, error};
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
-const SERVER_NAME: &str = "grephound";
+const SERVER_NAME: &str = "repotracer";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const REPO_SCOUT_DESC: &str = "Use repo_scout when you need to locate or understand behavior across an unfamiliar repository, trace multi-file flows, identify implementation and related tests, or discover where a feature lives. It autonomously explores the repository with the configured read-only local, subscription, or custom-endpoint backend and returns focused file/line citations. Skip it for trivial known-file edits or when the exact relevant code is already in context.";
@@ -199,7 +199,7 @@ fn repo_scout_tool_def() -> Value {
 fn repo_scout_prompt_def() -> Value {
     json!({
         "name": "repo_scout",
-        "description": "Delegate unfamiliar or multi-file repository exploration to Grephound.",
+        "description": "Delegate unfamiliar or multi-file repository exploration to Repotracer.",
         "arguments": [{
             "name": "query",
             "description": "Precise semantic repository question or flow to trace.",
@@ -222,7 +222,7 @@ fn repo_scout_prompt(params: Value) -> Result<Value, Value> {
         return Err(rpc_error(-32602, "`query` is required".into()));
     }
     Ok(json!({
-        "description": "Explore the repository with Grephound, then use its citations as focused evidence.",
+        "description": "Explore the repository with Repotracer, then use its citations as focused evidence.",
         "messages": [{
             "role": "user",
             "content": {

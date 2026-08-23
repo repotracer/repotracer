@@ -1,16 +1,16 @@
 # Show HN draft
 
-**Title:** Show HN: grephound – Stop paying frontier models to search your repo
+**Title:** Show HN: repotracer – Stop paying frontier models to search your repo
 
 **Body:**
 
-grephound is a local repository scout for coding agents (Claude Code, Codex, MCP).
+repotracer is a local repository scout for coding agents (Claude Code, Codex, MCP).
 
 Idea: a small specialist model owns the Read/Glob/Grep exploration loop and returns validated file:line citations. The frontier model solves instead of grepping.
 
 ```bash
-npx grephound setup
-grephound scout "trace refresh token rotation"
+npx repotracer setup
+repotracer scout "trace refresh token rotation"
 ```
 
 Why we built it:
@@ -23,4 +23,4 @@ Inspired by Microsoft FastContext; production runtime is Rust (concurrent tools,
 
 Not always cheaper on trivial edits — and we say so.
 
-Repo: https://github.com/grephound/grephound
+Repo: https://github.com/repotracer/repotracer
