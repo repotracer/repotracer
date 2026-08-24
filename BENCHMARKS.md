@@ -44,7 +44,7 @@ Higher reasoning has not improved the measured result. It missed the production 
 
 ## Method
 
-Paired runs hold the solver model, reasoning level, prompt, repository commit, environment, and timeout constant. The assisted arm differs only by installing RepoTracer's MCP server and routing skill.
+Paired runs hold the solver model, reasoning level, prompt, repository commit, environment, and timeout constant. The assisted arm differs only by installing RepoTracer's MCP server and routing instructions.
 
 Every retained study records:
 

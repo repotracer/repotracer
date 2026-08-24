@@ -25,7 +25,7 @@ RepoTracer is a beta. It reduced complete provider cost in several measured runs
 npx repotracer setup
 ```
 
-`setup` downloads the native binary, verifies its SHA-256 checksum, installs it under `~/.repotracer/bin`, registers the MCP server, and adds the Codex routing skill. It reuses your existing Codex login.
+`setup` downloads the native binary, verifies its SHA-256 checksum, installs it under `~/.repotracer/bin`, registers the MCP server, and adds a managed routing block to `~/.codex/AGENTS.md`. It reuses your existing Codex login.
 
 No Rust toolchain, second API key, background service, or hand-written config is required.
 
@@ -54,7 +54,7 @@ cargo install --git https://github.com/repotracer/repotracer --locked repotracer
 
 ## How it works
 
-1. The installed routing skill tells Codex when an unfamiliar or cross-file task needs repository exploration.
+1. The installed routing instructions tell Codex when an unfamiliar or cross-file task needs repository exploration.
 2. Codex calls the MCP tool `repo_scout(query)`.
 3. RepoTracer starts an isolated `codex exec` process using GPT-5.6 Luna at medium reasoning.
 4. Luna can call only read-only repository tools. It receives bounded Read, Glob, and Grep results.

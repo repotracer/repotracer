@@ -8,7 +8,7 @@ RepoTracer is an MCP server whose `repo_scout` tool runs an isolated, read-only 
 npx repotracer setup
 ```
 
-The installer downloads the native binary, verifies its SHA-256 checksum, copies it to `~/.repotracer/bin/repotracer`, registers the stdio MCP server, and adds the Codex routing skill.
+The installer downloads the native binary, verifies its SHA-256 checksum, copies it to `~/.repotracer/bin/repotracer`, registers the stdio MCP server, and adds a managed routing block to `~/.codex/AGENTS.md`.
 
 Codex must already be installed and signed in. RepoTracer reuses that login and does not require another API key.
 

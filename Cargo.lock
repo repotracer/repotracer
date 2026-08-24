@@ -1156,6 +1156,7 @@ dependencies = [
  "chrono",
  "clap",
  "dirs",
+ "libc",
  "predicates",
  "repotracer-core",
  "repotracer-mcp",

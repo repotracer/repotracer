@@ -8,7 +8,7 @@ I came across Microsoft's [FastContext paper](https://arxiv.org/abs/2606.14066v3
 
 I built RepoTracer to use that pattern with Codex.
 
-Technically, RepoTracer is an MCP server whose `repo_scout` tool starts an isolated GPT-5.6 Luna process with read-only Read, Glob, and Grep tools. It validates the returned paths and line ranges, then returns structured citations, source excerpts, and findings to Codex Sol. An installed skill tells Sol when to call it.
+Technically, RepoTracer is an MCP server whose `repo_scout` tool starts an isolated GPT-5.6 Luna process with read-only Read, Glob, and Grep tools. It validates the returned paths and line ranges, then returns structured citations, source excerpts, and findings to Codex Sol. Installed routing instructions tell Sol when to call it.
 
 My Codex limits seemed to last longer, but that was only an anecdote. I ran paired tests using the same prompts and repositories instead.
 
