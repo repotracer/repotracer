@@ -18,6 +18,7 @@ const MAX_CAPTURE_BYTES: usize = 1_048_576;
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const GPT_SCOUT_LABEL: &str = "GPT scout via Codex CLI";
+const TEMP_SCRIPTS_EXPERIMENT_ENV: &str = "REPOTRACER_EXPERIMENTAL_TEMP_SCRIPTS";
 
 pub fn is_subscription_backend(cfg: &RepoTracerConfig) -> bool {
     matches!(
@@ -31,6 +32,7 @@ pub struct CliScout {
     model: Option<String>,
     reasoning_effort: String,
     timeout: Duration,
+    temporary_scripts: bool,
 }
 
 impl CliScout {
@@ -60,6 +62,8 @@ impl CliScout {
             model,
             reasoning_effort,
             timeout: Duration::from_millis(cfg.model.timeout_ms),
+            temporary_scripts: std::env::var_os(TEMP_SCRIPTS_EXPERIMENT_ENV).as_deref()
+                == Some(std::ffi::OsStr::new("1")),
         })
     }
 
@@ -87,15 +91,24 @@ impl CliScout {
         Ok(())
     }
 
-    fn prompt(&self, request: &ScoutRequest) -> String {
+    fn prompt(&self, request: &ScoutRequest, analysis_temp: Option<&Path>) -> String {
         let focus = request
             .focus
             .as_ref()
             .map(|path| format!(" Prefer `{}` when relevant.", path.display()))
             .unwrap_or_default();
+        let temporary_scripts = analysis_temp
+            .map(|path| {
+                format!(
+                    " You may use command execution and, when useful, temporary analysis scripts with conventional file extensions. When the question explicitly requests a temporary script, create a named script such as `analysis.py` under the assigned directory and execute that file. Never write anywhere inside the repository. Write scripts and generated data only under `{}`; do not use the network; delete every temporary output you create after use.",
+                    path.display()
+                )
+            })
+            .unwrap_or_default();
         format!(
             "Read-only repository scout. Search the repository; never edit, use the network, or delegate. Use at most 3 repository tool calls; batch independent searches and reads, and keep each tool result under 120 lines. Answer concisely, then cite the smallest direct evidence covering the question: normally 3-4 repository-relative ranges, at most 5, each ideally 40 lines or fewer. Every material claim needs a citation; cite leaf implementations rather than only dispatch callers. Put implementation and tests first; omit optional context.{}\n\nQuestion: {}",
-            focus, request.query
+            format!("{focus}{temporary_scripts}"),
+            request.query
         )
     }
 
@@ -119,7 +132,11 @@ impl CliScout {
             "--disable",
             "plugins",
             "--sandbox",
-            "read-only",
+            if self.temporary_scripts {
+                "workspace-write"
+            } else {
+                "read-only"
+            },
             "--skip-git-repo-check",
             "--config",
             "approval_policy=\"never\"",
@@ -159,12 +176,23 @@ impl CliScout {
         }
         let started = Instant::now();
         let temp = TempRunDir::create()?;
+        let analysis_temp = if self.temporary_scripts {
+            let path = temp.path.join("analysis");
+            std::fs::create_dir(&path)?;
+            Some(path.canonicalize()?)
+        } else {
+            None
+        };
         let schema = temp.path.join("schema.json");
         let output = temp.path.join("result.json");
         std::fs::write(&schema, output_schema().to_string())?;
         let process = self
             .run_process(
-                self.codex_args(&schema, &output, &self.prompt(&request)),
+                self.codex_args(
+                    &schema,
+                    &output,
+                    &self.prompt(&request, analysis_temp.as_deref()),
+                ),
                 &request.root,
                 request.timeout.unwrap_or(self.timeout),
             )
@@ -180,13 +208,15 @@ impl CliScout {
         if !structured.citations.is_empty() && citations.is_empty() {
             bail!("{} returned only invalid citations", self.label());
         }
-        let metrics = codex_metrics(&process.stdout);
+        let metrics = codex_metrics(&process.stdout, analysis_temp.as_deref());
         Ok(ScoutResult {
             summary: truncate_utf8(structured.answer.trim(), 3_000),
             citations,
             stats: ScoutStats {
                 turns: metrics.tool_calls.saturating_add(1),
                 tool_calls: metrics.tool_calls,
+                command_execution_used: metrics.command_execution_used,
+                temporary_script_used: metrics.temporary_script_used,
                 duration_ms: started.elapsed().as_millis() as u64,
                 model: match &self.model {
                     Some(model) => format!("{} ({model})", self.label()),
@@ -285,9 +315,11 @@ struct TokenUsage {
 struct CodexMetrics {
     usage: Option<TokenUsage>,
     tool_calls: u32,
+    command_execution_used: bool,
+    temporary_script_used: bool,
 }
 
-fn codex_metrics(stdout: &[u8]) -> CodexMetrics {
+fn codex_metrics(stdout: &[u8], analysis_temp: Option<&Path>) -> CodexMetrics {
     let mut metrics = CodexMetrics::default();
     for event in String::from_utf8_lossy(stdout)
         .lines()
@@ -295,16 +327,35 @@ fn codex_metrics(stdout: &[u8]) -> CodexMetrics {
     {
         if event["type"] == "turn.completed" {
             metrics.usage = serde_json::from_value(event["usage"].clone()).ok();
-        } else if event["type"] == "item.completed"
-            && matches!(
-                event["item"]["type"].as_str(),
-                Some("command_execution" | "mcp_tool_call" | "web_search")
-            )
-        {
-            metrics.tool_calls += 1;
+        } else if event["type"] == "item.completed" {
+            match event["item"]["type"].as_str() {
+                Some("command_execution") => {
+                    metrics.tool_calls += 1;
+                    metrics.command_execution_used = true;
+                    if event["item"]["status"] == "completed"
+                        && analysis_temp.is_some_and(|temp| {
+                            command_uses_temporary_script(
+                                event["item"]["command"].as_str().unwrap_or_default(),
+                                temp,
+                            )
+                        })
+                    {
+                        metrics.temporary_script_used = true;
+                    }
+                }
+                Some("mcp_tool_call" | "web_search") => metrics.tool_calls += 1,
+                _ => {}
+            }
         }
     }
     metrics
+}
+
+fn command_uses_temporary_script(command: &str, analysis_temp: &Path) -> bool {
+    command.contains(analysis_temp.to_string_lossy().as_ref())
+        && [".py", ".sh", ".js", ".mjs", ".rb", ".pl"]
+            .iter()
+            .any(|extension| command.contains(extension))
 }
 
 fn codex_provider_overrides() -> Vec<OsString> {
@@ -514,7 +565,8 @@ mod tests {
         let mut codex_config = config("codex-cli", Path::new("codex"));
         codex_config.model.model = "gpt-5.6-luna".into();
         codex_config.model.reasoning_effort = "medium".into();
-        let codex = CliScout::from_config(&codex_config).unwrap();
+        let mut codex = CliScout::from_config(&codex_config).unwrap();
+        codex.temporary_scripts = false;
         let codex_args = codex
             .codex_args(Path::new("schema"), Path::new("output"), "prompt")
             .into_iter()
@@ -569,13 +621,16 @@ mod tests {
     fn scout_prompt_requests_a_ranked_bounded_handoff() {
         let scout = CliScout::from_config(&config("codex-cli", Path::new("codex"))).unwrap();
         let root = tempfile::tempdir().unwrap();
-        let prompt = scout.prompt(&ScoutRequest {
-            query: "trace auth".into(),
-            root: root.path().to_path_buf(),
-            focus: None,
-            max_turns: None,
-            timeout: None,
-        });
+        let prompt = scout.prompt(
+            &ScoutRequest {
+                query: "trace auth".into(),
+                root: root.path().to_path_buf(),
+                focus: None,
+                max_turns: None,
+                timeout: None,
+            },
+            None,
+        );
         assert!(prompt.contains("at most 3 repository tool calls"));
         assert!(prompt.contains("under 120 lines"));
         assert!(prompt.contains("normally 3-4"));
@@ -623,6 +678,8 @@ printf '%s\n' '{"type":"item.completed","item":{"type":"command_execution"}}'
         assert_eq!(result.citations[0].path, "source.rs");
         assert_eq!(result.stats.turns, 2);
         assert_eq!(result.stats.tool_calls, 1);
+        assert!(result.stats.command_execution_used);
+        assert!(!result.stats.temporary_script_used);
         assert_eq!(result.stats.prompt_tokens, Some(100));
         assert_eq!(result.stats.cached_prompt_tokens, Some(40));
         assert_eq!(result.stats.completion_tokens, Some(20));
@@ -646,5 +703,51 @@ printf '%s\n' '{"type":"item.completed","item":{"type":"command_execution"}}'
             .unwrap_err();
         assert!(error.to_string().contains("timed out"));
         assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[ignore = "requires an authenticated Codex CLI and runs a live Luna capability check"]
+    async fn temporary_script_experiment_leaves_repository_unchanged() {
+        fn git_status(root: &Path) -> Vec<u8> {
+            std::process::Command::new("git")
+                .args(["status", "--porcelain=v1", "-uall"])
+                .current_dir(root)
+                .output()
+                .unwrap()
+                .stdout
+        }
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
+        let mut cfg = config("codex-cli", Path::new("codex"));
+        cfg.model.model = "gpt-5.6-luna".into();
+        cfg.model.reasoning_effort = "medium".into();
+        cfg.model.timeout_ms = 180_000;
+        let mut scout = CliScout::from_config(&cfg).unwrap();
+        scout.temporary_scripts = true;
+        let before = git_status(&root);
+
+        let result = scout
+            .scout(ScoutRequest {
+                query: "Use a temporary Python script to find every line in crates/cli/src/subscription.rs that selects a Codex sandbox, execute the script, delete it, and cite the direct evidence.".into(),
+                root: root.clone(),
+                focus: None,
+                max_turns: None,
+                timeout: None,
+            })
+            .await;
+        let after = git_status(&root);
+
+        assert_eq!(after, before, "the scout changed repository files");
+        let result = result.unwrap();
+        assert!(result.stats.command_execution_used);
+        assert!(
+            result.stats.temporary_script_used,
+            "scout did not use a detected temporary script: {result:#?}"
+        );
+        assert!(!result.citations.is_empty());
     }
 }

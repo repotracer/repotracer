@@ -52,6 +52,8 @@ impl ScoutEngine {
                 stats: ScoutStats {
                     turns: 0,
                     tool_calls: 0,
+                    command_execution_used: false,
+                    temporary_script_used: false,
                     duration_ms: started.elapsed().as_millis() as u64,
                     model: self.model.name().to_string(),
                     prompt_tokens: None,
@@ -213,6 +215,8 @@ impl ScoutEngine {
                 stats: ScoutStats {
                     turns,
                     tool_calls: tool_calls_total,
+                    command_execution_used: false,
+                    temporary_script_used: false,
                     duration_ms: 0,
                     model: self.model.name().to_string(),
                     prompt_tokens: if prompt_tokens > 0 {
@@ -302,6 +306,8 @@ fn empty_result(
         stats: ScoutStats {
             turns,
             tool_calls,
+            command_execution_used: false,
+            temporary_script_used: false,
             duration_ms: 0,
             model: model.into(),
             prompt_tokens: if prompt_tokens > 0 {

@@ -30,6 +30,10 @@ pub struct ValidatedCitation {
 pub struct ScoutStats {
     pub turns: u32,
     pub tool_calls: u32,
+    #[serde(default)]
+    pub command_execution_used: bool,
+    #[serde(default)]
+    pub temporary_script_used: bool,
     pub duration_ms: u64,
     pub model: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
