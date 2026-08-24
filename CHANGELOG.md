@@ -11,6 +11,10 @@
 
 ## Unreleased
 
+### Changed
+- `setup` runs `doctor` itself instead of printing instructions to run it. A failing check reports what to fix but does not fail the command, since setup still succeeded
+- Removed the trailing "verify any time / remove it again" block from setup output
+
 ### Added
 - Independent routing benchmark tasks, bringing the predeclared suite to 37: 23 scout-eligible and 14 expected skips
 - Tamper-evident benchmark result index and SHA-256 ledger, including rejected runs and the Sol request-sequence analysis

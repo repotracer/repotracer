@@ -95,24 +95,20 @@ pub async fn run(
             "{}",
             style("1;34", "DRY RUN COMPLETE — no files or services changed")
         );
-        if already_installed {
-            println!("\nRepoTracer is already configured. Re-running setup refreshes it.");
-            println!("Remove it instead:  repotracer uninstall --yes");
-        }
-    } else if already_installed {
-        println!("{}", style("1;32", "UPDATED — configuration refreshed"));
-        println!("\nRestart configured agents, then ask a multi-file repository question.");
-        println!("Verify any time:  repotracer doctor");
-        println!("Remove it again:  repotracer uninstall --yes");
-    } else {
-        println!(
-            "{}",
-            style("1;32", "READY — small models search, big models solve")
-        );
-        println!("\nRestart configured agents, then ask a multi-file repository question.");
-        println!("Verify any time:  repotracer doctor");
-        println!("Remove it again:  repotracer uninstall --yes");
+        return Ok(());
     }
+
+    // Setup's own checkmarks say what was written, not whether it works, so run
+    // the real verification. A failing check does not undo a successful setup —
+    // doctor already prints what to fix — so its error must not fail this command.
+    if crate::doctor::run(root, &selected_cfg, false)
+        .await
+        .is_err()
+    {
+        println!("\nSetup finished. Fix the items above, then: repotracer doctor");
+        return Ok(());
+    }
+    println!("\nRestart Codex, then ask a question that spans several files.");
     Ok(())
 }
 
