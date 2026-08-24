@@ -3,7 +3,27 @@ name: ci
 on:
   push:
     branches: [main]
+    # Docs, assets, and the marketing copy cannot break the build, so they must
+    # not spin up three Rust toolchains.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'assets/**'
+      - 'benchmarks/results/**'
+      - 'LICENSE'
+      - 'NOTICE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'assets/**'
+      - 'benchmarks/results/**'
+      - 'LICENSE'
+      - 'NOTICE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
 
 jobs:
   test:
