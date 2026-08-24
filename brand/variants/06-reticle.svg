@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" role="img" aria-label="RepoTracer">
-  <path d="M24 72 L46 44 L59 49" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="24" cy="72" r="5" fill="currentColor"/>
-  <circle cx="46" cy="44" r="3.5" fill="currentColor"/>
-  <g class="hit">
-    <circle cx="72" cy="54" r="12" stroke="currentColor" stroke-width="4"/>
-    <circle cx="72" cy="54" r="4" fill="currentColor"/>
-  </g>
-</svg>
