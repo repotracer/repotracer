@@ -18,8 +18,6 @@
   <img src="assets/demo/scout.gif" alt="Asking RepoTracer a plain-English question about a codebase and getting back four verified file and line-range citations with a summary in 35 seconds" width="100%">
 </p>
 
-RepoTracer is a beta. It reduced complete provider cost in several measured runs, but one recent implementation task also exposed a quality regression. The raw results are public in [BENCHMARKS.md](./BENCHMARKS.md).
-
 ## Install
 
 ```bash
@@ -92,7 +90,7 @@ Whole task, with Luna's usage counted in.
 | SWE-bench Astropy 13453 | **−50.12%** | −9.60% |
 | Median of three paired runs | **−39.20%** | +31.21% |
 
-RepoTracer is a beta. One run came out cheaper and scored slightly lower. Every run is published, including that one.
+Every run is published, including the ones where it lost.
 
 [Methods, caveats, rejected runs, and raw artifacts.](./BENCHMARKS.md)
 
