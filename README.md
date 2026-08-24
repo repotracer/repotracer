@@ -78,7 +78,7 @@ Complete cost includes both Sol and Luna.
 
 | Run | Scope | Quality | Complete cost | Wall time |
 |---|---|---:|---:|---:|
-| Google signup | One real implementation task | RepoTracer 78.75, direct 83.125 | **−62.68%** | −24.54% |
+| Google signup | One real implementation task | 78.75 vs 83.13 — slightly lower | **−62.68%** | −24.54% |
 | SWE-bench Astropy 13453 | One coding task | Exact regression passed in both arms | **−50.12%** | −9.60% |
 | Repeated natural routing | Three randomized pairs of one cross-file question | 6/6 checks in every arm | **−39.20% median** | +31.21% median |
 | Current immediate routing | Three randomized pairs of one cross-file question | 6/6 checks in every arm | **−28.63% median** | +6.65% median |
