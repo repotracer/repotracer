@@ -10,7 +10,8 @@
 
 <p align="center">
   <a href="#install"><img src="assets/button-install.svg" alt="Install RepoTracer" height="38"></a>&nbsp;
-  <a href="./BENCHMARKS.md"><img src="assets/button-benchmarks.svg" alt="Benchmarks" height="38"></a>
+  <a href="./BENCHMARKS.md"><img src="assets/button-benchmarks.svg" alt="Benchmarks" height="38"></a>&nbsp;
+  <a href="https://repotracer.tech"><img src="assets/button-website.svg" alt="repotracer.tech" height="38"></a>
 </p>
 
 <p align="center">
@@ -29,14 +30,31 @@ npx repotracer setup
 
 No Rust toolchain, second API key, background service, or hand-written config is required.
 
+**Changed your mind?** Run the same command again and pick *Uninstall*:
+
+```bash
+npx repotracer setup
+```
+
+```text
+RepoTracer is already configured.
+Use arrow keys, then Enter. Esc to cancel.
+
+  > Update the configuration
+    Uninstall RepoTracer
+```
+
+That removes the MCP entry, the routing block, and the local config. Your Codex login and settings are untouched, and every file it edits is backed up alongside the original first. `repotracer uninstall --yes` does the same thing without the menu.
+
 If Codex is not installed:
 
 ```bash
 npm install -g @openai/codex
 codex login
 npx repotracer setup
-repotracer doctor
 ```
+
+`setup` runs `doctor` itself at the end, so you see whether it actually works rather than a list of things it wrote.
 
 Preview the changes:
 
@@ -44,7 +62,7 @@ Preview the changes:
 npx repotracer setup --dry-run
 ```
 
-Permanent installs are also available:
+Want the `repotracer` command in your own shell too?
 
 ```bash
 npm install -g repotracer
@@ -148,6 +166,7 @@ See [SECURITY.md](./SECURITY.md).
 
 ## Resources
 
+- [repotracer.tech](https://repotracer.tech) — the website
 - [Benchmarks](./BENCHMARKS.md)
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Why complete-task measurement matters](./docs/benchmarks/why-token-counters-lie.md)
