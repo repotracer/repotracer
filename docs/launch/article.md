@@ -1,49 +1,35 @@
-# We stopped paying frontier models to search the repository
+# I moved repository search from Sol to Luna
 
-![Grephound demo storyboard](../../assets/demo-storyboard.png)
+I came across Microsoft's [FastContext paper](https://arxiv.org/abs/2606.14066v3), which separates repository exploration from solving. A smaller model searches the code and returns the relevant locations. The main coding model works from that evidence instead of carrying every exploratory search in its context.
 
-## 1. The stupid part of coding-agent economics
+I wanted that workflow in Codex, so I built RepoTracer.
 
-Your most expensive model is doing `grep` duty.
+RepoTracer is an MCP server. Its `repo_scout` tool starts an isolated GPT-5.6 Luna process with read-only Read, Glob, and Grep tools. RepoTracer validates the returned paths and line ranges, then sends the citations, excerpts, and findings back to Codex Sol. A routing skill tells Sol when the task is broad enough to use it.
 
-## 2. Why grep isn't free
+```text
+Sol → MCP repo_scout → Luna → Read / Glob / Grep
+Sol ← validated citations and excerpts
+Sol → edit and verify
+```
 
-Every exploratory hop enters context, shapes the next hop, and compounds.
+My Codex limits seemed to last longer after I started using it. That was useful feedback, but it was not evidence. I ran paired benchmarks with the same prompts, repositories, commits, models, and checks.
 
-## 3. Small-model scout architecture
+In three randomized pairs of the same cross-file question, the current routing policy reduced median complete provider cost by 28.63%. Both direct and RepoTracer arms passed all six checks. At that measured rate, a fixed provider budget covers about 40% more equivalent runs of that task.
 
-One tool: `repo_scout(query)` → specialist explores → validated citations → frontier solves.
+A single SWE-bench task was 50.12% cheaper and passed the exact regression in both arms.
 
-## 4. Microsoft's FastContext insight
+There is a bad result too. On a real Google authentication implementation task, RepoTracer was 62.68% cheaper but scored 4.375 points below direct Codex in blind grading. It found the right files, but the parent agent tested a copied fixture instead of production configuration. That is why I am launching RepoTracer as a beta rather than claiming the same quality as direct Codex.
 
-Train/use a small model for autonomous repository exploration with Read/Glob/Grep.
+Every number includes Luna's usage. The repository keeps the losing runs and raw artifacts alongside the successful ones.
 
-## 5. What we rebuilt
-
-Rust engine, product CLI/MCP, setup UX, concurrent tools, citation trust layer.
-
-## 6. Parallel exploration
-
-One model turn, many independent tools — run concurrently.
-
-## 7. Citation validation
-
-Model text is not truth. Paths and line ranges are checked.
-
-## 8. The RTK/JetBrains lesson
-
-Measure complete tasks. Middleware counters can lie.
-
-## 9. Our paired benchmark
-
-(Insert results only when real.)
-
-## 10–11. Where it wins / doesn't
-
-Exploration-heavy tasks vs trivial known-file edits.
-
-## 12. Install
+## Install
 
 ```bash
-npx grephound setup
+npx repotracer setup
 ```
+
+Codex must already be installed and signed in. RepoTracer reuses that login, installs the MCP server and routing skill, and requires no second API key.
+
+- Repository: https://github.com/repotracer/repotracer
+- Benchmarks: https://github.com/repotracer/repotracer/blob/main/BENCHMARKS.md
+- Paper: https://arxiv.org/abs/2606.14066v3

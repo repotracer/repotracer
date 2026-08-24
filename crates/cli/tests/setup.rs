@@ -5,14 +5,14 @@ use predicates::prelude::*;
 fn dry_run_plans_zero_question_gpt_setup_without_writes() {
     let home = tempfile::tempdir().unwrap();
     let root = tempfile::tempdir().unwrap();
-    let config = home.path().join(".grephound").join("config.toml");
+    let config = home.path().join(".repotracer").join("config.toml");
 
-    let mut command = Command::cargo_bin("grephound").unwrap();
+    let mut command = Command::cargo_bin("repotracer").unwrap();
     command
         .env("HOME", home.path())
         .env("USERPROFILE", home.path())
         .env("CODEX_HOME", home.path().join(".codex"))
-        .env("GREPHOUND_CONFIG", &config)
+        .env("REPOTRACER_CONFIG", &config)
         .args([
             "--root",
             root.path().to_str().unwrap(),
@@ -33,7 +33,7 @@ fn dry_run_plans_zero_question_gpt_setup_without_writes() {
 #[test]
 fn custom_setup_accepts_only_gpt_models() {
     let root = tempfile::tempdir().unwrap();
-    let mut command = Command::cargo_bin("grephound").unwrap();
+    let mut command = Command::cargo_bin("repotracer").unwrap();
     command
         .args([
             "--root",
@@ -50,7 +50,7 @@ fn custom_setup_accepts_only_gpt_models() {
         .stdout(predicate::str::contains("gpt-5.6-mini"))
         .stdout(predicate::str::contains("https://models.example.com/v1"));
 
-    let mut command = Command::cargo_bin("grephound").unwrap();
+    let mut command = Command::cargo_bin("repotracer").unwrap();
     command
         .args([
             "--root",
@@ -82,20 +82,20 @@ fn setup_uses_existing_codex_login_without_prompts() {
     permissions.set_mode(0o755);
     std::fs::set_permissions(&codex, permissions).unwrap();
 
-    let config = home.path().join(".grephound/config.toml");
+    let config = home.path().join(".repotracer/config.toml");
     let codex_home = home.path().join(".codex");
     let path = format!(
         "{}:{}",
         bin.display(),
         std::env::var("PATH").unwrap_or_default()
     );
-    let mut command = Command::cargo_bin("grephound").unwrap();
+    let mut command = Command::cargo_bin("repotracer").unwrap();
     command
         .env("HOME", home.path())
         .env("USERPROFILE", home.path())
         .env("PATH", path)
         .env("CODEX_HOME", &codex_home)
-        .env("GREPHOUND_CONFIG", &config)
+        .env("REPOTRACER_CONFIG", &config)
         .args(["--root", root.path().to_str().unwrap(), "setup"])
         .assert()
         .success()
@@ -110,7 +110,7 @@ fn setup_uses_existing_codex_login_without_prompts() {
         .contains("reasoning_effort = \"medium\""));
     assert!(std::fs::read_to_string(codex_home.join("config.toml"))
         .unwrap()
-        .contains("mcp_servers.grephound"));
+        .contains("mcp_servers.repotracer"));
     assert!(std::fs::read_to_string(codex_home.join("AGENTS.md"))
         .unwrap()
         .contains("Validated citations complete broad exploration"));
@@ -131,12 +131,45 @@ api_key = "secret-provider-token"
     )
     .unwrap();
 
-    let mut command = Command::cargo_bin("grephound").unwrap();
+    let mut command = Command::cargo_bin("repotracer").unwrap();
     command
-        .env("GREPHOUND_CONFIG", &config)
+        .env("REPOTRACER_CONFIG", &config)
         .args(["--json", "status"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<redacted>"))
         .stdout(predicate::str::contains("secret-provider-token").not());
+}
+
+#[test]
+fn doctor_shows_backend_failure_and_exits_nonzero() {
+    let root = tempfile::tempdir().unwrap();
+    let config = root.path().join("config.toml");
+    std::fs::write(
+        &config,
+        r#"[model]
+backend = "codex-cli"
+executable = "/definitely/missing/codex"
+model = "gpt-5.6-luna"
+reasoning_effort = "medium"
+"#,
+    )
+    .unwrap();
+
+    let mut command = Command::cargo_bin("repotracer").unwrap();
+    command
+        .env("REPOTRACER_CONFIG", &config)
+        .args(["--root", root.path().to_str().unwrap(), "doctor"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("✗ GPT scout CLI"))
+        .stdout(predicate::str::contains("NOT READY"));
+
+    let mut command = Command::cargo_bin("repotracer").unwrap();
+    command
+        .env("REPOTRACER_CONFIG", &config)
+        .args(["--json", "--root", root.path().to_str().unwrap(), "doctor"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"ready\": false"));
 }

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-08-11",
   "status": "retained after Sol-token reduction became the primary optimization objective; still not a launch headline",
-  "prompt": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "prompt": "Explain how `repotracer setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
   "protocol": {
     "main_model": "gpt-5.6-sol",
     "main_reasoning_effort": "high",

@@ -1,26 +1,26 @@
-use grephound_core::GrephoundConfig;
+use repotracer_core::RepoTracerConfig;
 use std::path::{Path, PathBuf};
 
 pub fn default_config_path() -> PathBuf {
-    if let Ok(p) = std::env::var("GREPHOUND_CONFIG") {
+    if let Ok(p) = std::env::var("REPOTRACER_CONFIG") {
         return PathBuf::from(p);
     }
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".grephound")
+        .join(".repotracer")
         .join("config.toml")
 }
 
-pub fn load_or_default(path: &Path) -> GrephoundConfig {
+pub fn load_or_default(path: &Path) -> RepoTracerConfig {
     if path.exists() {
-        match GrephoundConfig::load_from(path) {
+        match RepoTracerConfig::load_from(path) {
             Ok(c) => c,
             Err(e) => {
                 eprintln!("warning: failed to load {}: {e:#}", path.display());
-                GrephoundConfig::default()
+                RepoTracerConfig::default()
             }
         }
     } else {
-        GrephoundConfig::default()
+        RepoTracerConfig::default()
     }
 }

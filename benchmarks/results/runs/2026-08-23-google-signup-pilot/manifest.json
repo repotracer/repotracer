@@ -1,0 +1,216 @@
+{
+  "schema_version": 2,
+  "study_id": "2026-08-23-google-signup-pilot",
+  "generated_at": "2026-08-23T19:44:33.669848+00:00",
+  "completed_at": "2026-08-23T20:44:10Z",
+  "status": "completed",
+  "headline_eligible": false,
+  "suite_root": "benchmarks",
+  "arms": ["baseline", "repotracer"],
+  "repeats_per_arm": 1,
+  "trial_count": 2,
+  "protocol": {
+    "main_model": "gpt-5.6-sol",
+    "main_reasoning_effort": "high",
+    "scout_model": "gpt-5.6-luna",
+    "scout_reasoning_effort": "medium",
+    "provider": "codex-lb",
+    "provider_base_url": "http://127.0.0.1:2455/backend-api/codex",
+    "setup_command": "node packages/npm/bin/repotracer.js setup using the local prepublish package",
+    "initial_order": ["repotracer", "baseline"],
+    "execution_note": "RepoTracer started first. At user request baseline started before RepoTracer finished; the valid runs overlapped for about 48 seconds.",
+    "timeout_seconds": 3600,
+    "network_policy": "normal Codex-LB access in both arms",
+    "cache_policy": "fresh clone, HOME, and CODEX_HOME per arm",
+    "repository_commit": "3b9d9a68d4b2d13ecfbb9f7784b3c47a1c8343de",
+    "quality_gate": "Every hidden grader requirement is mandatory."
+  },
+  "tasks": [
+    {
+      "schema_version": 2,
+      "suite": "private-low-compute",
+      "id": "subbridge-google-signup",
+      "prompt": "Google sign-up is broken. Diagnose and fix the root cause without changing working email or OTP authentication, and add the smallest regression check that proves the failure is gone.",
+      "expected_scout": true,
+      "expected_paths": [],
+      "source": {
+        "issue_url": "private issue tracker (redacted)",
+        "kind": "clickup",
+        "repository": "<private repository>"
+      },
+      "headline_eligible": false
+    }
+  ],
+  "trials": [
+    {
+      "task_id": "subbridge-google-signup",
+      "repeat": 1,
+      "arm": "baseline",
+      "status": "completed",
+      "started_at": "2026-08-23T20:28:33.422Z",
+      "finished_at": "2026-08-23T20:41:03.538Z",
+      "wall_seconds": 752.56,
+      "prompt_sha256": "036cea37173452c61d8f773dbf87238aead60046e1c5cf7ae48f0d943fde6bdc",
+      "repository": "<private repository>",
+      "commit": "3b9d9a68d4b2d13ecfbb9f7784b3c47a1c8343de",
+      "agent_version": "codex-cli 0.149.0",
+      "model": "gpt-5.6-sol",
+      "repo_scout_calls": 0,
+      "artifacts": {
+        "final_answer": "private/baseline-final.md",
+        "patch": "private/baseline.patch",
+        "test_log": "private/test-results.json",
+        "trajectories": [
+          "private/baseline-home/.codex/sessions/2026/08/23/rollout-2026-08-23T21-28-33-01a0304f-859a-7141-86e2-c1d291fe9d44.jsonl",
+          "private/baseline-home/.codex/sessions/2026/08/23/rollout-2026-08-23T21-30-48-01a03051-951d-7ff2-b88b-9feb2faceae7.jsonl"
+        ],
+        "sha256": {
+          "final_answer": "0b185b0f3f490421e76b62d2881894d880b0469f8771c5b012d59d369c796e6a",
+          "patch": "bbd35a93b01822df1e0eb0226e9ec872392c818f30cab9074ba7e7812fe4d222",
+          "trajectory_main": "00690fd8f124908d09f450155e3227d1060f11203dd0c5877c5f0bc47e840497",
+          "trajectory_child": "82553cb02d738897ca240750956a7871d1d78453e1b17775150313e2dbcd2d73"
+        }
+      },
+      "billing": {
+        "source": "private/billing.json from ~/.codex-lb/store.db",
+        "main": {
+          "provider_requests": 99,
+          "input_tokens": 8230252,
+          "cached_input_tokens": 7775744,
+          "uncached_input_tokens": 454508,
+          "output_tokens": 34814,
+          "reasoning_tokens": 13841,
+          "provider_latency_ms": 865678,
+          "provider_cost_usd": 7.204832
+        },
+        "scout": null,
+        "complete_provider_cost_usd": 7.204832
+      },
+      "quality": {
+        "method": "private/grader.json",
+        "requirements_passed": 5,
+        "requirements_total": 6,
+        "passed": false,
+        "grader_artifact": "private/grading-result.json"
+      }
+    },
+    {
+      "task_id": "subbridge-google-signup",
+      "repeat": 1,
+      "arm": "repotracer",
+      "status": "completed",
+      "started_at": "2026-08-23T20:19:25.397Z",
+      "finished_at": "2026-08-23T20:29:21.342Z",
+      "wall_seconds": 597.70,
+      "prompt_sha256": "036cea37173452c61d8f773dbf87238aead60046e1c5cf7ae48f0d943fde6bdc",
+      "repository": "<private repository>",
+      "commit": "3b9d9a68d4b2d13ecfbb9f7784b3c47a1c8343de",
+      "agent_version": "codex-cli 0.149.0",
+      "model": "gpt-5.6-sol",
+      "repo_scout_calls": 1,
+      "artifacts": {
+        "final_answer": "private/treatment-final.md",
+        "patch": "private/treatment.patch",
+        "test_log": "private/test-results.json",
+        "scout_handoff": "private/treatment-scout.json",
+        "trajectories": [
+          "private/treatment-home/.codex/sessions/2026/08/23/rollout-2026-08-23T21-19-25-01a03047-2998-7530-9ab7-60beecb93bc7.jsonl",
+          "private/treatment-home/.codex/sessions/2026/08/23/rollout-2026-08-23T21-21-50-01a03049-60e3-7603-acf6-de7fa03a67e0.jsonl"
+        ],
+        "sha256": {
+          "final_answer": "957ebdbfadefcddf19db9ec695187268683f9f16553734dce3020e4bbd3a58b5",
+          "patch": "8f29dfbf7b8c5d31064ccb9218e58c575dc80d794bd51cd17219500cd36477c6",
+          "trajectory_main": "c7baa93b8a939e617379a1a4316dbcabd9cf9a9e1b2bdc4a9ef7bb5f8f168a59",
+          "trajectory_child": "9ceb8121b54d1cb25b80e9840f98b62a97f5bf720566300cc2daa96723f29afc",
+          "scout_handoff": "b0acda247930214d88aa631aeacdb6cf28d24198b16a8e595d984add9282c2f5"
+        }
+      },
+      "billing": {
+        "source": "private/billing.json from ~/.codex-lb/store.db",
+        "main": {
+          "provider_requests": 81,
+          "input_tokens": 3367818,
+          "cached_input_tokens": 3070464,
+          "uncached_input_tokens": 297354,
+          "output_tokens": 21929,
+          "reasoning_tokens": 8300,
+          "provider_latency_ms": 544460,
+          "provider_cost_usd": 3.679872
+        },
+        "scout": {
+          "model": "gpt-5.6-luna",
+          "provider_requests": 6,
+          "input_tokens": 100979,
+          "cached_input_tokens": 57344,
+          "uncached_input_tokens": 43635,
+          "output_tokens": 2269,
+          "reasoning_tokens": 1187,
+          "provider_latency_ms": 54135,
+          "provider_cost_usd": 0.01259668
+        },
+        "complete_provider_cost_usd": 3.69246868
+      },
+      "quality": {
+        "method": "private/grader.json",
+        "requirements_passed": 4,
+        "requirements_total": 6,
+        "passed": false,
+        "grader_artifact": "private/grading-result.json"
+      }
+    }
+  ],
+  "paired_result": {
+    "quality_passing_pairs": "0/1",
+    "quality_result": "baseline 5/6 mandatory requirements; RepoTracer 4/6; neither passes",
+    "complete_input_tokens": {
+      "baseline": 8230252,
+      "repotracer": 3468797,
+      "delta": -4761455,
+      "delta_percent": -57.8531
+    },
+    "complete_output_tokens": {
+      "baseline": 34814,
+      "repotracer": 24198,
+      "delta": -10616,
+      "delta_percent": -30.4935
+    },
+    "complete_provider_cost_usd": {
+      "baseline": 7.204832,
+      "repotracer": 3.69246868,
+      "delta": -3.51236332,
+      "delta_percent": -48.7501
+    },
+    "wall_seconds": {
+      "baseline": 752.56,
+      "repotracer": 597.70,
+      "delta": -154.86,
+      "delta_percent": -20.5778
+    },
+    "conclusion": "RepoTracer used 57.85% fewer complete input tokens, cost 48.75% less, and finished 20.58% faster, but failed two mandatory quality requirements. Baseline failed one. No winner is declared."
+  },
+  "invalid_attempts": [
+    {
+      "arm": "repotracer",
+      "started_at": "2026-08-23T19:47:10.787Z",
+      "finished_at": "2026-08-23T19:47:15.984Z",
+      "reason": "The isolated config accidentally omitted model_provider=codex-lb and hit depleted direct OpenAI workspace credits before generation.",
+      "trajectory": "private/treatment-home/.codex/sessions/2026/08/23/rollout-2026-08-23T20-47-10-01a03029-a3b4-7b82-a3d9-da38c52e5069.jsonl",
+      "trajectory_sha256": "e6dafc836c234317a6c4d88c28a333bfe9082b949541f9394389e533543c4c9a",
+      "excluded": true
+    }
+  ],
+  "limitations": [
+    "One private task and one pair cannot support a launch headline or general savings claim.",
+    "The runs overlapped for only about 48 seconds after the user requested parallel execution; wall time remains order- and host-load-sensitive.",
+    "Both Sol agents spawned Sol child agents, so complete accounting includes parent, child, prewarm, and Luna scout requests.",
+    "Neither patch met every pre-registered quality requirement."
+  ],
+  "evidence_sha256": {
+    "billing": "84805b241ad1219768b82a3d98fc545682fdf7e2845ac214202fd20a51b41423",
+    "test_results": "6ecd14ff38420d23c397ffd785434ac910e2e91bc4cd3c2963b55ce26dc92c77",
+    "grader": "96a8c4d9e5702c0e207f96685c63fd28ee5015a2fcda61af8a96e828f4e58dea",
+    "grading_result": "b863dab156b3bb47dbf679937d08d58e523ccc662d7cd1b0df73baffbf6db9eb"
+  },
+  "result_layout": "benchmarks/results/runs/<study-id>/{manifest.json,private/}",
+  "methodology": "The solver receives the byte-identical task prompt in both arms. Only RepoTracer availability changes."
+}

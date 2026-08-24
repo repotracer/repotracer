@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "logo-generator": {
+      "source": "op7418/logo-generator-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "d949329c11df3efa25bc1cc387c92fc8b86077883fcd737803675e42e2da75eb"
+    }
+  }
+}

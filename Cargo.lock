@@ -504,115 +504,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "grephound"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "assert_cmd",
- "async-trait",
- "chrono",
- "clap",
- "dirs",
- "grephound-core",
- "grephound-mcp",
- "grephound-model",
- "grephound-repo-tools",
- "predicates",
- "reqwest",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "toml",
- "tracing",
- "tracing-subscriber",
- "which",
-]
-
-[[package]]
-name = "grephound-bench"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "grephound-core",
- "grephound-model",
- "grephound-repo-tools",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "grephound-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "futures",
- "grephound-model",
- "grephound-repo-tools",
- "regex",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "toml",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "grephound-mcp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "grephound-core",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "grephound-model"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "grephound-repo-tools"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures",
- "globset",
- "ignore",
- "regex",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "which",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1254,6 +1145,115 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "repotracer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "assert_cmd",
+ "async-trait",
+ "chrono",
+ "clap",
+ "dirs",
+ "predicates",
+ "repotracer-core",
+ "repotracer-mcp",
+ "repotracer-model",
+ "repotracer-repo-tools",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "which",
+]
+
+[[package]]
+name = "repotracer-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "repotracer-core",
+ "repotracer-model",
+ "repotracer-repo-tools",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "repotracer-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "futures",
+ "regex",
+ "repotracer-model",
+ "repotracer-repo-tools",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "repotracer-mcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "repotracer-core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "repotracer-model"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "repotracer-repo-tools"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "globset",
+ "ignore",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "which",
+]
 
 [[package]]
 name = "reqwest"

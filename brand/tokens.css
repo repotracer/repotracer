@@ -1,0 +1,151 @@
+/* RepoTracer design tokens — see BRAND.md
+   Drop-in replacement for the :root block in style.css. */
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+
+:root {
+  /* ink & surface */
+  --rt-ink:        #14181D;
+  --rt-slate:      #1B2027;
+  --rt-slate-2:    #39414A;
+  --rt-bone:       #F6F5F1;
+  --rt-panel:      #FCFCFA;
+  --rt-line:       #DFDFD8;
+  --rt-line-dark:  #2B3138;
+  --rt-muted:      #5F6670;
+  --rt-dim:        #9AA0A8;
+
+  /* accent — the hit. one per view. */
+  --rt-accent:      #0E9488;
+  --rt-accent-deep: #0A6E66;   /* accent as text on light grounds */
+  --rt-accent-soft: #E2F2F0;
+
+  /* semantic, not brand */
+  --rt-verify:     var(--rt-accent-deep);  /* pass / verified / cheaper */
+  --rt-warn:       #B4432B;
+
+  /* roles — light theme */
+  --bg:            var(--rt-bone);
+  --surface:       var(--rt-panel);
+  --surface-2:     #EFEEE9;
+  --text:          var(--rt-ink);
+  --text-muted:    var(--rt-muted);
+  --border:        var(--rt-line);
+  --accent:        var(--rt-accent);
+  --accent-text:   var(--rt-accent-deep);
+  --term-bg:       var(--rt-ink);
+  --term-text:     var(--rt-bone);
+  --term-dim:      var(--rt-dim);
+
+  /* type */
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", SFMono-Regular, Consolas, monospace;
+
+  --step-display: clamp(34px, 5vw, 56px);
+  --step-h2:      clamp(24px, 3vw, 34px);
+  --step-h3:      20px;
+  --step-body:    17px;
+  --step-small:   14px;
+  --step-label:   11.5px;
+
+  /* geometry — square-ish, this is a tool, not a consumer app */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --lattice: 40px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:          var(--rt-ink);
+    --surface:     var(--rt-slate);
+    --surface-2:   #232932;
+    --text:        var(--rt-bone);
+    --text-muted:  var(--rt-dim);
+    --border:      var(--rt-line-dark);
+    --accent-text: var(--rt-accent);
+    --term-bg:     #0E1116;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:          var(--rt-ink);
+  --surface:     var(--rt-slate);
+  --surface-2:   #232932;
+  --text:        var(--rt-bone);
+  --text-muted:  var(--rt-dim);
+  --border:      var(--rt-line-dark);
+  --accent-text: var(--rt-accent);
+  --term-bg:     #0E1116;
+}
+
+/* ---------------------------------------------------------- type defaults */
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--step-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: var(--step-display); font-weight: 600; line-height: 1.04; letter-spacing: -0.026em; text-wrap: balance; }
+h2 { font-size: var(--step-h2);      font-weight: 600; line-height: 1.15; letter-spacing: -0.018em; text-wrap: balance; }
+h3 { font-size: var(--step-h3);      font-weight: 600; letter-spacing: -0.012em; }
+p  { max-width: 68ch; }
+code, kbd, pre, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------ signature motif 1
+   the dot lattice — the mark's field, as page texture. background only. */
+.rt-lattice {
+  background-image: radial-gradient(var(--border) 1.5px, transparent 1.5px);
+  background-size: var(--lattice) var(--lattice);
+}
+
+/* ------------------------------------------------------ signature motif 2
+   the hit chip — how every file:line reference is rendered, everywhere. */
+.rt-hit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: var(--font-mono);
+  font-size: var(--step-small);
+  color: var(--text);
+}
+.rt-hit::before {
+  content: "";
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: var(--rt-accent);
+  flex: none;
+}
+.rt-hit .line { color: var(--text-muted); }
+
+/* ------------------------------------------------------ signature motif 3
+   the eyebrow label — mono, machine-voiced. */
+.rt-label {
+  font-family: var(--font-mono);
+  font-size: var(--step-label);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* the one loud thing: primary action */
+.rt-cta {
+  background: var(--rt-ink);
+  color: var(--rt-bone);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  padding: 12px 20px;
+  border: 1px solid var(--rt-ink);
+}
+:root[data-theme="dark"] .rt-cta,
+:root:not([data-theme="light"]) .rt-cta { background: var(--rt-accent); color: var(--rt-ink); border-color: var(--rt-accent); }
+
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--rt-accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

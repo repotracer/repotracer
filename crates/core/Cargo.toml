@@ -1,9 +1,9 @@
 [package]
-name = "grephound-core"
+name = "repotracer-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Core scout engine for grephound"
+description = "Core scout engine for repotracer"
 repository.workspace = true
 
 [dependencies]
@@ -11,8 +11,8 @@ anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 futures.workspace = true
-grephound-model = { workspace = true }
-grephound-repo-tools = { workspace = true }
+repotracer-model = { workspace = true }
+repotracer-repo-tools = { workspace = true }
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true

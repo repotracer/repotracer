@@ -28,6 +28,23 @@ jobs:
       - name: Fmt
         run: cargo fmt --all -- --check
 
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Version parity
+        run: |
+          cargo_version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          npm_version=$(node -p "require('./packages/npm/package.json').version")
+          echo "cargo=$cargo_version npm=$npm_version"
+          test "$cargo_version" = "$npm_version"
+      - name: Test
+        working-directory: packages/npm
+        run: node --test test/*.test.js
+
   windows:
     runs-on: windows-latest
     steps:

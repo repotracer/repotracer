@@ -1,26 +1,27 @@
 # Show HN draft
 
-**Title:** Show HN: grephound – Stop paying frontier models to search your repo
+**Title:** Show HN: I cut one repeated Codex task's cost 28.6% by moving repo search to Luna
 
 **Body:**
 
-grephound is a local repository scout for coding agents (Claude Code, Codex, MCP).
+I came across Microsoft's [FastContext paper](https://arxiv.org/abs/2606.14066v3). Its main idea is simple: use a smaller model for repository exploration when the coding agent does not yet know where to look.
 
-Idea: a small specialist model owns the Read/Glob/Grep exploration loop and returns validated file:line citations. The frontier model solves instead of grepping.
+I built RepoTracer to use that pattern with Codex.
+
+Technically, RepoTracer is an MCP server whose `repo_scout` tool starts an isolated GPT-5.6 Luna process with read-only Read, Glob, and Grep tools. It validates the returned paths and line ranges, then returns structured citations, source excerpts, and findings to Codex Sol. An installed skill tells Sol when to call it.
+
+My Codex limits seemed to last longer, but that was only an anecdote. I ran paired tests using the same prompts and repositories instead.
+
+The current routing policy reduced median complete provider cost by 28.63% across three randomized pairs of one cross-file task. Direct and RepoTracer runs passed all six checks. A fixed measured budget would cover about 40% more equivalent runs of that task.
+
+One SWE-bench task was 50.12% cheaper with the exact regression passing in both arms.
+
+This is not a general average. A newer Google authentication task was 62.68% cheaper but scored 4.375 points lower than direct Codex in blind grading. I kept that result in the benchmark report. RepoTracer is a beta while I investigate that quality failure across more tasks.
 
 ```bash
-npx grephound setup
-grephound scout "trace refresh token rotation"
+npx repotracer setup
 ```
 
-Why we built it:
+Repo: https://github.com/repotracer/repotracer
 
-- Frontier models waste context on exploratory search
-- “Token savings” middleware often measures the wrong thing
-- We benchmark complete-task cost (the bill), not characters filtered
-
-Inspired by Microsoft FastContext; production runtime is Rust (concurrent tools, citation validation, one-command setup).
-
-Not always cheaper on trivial edits — and we say so.
-
-Repo: https://github.com/grephound/grephound
+Benchmarks: https://github.com/repotracer/repotracer/blob/main/BENCHMARKS.md

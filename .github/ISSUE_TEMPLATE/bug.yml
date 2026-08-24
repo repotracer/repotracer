@@ -1,10 +1,10 @@
 name: Bug
-description: Something broken in grephound
+description: Something broken in repotracer
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
-      value: Thanks for reporting. Include `grephound doctor` output when possible.
+      value: Thanks for reporting. Include `repotracer doctor` output when possible.
   - type: textarea
     id: what
     attributes:
@@ -20,7 +20,7 @@ body:
   - type: textarea
     id: doctor
     attributes:
-      label: grephound doctor
+      label: repotracer doctor
   - type: input
     id: version
     attributes:

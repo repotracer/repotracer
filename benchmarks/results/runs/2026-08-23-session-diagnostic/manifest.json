@@ -1,0 +1,122 @@
+{
+  "schema_version": 2,
+  "study_id": "2026-08-23-session-diagnostic",
+  "generated_at": "2026-08-23T16:34:01.337617+00:00",
+  "status": "failed",
+  "suite_root": "benchmarks",
+  "arms": [
+    "baseline",
+    "repotracer"
+  ],
+  "repeats_per_arm": 1,
+  "trial_count": 2,
+  "protocol": {
+    "main_model": "Codex CLI account default; resolved model recorded from each trajectory",
+    "reasoning_effort": "high",
+    "setup_command": "node packages/npm/bin/repotracer.js setup with the local prepublish package and REPOTRACER_BIN",
+    "order_policy": "randomized once: baseline, then repotracer",
+    "timeout_seconds": 3600,
+    "network_policy": "normal Codex network access in both arms",
+    "cache_policy": "isolated HOME and CODEX_HOME per arm; shared authentication only"
+  },
+  "tasks": [
+    {
+      "schema_version": 2,
+      "suite": "private-low-compute",
+      "id": "session-recurring-problems",
+      "prompt": "Analyze my local Codex and OMP session histories plus my open engineering issues. The source manifest is `benchmarks/results/private/session-sources.json`. Identify recurring failures by model, repository, and workflow; separate tool failures from prompting, process, and product failures; then design the smallest high-leverage fix for each repeated problem. Reuse existing skills, tools, and code before proposing anything new. Support every finding with session or issue evidence, rank fixes by recurrence and impact, and do not modify files.",
+      "expected_scout": true,
+      "expected_paths": [],
+      "source": {
+        "inputs": [
+          "~/.codex/sessions/**/*.jsonl",
+          "~/.omp/agent/sessions/**/*.jsonl",
+          "ClickUp open engineering tasks"
+        ],
+        "kind": "private-local",
+        "quality_method": "blind rubric: evidence coverage, recurrence proof, root-cause separation, reuse, and actionable minimal fixes"
+      },
+      "headline_eligible": false
+    }
+  ],
+  "trials": [
+    {
+      "task_id": "session-recurring-problems",
+      "repeat": 1,
+      "arm": "baseline",
+      "order": 1,
+      "status": "complete",
+      "started_at": "2026-08-23T16:37:10.658Z",
+      "finished_at": "2026-08-23T16:54:20.505Z",
+      "prompt_sha256": "ab7ea89623133f238ed6c2194a0c8b521fae55c955a8f0762797c38ee100efc1",
+      "repository": "<home>",
+      "commit": "not applicable: read-only cross-repository diagnosis",
+      "agent_version": "codex-cli 0.149.0",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/baseline/home/.codex/sessions/2026/08/23/rollout-2026-08-23T17-37-10-01a02f7b-b182-7fe0-8469-be288a4a521a.jsonl",
+        "patch": "",
+        "test_log": "private/baseline/final.md",
+        "sha256": {
+          "trajectory": "435b2a90f02a323d362148268ab0bfcff0d9fac6a16244ca217af733576f3d35",
+          "report": "dd33547d485b0646dc3266340060c8e8de937a175ebc2a8910f8c60c304bc21b"
+        }
+      },
+      "billing": {
+        "source": "Codex CLI trajectory token_count; subscription provider cost unavailable",
+        "main": {
+          "input_tokens": 3868055,
+          "cached_input_tokens": 3634688,
+          "output_tokens": 39001,
+          "reasoning_output_tokens": 13877
+        },
+        "scout": {},
+        "complete_provider_cost_usd": null
+      },
+      "quality": {
+        "method": "not graded because the paired treatment arm did not generate",
+        "passed": null,
+        "grader_artifact": ""
+      }
+    },
+    {
+      "task_id": "session-recurring-problems",
+      "repeat": 1,
+      "arm": "repotracer",
+      "order": 2,
+      "status": "invalid",
+      "started_at": "2026-08-23T16:54:34.244Z",
+      "finished_at": "2026-08-23T16:54:38.175Z",
+      "prompt_sha256": "ab7ea89623133f238ed6c2194a0c8b521fae55c955a8f0762797c38ee100efc1",
+      "repository": "<home>",
+      "commit": "not applicable: read-only cross-repository diagnosis",
+      "agent_version": "codex-cli 0.149.0",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/repotracer/home/.codex/sessions/2026/08/23/rollout-2026-08-23T17-54-34-01a02f8b-9e04-7bf1-9d97-cbd2e188e16b.jsonl",
+        "patch": "",
+        "test_log": "",
+        "sha256": {
+          "trajectory": "2508dda2a6d3b575fbeaf11b30215255fb28aedaefd4ba9269b163a93e0419ca"
+        }
+      },
+      "billing": {
+        "source": "No generation: workspace credits depleted before first model response",
+        "main": {},
+        "scout": {},
+        "complete_provider_cost_usd": null
+      },
+      "quality": {
+        "method": "invalid trial; no output to grade",
+        "passed": null,
+        "grader_artifact": ""
+      }
+    }
+  ],
+  "limitations": [
+    "The treatment arm was invalid because the workspace exhausted credits after the baseline arm.",
+    "No paired quality or savings conclusion is allowed from this run.",
+    "The baseline report is useful diagnostic evidence but not benchmark evidence for RepoTracer impact."
+  ],
+  "methodology": "The solver receives the byte-identical task prompt in both arms. Only RepoTracer availability changes."
+}

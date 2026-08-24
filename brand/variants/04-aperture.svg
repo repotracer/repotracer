@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" role="img" aria-label="RepoTracer">
+  <defs><clipPath id="ap"><circle cx="50" cy="50" r="33"/></clipPath></defs>
+  <g clip-path="url(#ap)" fill="currentColor" opacity="0.32">
+    <circle cx="23" cy="23" r="2.6"/><circle cx="32" cy="23" r="2.6"/><circle cx="41" cy="23" r="2.6"/><circle cx="50" cy="23" r="2.6"/><circle cx="59" cy="23" r="2.6"/><circle cx="68" cy="23" r="2.6"/><circle cx="77" cy="23" r="2.6"/>
+    <circle cx="23" cy="32" r="2.6"/><circle cx="32" cy="32" r="2.6"/><circle cx="41" cy="32" r="2.6"/><circle cx="50" cy="32" r="2.6"/><circle cx="59" cy="32" r="2.6"/><circle cx="68" cy="32" r="2.6"/><circle cx="77" cy="32" r="2.6"/>
+    <circle cx="23" cy="41" r="2.6"/><circle cx="32" cy="41" r="2.6"/><circle cx="41" cy="41" r="2.6"/><circle cx="50" cy="41" r="2.6"/><circle cx="59" cy="41" r="2.6"/><circle cx="68" cy="41" r="2.6"/><circle cx="77" cy="41" r="2.6"/>
+    <circle cx="23" cy="50" r="2.6"/><circle cx="32" cy="50" r="2.6"/><circle cx="41" cy="50" r="2.6"/><circle cx="50" cy="50" r="2.6"/><circle cx="77" cy="50" r="2.6"/>
+    <circle cx="23" cy="59" r="2.6"/><circle cx="32" cy="59" r="2.6"/><circle cx="41" cy="59" r="2.6"/><circle cx="50" cy="59" r="2.6"/><circle cx="77" cy="59" r="2.6"/>
+    <circle cx="23" cy="68" r="2.6"/><circle cx="32" cy="68" r="2.6"/><circle cx="41" cy="68" r="2.6"/><circle cx="50" cy="68" r="2.6"/><circle cx="68" cy="68" r="2.6"/><circle cx="77" cy="68" r="2.6"/>
+    <circle cx="23" cy="77" r="2.6"/><circle cx="32" cy="77" r="2.6"/><circle cx="41" cy="77" r="2.6"/><circle cx="50" cy="77" r="2.6"/><circle cx="59" cy="77" r="2.6"/><circle cx="68" cy="77" r="2.6"/><circle cx="77" cy="77" r="2.6"/>
+  </g>
+  <circle class="hit" cx="61.5" cy="57.5" r="9" fill="currentColor"/>
+</svg>

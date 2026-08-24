@@ -162,7 +162,7 @@
   "limitations": [
     "One instance and one run per arm; no statistical inference or product savings claim.",
     "Arms ran sequentially, so wall time includes uncontrolled cache and host-load effects.",
-    "The benchmark exercises the preserved FastContext Python explorer scaffold, not Grephound's Rust repo_scout runtime.",
+    "The benchmark exercises the preserved FastContext Python explorer scaffold, not RepoTracer's Rust repo_scout runtime.",
     "Provider-reported API cost excludes local compute and electricity.",
     "Local explorer token usage is unavailable because its trajectory was removed before extraction."
   ],

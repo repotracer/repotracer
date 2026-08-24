@@ -1,16 +1,18 @@
 {
-  "name": "grephound",
+  "name": "repotracer",
   "version": "0.1.0",
   "description": "Local repository scout for AI coding agents. Small models search. Big models solve.",
   "bin": {
-    "grephound": "bin/grephound.js"
+    "repotracer": "bin/repotracer.js"
   },
   "files": [
     "bin/",
-    "scripts/"
+    "scripts/",
+    "README.md"
   ],
   "scripts": {
-    "postinstall": "node scripts/fetch-binary.js || true"
+    "postinstall": "node scripts/fetch-binary.js",
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "mcp",
@@ -21,9 +23,17 @@
     "local-ai"
   ],
   "license": "MIT",
+  "homepage": "https://github.com/repotracer/repotracer#readme",
+  "bugs": {
+    "url": "https://github.com/repotracer/repotracer/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/grephound/grephound.git"
+    "url": "git+https://github.com/repotracer/repotracer.git",
+    "directory": "packages/npm"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=18"

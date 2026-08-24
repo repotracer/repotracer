@@ -2,14 +2,14 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GrephoundConfig {
+pub struct RepoTracerConfig {
     #[serde(default)]
     pub model: ModelSettings,
     #[serde(default)]
     pub explorer: ExplorerBudget,
 }
 
-impl GrephoundConfig {
+impl RepoTracerConfig {
     pub fn load_from(path: &std::path::Path) -> anyhow::Result<Self> {
         let text = std::fs::read_to_string(path)?;
         Ok(toml::from_str(&text)?)
@@ -47,7 +47,7 @@ pub struct ModelSettings {
 
 impl ModelSettings {
     pub fn resolved_api_key(&self) -> Option<String> {
-        std::env::var("GREPHOUND_API_KEY")
+        std::env::var("REPOTRACER_API_KEY")
             .ok()
             .or_else(|| self.api_key.clone())
     }

@@ -1,7 +1,7 @@
-//! Minimal MCP JSON-RPC server over stdio for grephound.
+//! Minimal MCP JSON-RPC server over stdio for repotracer.
 //! NEVER write non-protocol text to stdout.
 
-use grephound_core::{ScoutBackend, ScoutRequest, ScoutResult, ValidatedCitation};
+use repotracer_core::{ScoutBackend, ScoutRequest, ScoutResult, ValidatedCitation};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -9,16 +9,16 @@ use std::sync::Arc;
 use tracing::{debug, error};
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
-const SERVER_NAME: &str = "grephound";
+const SERVER_NAME: &str = "repotracer";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 const MAX_HANDOFF_CITATIONS: usize = 5;
 const MAX_EVIDENCE_BYTES: usize = 6 * 1024;
 const MAX_EXCERPT_BYTES: usize = 1200;
 const MAX_EXCERPT_LINES: u32 = 40;
-const SUCCESSFUL_HANDOFF: &str = "Broad repository exploration is complete. Use the summary and included evidence excerpts. For read-only explanation or planning, you MUST answer immediately and MUST NOT make another repository tool call. For edits, read one narrow cited range only when the handoff does not resolve a specific fact needed for the change. Do not run repository-wide file listings, broad Grep/Glob searches, history scans, or unrelated documentation reads.";
+const SUCCESSFUL_HANDOFF: &str = "Broad repository exploration is complete. Use the summary and included evidence excerpts. For read-only explanation or planning, you MUST answer immediately and MUST NOT make another repository tool call. For edits, read one narrow cited range only when the handoff does not resolve a specific fact needed for the change. Do not run repository-wide file listings, broad Grep/Glob searches, or unrelated documentation reads. RepoTracer cannot inspect Git history; when the task describes a regression and current-source evidence does not establish what changed, run one targeted history lookup before selecting the fix.";
 const EMPTY_HANDOFF: &str =
     "No validated evidence was returned. Fall back to normal repository exploration.";
-const REPO_SCOUT_DESC: &str = "Use repo_scout only when it replaces broad repository exploration: the relevant implementation is unknown and the task needs unfamiliar cross-file understanding, or a targeted search failed. Skip when the prompt names the relevant files or symbols, supplies a precise change surface, the code is already in context, or one targeted lookup is likely enough. A successful result completes broad exploration and includes bounded source excerpts. For read-only explanation or planning, answer immediately without another repository tool call. For edits, read one narrow cited range only for a specific unresolved fact. Do not repeat repository-wide searches, history scans, or unrelated documentation reads.";
+const REPO_SCOUT_DESC: &str = "Use repo_scout only when it replaces broad repository exploration: the relevant implementation is unknown and the task needs unfamiliar cross-file understanding, or a targeted search failed. Skip when the prompt names the relevant files or symbols, supplies a precise change surface, the code is already in context, or one targeted lookup is likely enough. A successful result completes broad exploration and includes bounded source excerpts. For read-only explanation or planning, answer immediately without another repository tool call. For edits, read one narrow cited range only for a specific unresolved fact. Do not repeat repository-wide searches or unrelated documentation reads. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup when current source does not establish what changed.";
 
 pub struct McpServer {
     scout: Arc<dyn ScoutBackend>,
@@ -308,7 +308,7 @@ fn repo_scout_tool_def() -> Value {
 fn repo_scout_prompt_def() -> Value {
     json!({
         "name": "repo_scout",
-        "description": "Delegate unknown-location or broad repository exploration to Grephound.",
+        "description": "Delegate unknown-location or broad repository exploration to RepoTracer.",
         "arguments": [{
             "name": "query",
             "description": "Precise semantic repository question or flow to trace.",
@@ -331,7 +331,7 @@ fn repo_scout_prompt(params: Value) -> Result<Value, Value> {
         return Err(rpc_error(-32602, "`query` is required".into()));
     }
     Ok(json!({
-        "description": "Explore the repository with Grephound, then treat its validated citations as the completed exploration handoff.",
+        "description": "Explore the repository with RepoTracer, then treat its validated citations as the completed exploration handoff.",
         "messages": [{
             "role": "user",
             "content": {
@@ -442,6 +442,7 @@ mod tests {
         assert!(description.contains("includes bounded source excerpts"));
         assert!(description.contains("Do not repeat repository-wide searches"));
         assert!(description.contains("answer immediately without another repository tool call"));
+        assert!(description.contains("one targeted history lookup"));
     }
 
     #[test]
@@ -463,14 +464,14 @@ mod tests {
         ScoutResult {
             summary: "Focused evidence".into(),
             citations: (0..citation_count)
-                .map(|index| grephound_core::ValidatedCitation {
+                .map(|index| repotracer_core::ValidatedCitation {
                     path: format!("src/{index}.rs"),
                     start_line: 1,
                     end_line: 2,
                     reason: Some("relevant".into()),
                 })
                 .collect(),
-            stats: grephound_core::ScoutStats::default(),
+            stats: repotracer_core::ScoutStats::default(),
             raw_final: None,
         }
     }

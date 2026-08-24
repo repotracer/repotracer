@@ -84,6 +84,8 @@ mod tests {
         assert!(prompt.contains("split separate regions"));
         assert!(prompt.contains("omit low-value documentation"));
         assert!(prompt.contains("A failed search"));
+        assert!(prompt.contains("Separate direct source evidence from hypotheses"));
+        assert!(prompt.contains("not Git history"));
     }
 
     #[test]

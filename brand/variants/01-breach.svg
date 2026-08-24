@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" role="img" aria-label="RepoTracer">
+  <path d="M62 82 H38 A20 20 0 0 1 18 62 V38 A20 20 0 0 1 38 18 H62 A20 20 0 0 1 82 38 V55"
+        stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+  <circle class="hit" cx="76" cy="76" r="8" fill="currentColor"/>
+</svg>

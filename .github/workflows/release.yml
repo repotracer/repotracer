@@ -14,49 +14,57 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact: grephound-linux-x64
+            artifact: repotracer-linux-x64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            artifact: grephound-linux-arm64
+            artifact: repotracer-linux-arm64
             cross: true
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: grephound-darwin-arm64
+            artifact: repotracer-darwin-arm64
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact: grephound-darwin-x64
+            artifact: repotracer-darwin-x64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: grephound-windows-x64
+            artifact: repotracer-windows-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - uses: taiki-e/install-action@cross
+        if: matrix.cross
       - name: Build
-        run: cargo build -p grephound --release --target ${{ matrix.target }}
+        if: ${{ !matrix.cross }}
+        run: cargo build -p repotracer --release --target ${{ matrix.target }}
+      - name: Cross-build
+        if: matrix.cross
+        run: cross build -p repotracer --release --target ${{ matrix.target }}
       - name: Package
         shell: bash
         run: |
-          bin=grephound
+          bin=repotracer
           ext=""
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then ext=".exe"; fi
           src="target/${{ matrix.target }}/release/${bin}${ext}"
-          stage="${{ matrix.artifact }}"
           mkdir -p dist
           cp "$src" "dist/${bin}${ext}"
+          cp "$src" "${{ matrix.artifact }}${ext}"
           cp README.md LICENSE NOTICE dist/ || true
           cd dist
           if [[ -n "$ext" ]]; then
-            7z a "../${{ matrix.artifact }}.zip" *
+            7z a "../${{ matrix.artifact }}.zip" ./*
           else
-            tar czf "../${{ matrix.artifact }}.tar.gz" *
+            tar czf "../${{ matrix.artifact }}.tar.gz" ./*
           fi
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: |
+            ${{ matrix.artifact }}
+            ${{ matrix.artifact }}.exe
             ${{ matrix.artifact }}.tar.gz
             ${{ matrix.artifact }}.zip
 
@@ -70,7 +78,10 @@ jobs:
       - name: Checksums
         run: |
           cd artifacts
-          find . -type f \( -name '*.tar.gz' -o -name '*.zip' \) -print0 | xargs -0 sha256sum > SHA256SUMS
+          # Write outside the tree first: redirecting into it makes find hash SHA256SUMS itself.
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > "${RUNNER_TEMP}/SHA256SUMS"
+          mv "${RUNNER_TEMP}/SHA256SUMS" SHA256SUMS
+          cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*

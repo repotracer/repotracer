@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "suite": "private-low-compute",
+  "id": "session-recurring-problems",
+  "prompt": "Analyze my local Codex and OMP session histories plus my open engineering issues. The source manifest is `benchmarks/results/private/session-sources.json`. Identify recurring failures by model, repository, and workflow; separate tool failures from prompting, process, and product failures; then design the smallest high-leverage fix for each repeated problem. Reuse existing skills, tools, and code before proposing anything new. Support every finding with session or issue evidence, rank fixes by recurrence and impact, and do not modify files.",
+  "expected_scout": true,
+  "expected_paths": [],
+  "source": {
+    "kind": "private-local",
+    "inputs": [
+      "~/.codex/sessions/**/*.jsonl",
+      "~/.omp/agent/sessions/**/*.jsonl",
+      "ClickUp open engineering tasks"
+    ],
+    "quality_method": "blind rubric: evidence coverage, recurrence proof, root-cause separation, reuse, and actionable minimal fixes"
+  },
+  "headline_eligible": false
+}

@@ -1,4 +1,4 @@
-use grephound_repo_tools::ToolResult;
+use repotracer_repo_tools::ToolResult;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;

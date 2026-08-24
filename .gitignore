@@ -1,7 +1,7 @@
 /target
 **/*.rs.bk
 .DS_Store
-.grephound/
+.repotracer/
 *.bak
 .env
 .idea/
@@ -9,8 +9,17 @@
 node_modules/
 packages/npm/vendor/
 benchmarks/results/**/raw.jsonl
+benchmarks/results/private/
+benchmarks/results/runs/**/private/
+benchmarks/results/runs/**/trajectory.jsonl
+benchmarks/results/runs/**/{stdout,stderr}.log
 .project/STATE.local.md
 third_party/
 
 .fastcontext/
 docs/benchmarks/*.log
+# Local agent/design tooling and run evidence
+.design-playbooks/
+.claude/
+.agents/
+.fastcontext/

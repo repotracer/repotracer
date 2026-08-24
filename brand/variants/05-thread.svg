@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" role="img" aria-label="RepoTracer">
+  <rect x="16" y="16" width="68" height="68" rx="19" stroke="currentColor" stroke-width="3" opacity="0.28"/>
+  <path d="M30 71 C 43 71 40 52 53 52 S 62 33 71 33" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
+  <circle cx="30" cy="71" r="4.5" stroke="currentColor" stroke-width="3.5"/>
+  <circle class="hit" cx="71" cy="33" r="7" fill="currentColor"/>
+</svg>

@@ -184,10 +184,13 @@ fn from_openai_message(m: OpenAiMessage) -> Result<ChatMessage, ModelError> {
 
 fn truncate(s: &str, n: usize) -> String {
     if s.len() <= n {
-        s.to_string()
-    } else {
-        format!("{}…", &s[..n])
+        return s.to_string();
     }
+    let mut end = n;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}…", &s[..end])
 }
 
 #[derive(Debug, Deserialize)]
@@ -226,4 +229,14 @@ struct OpenAiUsage {
     prompt_tokens: Option<u32>,
     completion_tokens: Option<u32>,
     total_tokens: Option<u32>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::truncate;
+
+    #[test]
+    fn truncates_at_utf8_boundary() {
+        assert_eq!(truncate("1234567é", 8), "1234567…");
+    }
 }

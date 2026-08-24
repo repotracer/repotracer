@@ -1,6 +1,6 @@
 {
   "id": "usage-accounting",
-  "prompt": "Grephound's usage stats are incomplete for OpenAI-compatible providers. Include cached input, cache-write input, reasoning output, and total tokens across multi-turn scout runs, but leave values absent when a provider does not report them.",
+  "prompt": "RepoTracer's usage stats are incomplete for OpenAI-compatible providers. Include cached input, cache-write input, reasoning output, and total tokens across multi-turn scout runs, but leave values absent when a provider does not report them.",
   "expected_scout": true,
   "expected_paths": [
     "crates/model/src/types.rs",
