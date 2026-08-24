@@ -1,35 +1,27 @@
-# Why token counters lie
+# Measure the complete task
 
-A tool cannot prove savings by comparing its output against the output it chose not to send.
+A middleware tool cannot prove savings by counting only the text it removed. Coding agents react to tool output, so one compressed result can change later searches, cache reads, retries, and the final patch.
 
-The coding agent is a feedback loop. Compressing one step can change everything that happens afterward:
+Measure both arms from the same user prompt:
 
-- more turns
-- rereads
-- bypassed tools
-- different cache behavior
-- compensating searches
-- lost evidence → worse patches → retries
+```text
+direct cost = main-agent requests
+assisted cost = main-agent requests + scout requests
+```
 
-Middleware “97% savings” counters measure **their own filter**, not your invoice.
+A cost result is valid only when both arms meet the same quality gate.
 
-## Precedent
+RepoTracer benchmarks record:
 
-JetBrains' RTK paired evaluation showed that an arm marketed around token savings can still increase **complete-task** cost:
+1. Main and scout input, cache, output, and reasoning tokens
+2. Complete provider cost
+3. Wall time
+4. Task checks or blind quality scores
+5. Failed and rejected runs
+6. Raw artifacts and checksums
 
-https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/
+This distinction matters. JetBrains measured an RTK configuration whose local counter reported 96.2 million saved tokens while complete task cost rose 7.6% at low reasoning effort. The filter reduced its own output, but the agent spent more elsewhere.
 
-Related evaluation culture:
+Source: [JetBrains RTK paired evaluation](https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/)
 
-- https://blog.jetbrains.com/ai/2026/07/speak-to-ai-agents-like-cavemen-tosave-tokens/
-- https://blog.jetbrains.com/ai/2026/07/ponytail-skill-claude-tested/
-
-## Our standard
-
-1. Same tasks, same model, same agent
-2. Measure total provider cost including explorer cost
-3. Measure success, not only tokens
-4. Report median + variance on repeated pairs
-5. Publish raw artifacts
-
-**Benchmark the bill or shut up about token savings.**
+RepoTracer reports paired medians only for repeated runs and labels single runs as diagnostics. The current results still cover too few independent tasks for a general savings or quality claim.

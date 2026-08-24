@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const MANAGED_START: &str = "<!-- grephound:start -->";
-const MANAGED_END: &str = "<!-- grephound:end -->";
+const MANAGED_START: &str = "<!-- repotracer:start -->";
+const MANAGED_END: &str = "<!-- repotracer:end -->";
 
-const ROUTING_INSTRUCTIONS: &str = "Decide repository-scout eligibility from the request and current context before repository operations. When unfamiliar or cross-file understanding would otherwise require broad exploration, call repo_scout as the first repository operation; do not run preliminary pwd, listing, CodeGraph, Grep, Glob, Read, or shell searches. Skip it when one targeted lookup is sufficient or the relevant files, symbols, source, or precise change surface are already known. Do not call it merely because a task is difficult. Validated citations complete broad exploration; use the handoff summary and evidence excerpts, and do not repeat broad searches. If it returns no validated citations, fall back to normal repository tools.";
+const ROUTING_INSTRUCTIONS: &str = "Decide repository-scout eligibility from the request and current context before repository operations. When unfamiliar or cross-file understanding would otherwise require broad exploration, call repo_scout as the first repository operation; do not run preliminary pwd, listing, CodeGraph, Grep, Glob, Read, or shell searches. Skip it when one targeted lookup is sufficient or the relevant files, symbols, source, or precise change surface are already known. Do not call it merely because a task is difficult. Validated citations complete broad exploration; use the handoff summary and evidence excerpts, and do not repeat broad searches. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup when current-source evidence does not establish what changed. If it returns no validated citations, fall back to normal repository tools.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInfo {
@@ -28,7 +28,7 @@ fn detect_codex() -> AgentInfo {
             .is_some_and(Path::exists);
     let configured = path
         .as_ref()
-        .is_some_and(|p| p.exists() && file_contains_grephound(p));
+        .is_some_and(|p| p.exists() && file_contains_repotracer(p));
     AgentInfo {
         name: "Codex".into(),
         detected,
@@ -37,9 +37,9 @@ fn detect_codex() -> AgentInfo {
     }
 }
 
-fn file_contains_grephound(path: &Path) -> bool {
+fn file_contains_repotracer(path: &Path) -> bool {
     fs::read_to_string(path)
-        .map(|s| s.contains("grephound"))
+        .map(|s| s.contains("repotracer"))
         .unwrap_or(false)
 }
 
@@ -57,7 +57,7 @@ fn codex_skill_path() -> anyhow::Result<PathBuf> {
     Ok(codex_home()
         .ok_or_else(|| anyhow::anyhow!("no Codex home"))?
         .join("skills")
-        .join("grephound-scout")
+        .join("repotracer-scout")
         .join("SKILL.md"))
 }
 
@@ -103,10 +103,10 @@ fn install_codex_config(path: &Path, binary: &Path) -> anyhow::Result<()> {
         String::new()
     };
     let command = serde_json::to_string(&binary.display().to_string())?;
-    let block = format!("[mcp_servers.grephound]\ncommand = {command}\nargs = [\"serve\"]\n");
+    let block = format!("[mcp_servers.repotracer]\ncommand = {command}\nargs = [\"serve\"]\n");
     fs::write(
         path,
-        replace_toml_section(&text, "[mcp_servers.grephound]", &block),
+        replace_toml_section(&text, "[mcp_servers.repotracer]", &block),
     )?;
     Ok(())
 }
@@ -182,9 +182,9 @@ pub fn uninstall_all(_root: &Path) -> anyhow::Result<Vec<String>> {
     let mut messages = Vec::new();
     if let Some(path) = codex_config_path().filter(|p| p.exists()) {
         backup_file(&path)?;
-        let updated = remove_toml_section(&fs::read_to_string(&path)?, "[mcp_servers.grephound]");
+        let updated = remove_toml_section(&fs::read_to_string(&path)?, "[mcp_servers.repotracer]");
         fs::write(&path, updated)?;
-        messages.push(format!("removed Grephound from {}", path.display()));
+        messages.push(format!("removed RepoTracer from {}", path.display()));
     }
     if let Ok(path) = codex_skill_path() {
         if path.exists() {
@@ -207,7 +207,7 @@ fn remove_managed_instructions(path: &Path, messages: &mut Vec<String>) -> anyho
         fs::write(path, updated + "\n")?;
     }
     messages.push(format!(
-        "removed Grephound instructions from {}",
+        "removed RepoTracer instructions from {}",
         path.display()
     ));
     Ok(())
@@ -231,7 +231,7 @@ fn backup_file(path: &Path) -> anyhow::Result<()> {
 }
 
 pub fn current_binary() -> PathBuf {
-    std::env::current_exe().unwrap_or_else(|_| PathBuf::from("grephound"))
+    std::env::current_exe().unwrap_or_else(|_| PathBuf::from("repotracer"))
 }
 
 #[cfg(test)]
@@ -240,12 +240,12 @@ mod tests {
 
     #[test]
     fn codex_section_update_is_idempotent() {
-        let original = "model = \"gpt\"\n\n[mcp_servers.grephound]\ncommand = \"old\"\nargs = [\"serve\"]\n\n[other]\nvalue = 1\n";
-        let block = "[mcp_servers.grephound]\ncommand = \"new\"\nargs = [\"serve\"]\n";
-        let once = replace_toml_section(original, "[mcp_servers.grephound]", block);
-        let twice = replace_toml_section(&once, "[mcp_servers.grephound]", block);
+        let original = "model = \"gpt\"\n\n[mcp_servers.repotracer]\ncommand = \"old\"\nargs = [\"serve\"]\n\n[other]\nvalue = 1\n";
+        let block = "[mcp_servers.repotracer]\ncommand = \"new\"\nargs = [\"serve\"]\n";
+        let once = replace_toml_section(original, "[mcp_servers.repotracer]", block);
+        let twice = replace_toml_section(&once, "[mcp_servers.repotracer]", block);
         assert_eq!(once, twice);
-        assert_eq!(once.matches("[mcp_servers.grephound]").count(), 1);
+        assert_eq!(once.matches("[mcp_servers.repotracer]").count(), 1);
         assert!(once.contains("[other]"));
     }
 
@@ -253,11 +253,11 @@ mod tests {
     fn managed_instructions_preserve_user_content() {
         let first = replace_managed_block(
             "# Existing\n",
-            "<!-- grephound:start -->\none\n<!-- grephound:end -->",
+            "<!-- repotracer:start -->\none\n<!-- repotracer:end -->",
         );
         let second = replace_managed_block(
             &first,
-            "<!-- grephound:start -->\ntwo\n<!-- grephound:end -->",
+            "<!-- repotracer:start -->\ntwo\n<!-- repotracer:end -->",
         );
         assert!(second.contains("# Existing"));
         assert!(!second.contains("\none\n"));
@@ -270,5 +270,6 @@ mod tests {
         assert!(ROUTING_INSTRUCTIONS.contains("first repository operation"));
         assert!(ROUTING_INSTRUCTIONS.contains("complete broad exploration"));
         assert!(ROUTING_INSTRUCTIONS.contains("do not repeat broad searches"));
+        assert!(ROUTING_INSTRUCTIONS.contains("one targeted history lookup"));
     }
 }

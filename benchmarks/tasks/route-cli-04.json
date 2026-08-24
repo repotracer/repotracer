@@ -1,11 +1,11 @@
 {
   "id": "route-cli-04",
-  "prompt": "Installing Grephound from npm should leave a runnable native binary on every platform shipped in releases. Download the matching archive, verify its published checksum before extraction, retain the development and explicit-binary fallbacks, and fail installation clearly when an artifact is unavailable.",
+  "prompt": "Installing RepoTracer from npm should leave a runnable native binary on every platform shipped in releases. Download the matching archive, verify its published checksum before extraction, retain the development and explicit-binary fallbacks, and fail installation clearly when an artifact is unavailable.",
   "expected_scout": true,
   "expected_paths": [
     ".github/workflows/release.yml",
     "packages/npm/package.json",
     "packages/npm/scripts/fetch-binary.js",
-    "packages/npm/bin/grephound.js"
+    "packages/npm/bin/repotracer.js"
   ]
 }

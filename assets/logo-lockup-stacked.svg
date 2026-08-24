@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 108" role="img" aria-label="RepoTracer">
+  <g transform="translate(104,6) scale(1.0)">
+    <path d="M11.4 7H8.2v18h3.2" fill="none" stroke="#0e3d42" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="13.4" y="9.1" width="15.4" height="3.6" rx="1.8" fill="#0e3d42"/>
+    <rect x="13.4" y="14.2" width="10.2" height="3.6" rx="1.8" fill="#0e3d42"/>
+    <rect x="15.6" y="19.3" width="6.6" height="3.6" rx="1.8" fill="#e4ee4f"/>
+  </g>
+  <text x="120" y="72" text-anchor="middle" font-family="DM Sans, Avenir Next, system-ui, sans-serif" font-size="30" font-weight="700" letter-spacing="-0.9" fill="#0e3d42">RepoTracer</text>
+  <text x="120" y="94" text-anchor="middle" font-family="DM Sans, Avenir Next, system-ui, sans-serif" font-size="11.5" font-weight="400" letter-spacing="0.1" fill="#5b7276">Small models search. Big models solve.</text>
+</svg>

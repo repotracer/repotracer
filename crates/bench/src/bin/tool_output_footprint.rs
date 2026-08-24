@@ -1,4 +1,4 @@
-use grephound_repo_tools::RepoTools;
+use repotracer_repo_tools::RepoTools;
 use serde::Serialize;
 use serde_json::json;
 use std::path::PathBuf;
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
 
 fn fixture() -> anyhow::Result<PathBuf> {
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    let root = std::env::temp_dir().join(format!("grephound-output-footprint-{nonce}"));
+    let root = std::env::temp_dir().join(format!("repotracer-output-footprint-{nonce}"));
     std::fs::create_dir_all(root.join("matches"))?;
     let big = (1..=2000)
         .map(|line| format!("line-{line:04} {}", "x".repeat(1980)))

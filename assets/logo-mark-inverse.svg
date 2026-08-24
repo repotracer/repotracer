@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="RepoTracer">
+  <path d="M11.4 7H8.2v18h3.2" fill="none" stroke="#f5f3eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="13.4" y="9.1" width="15.4" height="3.6" rx="1.8" fill="#f5f3eb"/>
+  <rect x="13.4" y="14.2" width="10.2" height="3.6" rx="1.8" fill="#f5f3eb"/>
+  <rect x="15.6" y="19.3" width="6.6" height="3.6" rx="1.8" fill="#e4ee4f"/>
+</svg>

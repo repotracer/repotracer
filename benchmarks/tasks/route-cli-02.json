@@ -1,6 +1,6 @@
 {
   "id": "route-cli-02",
-  "prompt": "After Grephound is upgraded or moved, coding agents can keep invoking the old executable. Make onboarding detect and repair stale Grephound entries for every supported agent without changing unrelated user settings, and surface stale versus healthy integrations in diagnostics.",
+  "prompt": "After RepoTracer is upgraded or moved, coding agents can keep invoking the old executable. Make onboarding detect and repair stale RepoTracer entries for every supported agent without changing unrelated user settings, and surface stale versus healthy integrations in diagnostics.",
   "expected_scout": true,
   "expected_paths": [
     "crates/cli/src/agents.rs",

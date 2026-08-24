@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-08-10",
   "status": "single-pair natural-routing diagnostic; not a headline result",
-  "prompt": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "prompt": "Explain how `repotracer setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
   "protocol": {
     "main_model": "gpt-5.6-sol",
     "main_reasoning_effort": "high",
@@ -57,7 +57,7 @@
         "reasoning_tokens": 84,
         "provider_latency_ms": 31435,
         "provider_cost_usd": 0.0126198,
-        "grephound_duration_ms": 36393,
+        "repotracer_duration_ms": 36393,
         "validated_citations": 6
       }
     }

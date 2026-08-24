@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-24-google-signup-three-arm",
+  "status": "completed",
+  "headline_eligible": false,
+  "task": "Google sign-up is broken. Diagnose and fix the root cause without changing working email or OTP authentication, and add the smallest regression check that proves the failure is gone.",
+  "arms": [
+    {"id": "baseline", "routing": "normal Codex, no RepoTracer", "quality_score_100": 83.125, "wall_seconds": 437.74, "complete_input_tokens": 3445045, "complete_output_tokens": 18556, "complete_cost_usd": 3.294353},
+    {"id": "current", "routing": "unchanged RepoTracer", "quality_score_100": 78.75, "wall_seconds": 330.31, "complete_input_tokens": 866179, "complete_output_tokens": 13870, "complete_cost_usd": 1.22956364},
+    {"id": "variant", "routing": "regression-aware RepoTracer handoff", "quality_score_100": 67.5, "wall_seconds": 449.15, "complete_input_tokens": 1577359, "complete_output_tokens": 18818, "complete_cost_usd": 1.74790172}
+  ],
+  "ranking": ["baseline", "current", "variant"],
+  "diagnosis": {
+    "baseline": "Best quality. Broad search plus Git history recovered both Google signup and login, but at the highest token and dollar cost.",
+    "current": "Fastest and cheapest. RepoTracer identified the backend and both UI surfaces, but the parent wrote a regression test against a duplicated test fixture rather than production configuration.",
+    "variant": "The new policy behaved as designed: RepoTracer ran first and the parent performed one targeted Git-history lookup. It then overfit to signup, omitted Google login, and spent more time and tokens than unchanged RepoTracer.",
+    "decision": "Reject this regression-aware wording. Keep current RepoTracer routing for now; it preserved most of the quality while materially reducing compute. A future change should require checking sibling user-visible entry points and testing the real shared module, not merely invite history lookup."
+  },
+  "deltas": {
+    "current_vs_baseline": {"wall_percent": -24.54, "input_tokens_percent": -74.86, "output_tokens_percent": -25.25, "cost_percent": -62.68, "quality_points": -4.375},
+    "variant_vs_current": {"wall_percent": 35.98, "input_tokens_percent": 82.11, "output_tokens_percent": 35.67, "cost_percent": 42.16, "quality_points": -11.25}
+  },
+  "validation": {
+    "all_arms": ["auth integration 11/11", "Nuxt typecheck"],
+    "current_infrastructure_note": "After implementation and required checks, the Codex process ended on invalid previous_response_id. The patch and completed checks were still gradeable; no final-answer artifact was emitted."
+  },
+  "artifacts": {
+    "billing": "private/billing.json",
+    "grading": "private/grading-result.json",
+    "rubric": "private/grader-rubric.json",
+    "patches": ["private/baseline.patch", "private/current.patch", "private/variant.patch"],
+    "trajectories": ["private/baseline-trajectory.jsonl", "private/current-trajectory.jsonl", "private/variant-trajectory.jsonl"],
+    "variant_delta": "private/variant-delta.json"
+  },
+  "limitations": [
+    "One task and one run per arm: diagnostic only, not a general product claim.",
+    "Runs were sequential; wall time is sensitive to host and provider load.",
+    "Blind graders scored patches after common focused validation, not live browser behavior.",
+    "The current arm's terminal provider error may have shortened its run after the required implementation and checks."
+  ]
+}

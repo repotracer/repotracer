@@ -1,14 +1,14 @@
 # Contributing
 
 ```bash
-git clone https://github.com/grephound/grephound
-cd grephound
+git clone https://github.com/repotracer/repotracer
+cd repotracer
 cargo test --workspace
-cargo run -p grephound -- doctor
-cargo run -p grephound -- scout "where is config loaded?" --mock
+cargo run -p repotracer -- doctor
+cargo run -p repotracer -- scout "where is config loaded?" --mock
 ```
 
-CI must pass without GPU, Ollama, or API keys (mock backend).
+CI must pass without a GPU, a local model runtime, or API keys — use the mock backend.
 
 ## Good first areas
 

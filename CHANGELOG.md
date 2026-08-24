@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- Thirty independent routing benchmark tasks, bringing the predeclared suite to 34 tasks: 20 scout-eligible and 14 expected skips
+- Independent routing benchmark tasks, bringing the predeclared suite to 37: 23 scout-eligible and 14 expected skips
 - Tamper-evident benchmark result index and SHA-256 ledger, including rejected runs and the Sol request-sequence analysis
 
 ### Changed
@@ -36,7 +36,7 @@
 - Interactive macOS, Linux, and Windows setup with Ollama install, model pull, and live tool-call verification
 - Zero-download Codex and Claude subscription backends through the official installed CLIs, with read-only execution, strict structured output, timeouts, and citation revalidation
 - Hardware-aware setup defaults plus explicit `--provider ollama|codex|claude|custom` selection
-- Grephound routing skills for Claude Code and Codex, Cursor rules, and GitHub Copilot instructions
+- RepoTracer routing skills for Claude Code and Codex, Cursor rules, and GitHub Copilot instructions
 - MCP `repo_scout` prompt for generic clients
 - npm launcher package scaffold
 - Benchmark harness scaffold and methodology docs

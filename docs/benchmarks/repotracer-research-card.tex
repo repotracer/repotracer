@@ -1,0 +1,178 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage[margin=0.6in]{geometry}
+\usepackage[T1]{fontenc}
+\renewcommand{\rmdefault}{lmr}
+\DeclareFontShape{T1}{lmr}{m}{n}{<-> ec-lmr10}{}
+\DeclareFontShape{T1}{lmr}{bx}{n}{<-> ec-lmbx10}{}
+\DeclareFontShape{OT1}{cmr}{m}{n}{<-> cmr10}{}
+\DeclareFontShape{OML}{cmm}{m}{it}{<-> cmmi10}{}
+\DeclareFontShape{OMS}{cmsy}{m}{n}{<-> cmsy10}{}
+\DeclareFontShape{OMX}{cmex}{m}{n}{<-> cmex10}{}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\tabcolsep}{7pt}
+\setlength{\parskip}{4pt}
+\definecolor{ink}{HTML}{16202A}
+\definecolor{muted}{HTML}{52606D}
+\definecolor{blue}{HTML}{155EEF}
+\definecolor{bluewash}{HTML}{EEF4FF}
+\definecolor{green}{HTML}{067647}
+\definecolor{greenwash}{HTML}{ECFDF3}
+\definecolor{amber}{HTML}{B54708}
+\definecolor{amberwash}{HTML}{FFFAEB}
+\definecolor{rule}{HTML}{D0D5DD}
+\color{ink}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+\newcommand{\sectiontitle}[1]{\vspace{6pt}{\color{blue}\fontsize{15}{18}\selectfont\bfseries #1}\par\vspace{-3pt}{\color{rule}\rule{\linewidth}{0.7pt}}}
+\newcommand{\metric}[2]{\begin{minipage}[t]{0.23\linewidth}{\fontsize{23}{27}\selectfont\bfseries #1}\par{\color{muted}#2}\end{minipage}}
+\newcommand{\good}[1]{{\color{green}\bfseries #1}}
+\newcommand{\warn}[1]{{\color{amber}\bfseries #1}}
+\newcommand{\smallnote}[1]{{\fontsize{9.5}{12}\selectfont\color{muted}#1}}
+\newcommand{\footer}{}
+
+\begin{document}
+\pagecolor{white}
+
+{\fontsize{12}{14}\selectfont\color{blue}\bfseries REPOTRACER / MEASURED ECONOMICS}\par
+{\fontsize{28}{32}\selectfont\bfseries A cheaper scout cut the measured bill.}\par
+{\fontsize{14}{19}\selectfont\color{muted}GPT-5.6 Luna searched the repository before GPT-5.6 Sol answered. The useful result is not ``fewer tokens'' by itself. It is less Sol work and a lower complete provider cost after adding Luna.}
+
+\vspace{8pt}
+\colorbox{greenwash}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\vspace{5pt}
+\metric{\good{39.2\%}}{median complete-cost reduction}\hfill
+\metric{\$0.388}{median direct cost}\hfill
+\metric{\$0.265}{median assisted cost}\hfill
+\metric{\$0.0098}{median Luna scout cost}
+\vspace{5pt}}}
+
+\sectiontitle{What the median run actually cost}
+\begin{tabular}{@{}L{2.1in}R{1.25in}R{1.25in}R{1.25in}@{}}
+\toprule
+ & Sol alone & RepoTracer & Change \\
+\midrule
+Complete provider bill & \$0.387586 & \$0.265499 & \good{-\$0.122087} \\
+Sol portion & \$0.387586 & \$0.255668 & \good{-\$0.131918} \\
+Luna scout portion & --- & \$0.009831 & +\$0.009831 \\
+Sol input tokens & 98,684 & 77,878 & \good{-21.08\%} \\
+Luna input tokens & --- & 78,830 & +78,830 \\
+All-model input tokens & 98,684 & 156,708 & \warn{+58.80\%} \\
+Quality checks & 6/6 & 6/6 & tied \\
+\bottomrule
+\end{tabular}
+
+\vspace{4pt}
+\colorbox{bluewash}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\textbf{The mechanism:} RepoTracer added about one cent of Luna work, then removed about thirteen cents of Sol work. Total input rose in this median pair because Luna did the search. The bill still fell because Luna tokens were much cheaper.}}
+
+\sectiontitle{Three repeated pairs, one repository question}
+\begin{tabular}{@{}L{0.65in}R{1.05in}R{1.05in}R{1.05in}R{1.05in}R{0.95in}@{}}
+\toprule
+Pair & Direct & Assisted & Luna & Dollars saved & Cost change \\
+\midrule
+1 & \$0.372301 & \$0.226347 & \$0.009905 & \good{\$0.145954} & \good{-39.20\%} \\
+2 & \$0.387586 & \$0.265499 & \$0.009831 & \good{\$0.122087} & \good{-31.50\%} \\
+3 & \$0.832314 & \$0.304628 & \$0.009548 & \good{\$0.527686} & \good{-63.40\%} \\
+\bottomrule
+\end{tabular}
+
+\smallnote{All three pairs passed the same 6/6 behavior rubric in both arms. Median paired cost change was -39.20\%. Median wall time increased 31.21\%; pair 3 was faster assisted. These are repeated diagnostics on one read-only question, not a universal product savings claim.}
+
+\footer
+\newpage
+
+{\fontsize{12}{14}\selectfont\color{blue}\bfseries TOKEN AND COST ACCOUNTING}\par
+{\fontsize{26}{31}\selectfont\bfseries Luna tokens are visible, not hidden.}\par
+{\fontsize{13}{18}\selectfont\color{muted}Every assisted total below includes both models. Luna pricing used \$0.20/M uncached input, \$0.02/M cached input reads, and \$1.20/M output including reasoning. Cache writes were unbilled.}
+
+\sectiontitle{The repeated optimized cohort}
+{\fontsize{10}{12}\selectfont\setlength{\tabcolsep}{4.5pt}\begin{tabular}{@{}L{0.45in}R{0.83in}R{0.83in}R{0.83in}R{0.83in}R{0.83in}R{0.83in}@{}}
+\toprule
+ & \multicolumn{2}{c}{Sol alone} & \multicolumn{4}{c}{RepoTracer assisted} \\
+\cmidrule(lr){2-3}\cmidrule(l){4-7}
+Pair & Sol input & Cost & Sol input & Sol cost & Luna input & Luna cost \\
+\midrule
+1 & 110,033 & \$0.372301 & 80,522 & \$0.216442 & 77,310 & \$0.009905 \\
+2 & 98,684 & \$0.387586 & 77,878 & \$0.255668 & 78,830 & \$0.009831 \\
+3 & 437,052 & \$0.832314 & 66,630 & \$0.295080 & 76,660 & \$0.009548 \\
+\bottomrule
+\end{tabular}}
+
+\smallnote{Luna input includes cached and uncached input as reported. Cost is cache-aware; raw token count is not used as a cost proxy. Each assisted run used one scout conversation, three repository tool calls, and five validated citations.}
+
+\sectiontitle{The real coding-task diagnostic}
+\colorbox{greenwash}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\vspace{4pt}
+\metric{\$0.8694}{Sol alone}\hfill
+\metric{\$0.4336}{Sol + Luna}\hfill
+\metric{\good{\$0.4358}}{provider dollars saved}\hfill
+\metric{\good{50.12\%}}{complete-cost reduction}
+\vspace{4pt}}}
+
+\begin{tabular}{@{}L{2.15in}R{1.35in}R{1.35in}R{1.35in}@{}}
+\toprule
+Astropy SWE-bench Verified & Sol alone & Sol + Luna & Change \\
+\midrule
+Sol input tokens & 823,105 & 324,636 & \good{-60.56\%} \\
+Luna input tokens & --- & 62,766 & +62,766 \\
+Luna cached input & --- & 40,544 & +40,544 \\
+Luna output tokens & --- & 1,642 & +1,642 \\
+Luna cost & --- & \$0.008336 & +\$0.008336 \\
+Sol cost & \$0.869422 & \$0.425304 & \good{-\$0.444118} \\
+Complete provider bill & \$0.869422 & \$0.433640 & \good{-\$0.435782} \\
+All-model tokens & 831,166 & 394,780 & \good{-52.50\%} \\
+Wall time & 426.52 s & 385.57 s & \good{-9.60\%} \\
+Verification & pass & pass & tied \\
+\bottomrule
+\end{tabular}
+
+\smallnote{Task: fix Astropy's ASCII HTML writer so write(formats=...) formats HTML table output. Both arms passed the exact gold regression and the full HTML test file. The Luna scout returned the writer, formatting path, tests, and focused file/line evidence. This is one stochastic task using the preserved FastContext explorer, not the RepoTracer Rust runtime and not headline evidence.}
+
+\footer
+\newpage
+
+{\fontsize{12}{14}\selectfont\color{blue}\bfseries DECISION AND LIMITS}\par
+{\fontsize{26}{31}\selectfont\bfseries What the evidence supports now.}\par
+
+\sectiontitle{Supported}
+\begin{tabular}{@{}L{2.0in}L{4.65in}@{}}
+\toprule
+Claim & Evidence \\
+\midrule
+Complete cost fell & 3/3 repeated quality-passing pairs cost less assisted; median paired reduction 39.20\%. \\
+Sol work fell & Median Sol input fell 26.82\% in the optimized cohort and 50.19\% under immediate routing. \\
+Luna was cheap enough & Median Luna scout cost was \$0.009831 in the optimized cohort and \$0.008478 under immediate routing. \\
+The handoff was useful & Each optimized scout used three repository tools and returned five validated citations; the main agent did no repository search after handoff. \\
+\bottomrule
+\end{tabular}
+
+\sectiontitle{Not supported yet}
+\colorbox{amberwash}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{
+\textbf{No universal savings percentage.} The paired economics repeat one repository question.\par
+\textbf{No claim that total tokens always fall.} In the optimized median pair, all-model input rose 58.80\% while cost fell.\par
+\textbf{No latency win.} Median wall time rose 31.21\% in the optimized cohort and 6.65\% under immediate routing.\par
+\textbf{No local-model win.} FastContext 4B Q4 produced only one usable handoff in three bounded runs and remains disabled by default.}}
+
+\sectiontitle{Current production choice}
+\begin{tabular}{@{}L{2.2in}L{4.45in}@{}}
+\toprule
+Setting & Retained value \\
+\midrule
+Routing & Scout first only for eligible, unknown-location broad exploration \\
+Scout & GPT-5.6 Luna, medium reasoning \\
+Bound & 120 seconds; three repository tools \\
+Handoff & Five citations; 6 KiB evidence cap \\
+Repository tool result cap & 32 KiB \\
+Native repository map & Removed after median Luna cost increased 20.53\% \\
+Local FastContext default & Disabled as unreliable \\
+\bottomrule
+\end{tabular}
+
+\sectiontitle{Next evidence gate}
+{\fontsize{16}{21}\selectfont\bfseries 34 independent tasks $\times$ 3 randomized, blind-graded repeats per arm.}\par
+Only after that run should the project publish a general cost-reduction headline. The gate requires complete Sol + Luna accounting, quality grading before economics, preserved losing runs, and provider-bill totals rather than a middleware savings counter.
+
+\footer
+\end{document}

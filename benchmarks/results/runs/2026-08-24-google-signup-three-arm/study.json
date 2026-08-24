@@ -1,0 +1,24 @@
+{
+  "date": "2026-08-24",
+  "design": "three-arm single-task diagnostic",
+  "replicates_per_arm": 1,
+  "target_repository": "Sub Bridge",
+  "target_commit": "3b9d9a68d4b2d13ecfbb9f7784b3c47a1c8343de",
+  "prompt": "private/prompt.txt",
+  "rubric": "private/grader-rubric.json",
+  "arms": {
+    "baseline": "Codex gpt-5.6-sol high, no RepoTracer",
+    "current": "Codex gpt-5.6-sol high plus unchanged RepoTracer using gpt-5.6-luna medium",
+    "variant": "Codex gpt-5.6-sol high plus regression-aware RepoTracer variant using gpt-5.6-luna medium"
+  },
+  "controls": [
+    "fresh clone at identical target commit per arm",
+    "fresh isolated HOME and CODEX_HOME per arm",
+    "identical task prompt",
+    "identical outer model and reasoning effort",
+    "same installed dependencies",
+    "sequential execution",
+    "patches anonymized before grading"
+  ],
+  "interpretation_limit": "One task and one replicate per arm diagnose this observed regression; they do not estimate general product quality."
+}

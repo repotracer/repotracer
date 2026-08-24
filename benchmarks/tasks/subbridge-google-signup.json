@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "suite": "private-low-compute",
+  "id": "subbridge-google-signup",
+  "prompt": "Google sign-up is broken. Diagnose and fix the root cause without changing working email or OTP authentication, and add the smallest regression check that proves the failure is gone.",
+  "expected_scout": true,
+  "expected_paths": [],
+  "source": {
+    "kind": "clickup",
+    "issue_url": "private issue tracker (redacted)",
+    "repository": "<private repository>"
+  },
+  "headline_eligible": false
+}

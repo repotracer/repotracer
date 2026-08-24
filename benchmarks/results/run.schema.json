@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://repotracer.dev/schemas/benchmark-run-v2.json",
+  "title": "RepoTracer paired benchmark run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "generated_at",
+    "status",
+    "suite_root",
+    "arms",
+    "repeats_per_arm",
+    "trial_count",
+    "tasks",
+    "result_layout",
+    "methodology"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "study_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["planned", "running", "complete", "failed", "cancelled"] },
+    "suite_root": { "type": "string", "minLength": 1 },
+    "arms": {
+      "const": ["baseline", "repotracer"]
+    },
+    "repeats_per_arm": { "type": "integer", "minimum": 1 },
+    "trial_count": { "type": "integer", "minimum": 0 },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/task" }
+    },
+    "result_layout": { "type": "string", "minLength": 1 },
+    "methodology": { "type": "string", "minLength": 1 },
+    "protocol": { "$ref": "#/$defs/protocol" },
+    "trials": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/trial" }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "suite",
+        "id",
+        "prompt",
+        "expected_scout",
+        "expected_paths",
+        "headline_eligible"
+      ],
+      "properties": {
+        "schema_version": { "enum": [1, 2] },
+        "suite": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "prompt": { "type": "string", "minLength": 1 },
+        "expected_scout": { "type": "boolean" },
+        "expected_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "source": { "type": "object" },
+        "headline_eligible": { "type": "boolean" }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "main_model",
+        "reasoning_effort",
+        "setup_command",
+        "order_policy",
+        "timeout_seconds",
+        "network_policy",
+        "cache_policy"
+      ],
+      "properties": {
+        "main_model": { "type": "string", "minLength": 1 },
+        "reasoning_effort": { "type": "string", "minLength": 1 },
+        "setup_command": { "type": "string", "minLength": 1 },
+        "order_policy": { "type": "string", "minLength": 1 },
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "network_policy": { "type": "string", "minLength": 1 },
+        "cache_policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "repeat",
+        "arm",
+        "order",
+        "status",
+        "started_at",
+        "finished_at",
+        "prompt_sha256",
+        "repository",
+        "commit",
+        "agent_version",
+        "model",
+        "artifacts",
+        "billing",
+        "quality"
+      ],
+      "properties": {
+        "task_id": { "type": "string", "minLength": 1 },
+        "repeat": { "type": "integer", "minimum": 1 },
+        "arm": { "enum": ["baseline", "repotracer"] },
+        "order": { "type": "integer", "minimum": 1 },
+        "status": { "enum": ["complete", "failed", "timed_out", "invalid"] },
+        "started_at": { "type": "string", "format": "date-time" },
+        "finished_at": { "type": "string", "format": "date-time" },
+        "prompt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repository": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "minLength": 1 },
+        "agent_version": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "artifacts": {
+          "type": "object",
+          "required": ["trajectory", "patch", "test_log", "sha256"],
+          "properties": {
+            "trajectory": { "type": "string" },
+            "patch": { "type": "string" },
+            "test_log": { "type": "string" },
+            "sha256": { "type": "object", "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+          },
+          "additionalProperties": false
+        },
+        "billing": {
+          "type": "object",
+          "required": ["source", "main", "scout", "complete_provider_cost_usd"],
+          "properties": {
+            "source": { "type": "string", "minLength": 1 },
+            "main": { "type": "object" },
+            "scout": { "type": "object" },
+            "complete_provider_cost_usd": { "type": ["number", "null"], "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "quality": {
+          "type": "object",
+          "required": ["method", "passed", "grader_artifact"],
+          "properties": {
+            "method": { "type": "string", "minLength": 1 },
+            "passed": { "type": ["boolean", "null"] },
+            "grader_artifact": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  }
+}

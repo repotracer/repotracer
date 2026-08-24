@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-08-11",
   "status": "timeout correction and optimization diagnostics; one repeated read-only question; not launch evidence",
-  "question": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "question": "Explain how `repotracer setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
   "correction": {
     "original_scout_process_ceiling_seconds": 120,
     "outer_mcp_client_ceiling_seconds_observed": 300,

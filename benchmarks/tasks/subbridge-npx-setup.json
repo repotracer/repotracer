@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "suite": "private-low-compute",
+  "id": "subbridge-npx-setup",
+  "prompt": "Build a zero-install interactive setup command that configures Sub Bridge for Claude Code, Codex, OpenCode, Aider, Cursor, Cline, Roo Code, and Windsurf. Preserve unrelated user settings, support a non-interactive path, show exact manual configuration where direct edits are unsafe, and make repeated setup idempotent.",
+  "expected_scout": true,
+  "expected_paths": [],
+  "source": {
+    "kind": "clickup",
+    "issue_url": "private issue tracker (redacted)",
+    "repository": "<private repository>"
+  },
+  "headline_eligible": false
+}

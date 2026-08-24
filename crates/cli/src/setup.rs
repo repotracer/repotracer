@@ -2,12 +2,17 @@ use crate::agents;
 use crate::config;
 use crate::subscription::{is_subscription_backend, CliScout};
 use anyhow::{bail, Context, Result};
-use grephound_core::GrephoundConfig;
+use repotracer_core::RepoTracerConfig;
 use std::io::{self, IsTerminal};
 use std::path::Path;
 use std::process::Command;
 
-pub async fn run(root: &Path, cfg_path: &Path, cfg: &GrephoundConfig, dry_run: bool) -> Result<()> {
+pub async fn run(
+    root: &Path,
+    cfg_path: &Path,
+    cfg: &RepoTracerConfig,
+    dry_run: bool,
+) -> Result<()> {
     banner();
     section("1 / 4  Environment");
     item(
@@ -22,8 +27,16 @@ pub async fn run(root: &Path, cfg_path: &Path, cfg: &GrephoundConfig, dry_run: b
 
     let detected = agents::detect(root);
     for agent in &detected {
-        item(agent.detected, &format!("{} detected", agent.name));
+        if agent.configured {
+            item(
+                true,
+                &format!("{} detected — already configured", agent.name),
+            );
+        } else {
+            item(agent.detected, &format!("{} detected", agent.name));
+        }
     }
+    let already_installed = detected.iter().any(|agent| agent.configured);
 
     section("2 / 4  GPT scout");
     let selected_cfg = gpt_config(cfg)?;
@@ -51,7 +64,7 @@ pub async fn run(root: &Path, cfg_path: &Path, cfg: &GrephoundConfig, dry_run: b
         Err(error) => bail!("Codex configuration failed: {error}"),
     }
 
-    section("4 / 4  Grephound configuration");
+    section("4 / 4  RepoTracer configuration");
     if dry_run {
         plan(&format!("would write {}", cfg_path.display()));
     } else {
@@ -69,18 +82,28 @@ pub async fn run(root: &Path, cfg_path: &Path, cfg: &GrephoundConfig, dry_run: b
             "{}",
             style("1;34", "DRY RUN COMPLETE — no files or services changed")
         );
+        if already_installed {
+            println!("\nRepoTracer is already configured. Re-running setup refreshes it.");
+            println!("Remove it instead:  repotracer uninstall --yes");
+        }
+    } else if already_installed {
+        println!("{}", style("1;32", "UPDATED — configuration refreshed"));
+        println!("\nRestart configured agents, then ask a multi-file repository question.");
+        println!("Verify any time:  repotracer doctor");
+        println!("Remove it again:  repotracer uninstall --yes");
     } else {
         println!(
             "{}",
             style("1;32", "READY — small models search, big models solve")
         );
         println!("\nRestart configured agents, then ask a multi-file repository question.");
-        println!("Verify any time: grephound doctor");
+        println!("Verify any time:  repotracer doctor");
+        println!("Remove it again:  repotracer uninstall --yes");
     }
     Ok(())
 }
 
-fn gpt_config(cfg: &GrephoundConfig) -> Result<GrephoundConfig> {
+fn gpt_config(cfg: &RepoTracerConfig) -> Result<RepoTracerConfig> {
     let mut selected = cfg.clone();
     match selected.model.backend.to_ascii_lowercase().as_str() {
         "codex" | "codex-cli" => {
@@ -93,7 +116,7 @@ fn gpt_config(cfg: &GrephoundConfig) -> Result<GrephoundConfig> {
         "openai" | "openai-compatible" => {
             if !selected.model.model.starts_with("gpt-") {
                 bail!(
-                    "unsupported model `{}`; Grephound currently supports GPT models",
+                    "unsupported model `{}`; RepoTracer currently supports GPT models",
                     selected.model.model
                 );
             }
@@ -110,7 +133,7 @@ fn gpt_config(cfg: &GrephoundConfig) -> Result<GrephoundConfig> {
     Ok(selected)
 }
 
-fn verify_codex(cfg: &GrephoundConfig, dry_run: bool) -> Result<()> {
+fn verify_codex(cfg: &RepoTracerConfig, dry_run: bool) -> Result<()> {
     let scout = CliScout::from_config(cfg)?;
     if dry_run {
         plan(&format!(
@@ -122,7 +145,7 @@ fn verify_codex(cfg: &GrephoundConfig, dry_run: bool) -> Result<()> {
     }
     if !scout.executable().is_file() && which::which(scout.executable()).is_err() {
         bail!(
-            "Codex CLI is required for zero-config GPT scouting; install Codex, sign in, then rerun `grephound setup`"
+            "Codex CLI is required for zero-config GPT scouting; install Codex, sign in, then rerun `repotracer setup`"
         );
     }
     let output = Command::new(scout.executable())
@@ -130,7 +153,7 @@ fn verify_codex(cfg: &GrephoundConfig, dry_run: bool) -> Result<()> {
         .output()
         .context("could not check Codex login")?;
     if !output.status.success() {
-        bail!("Codex is not signed in; run `codex login`, then rerun `grephound setup`");
+        bail!("Codex is not signed in; run `codex login`, then rerun `repotracer setup`");
     }
     item(
         true,
@@ -141,7 +164,7 @@ fn verify_codex(cfg: &GrephoundConfig, dry_run: bool) -> Result<()> {
 
 pub fn uninstall(root: &Path, yes: bool) -> Result<()> {
     if !yes {
-        println!("This removes Grephound MCP entries, skills, and project routing instructions.");
+        println!("This removes RepoTracer MCP entries, skills, and project routing instructions.");
         println!("Re-run with --yes to confirm.");
         return Ok(());
     }
@@ -153,12 +176,12 @@ pub fn uninstall(root: &Path, yes: bool) -> Result<()> {
         std::fs::remove_file(&cfg)?;
         item(true, &format!("removed {}", cfg.display()));
     }
-    println!("Uninstall complete. Provider logins and the Grephound binary were left in place.");
+    println!("Uninstall complete. Provider logins and the RepoTracer binary were left in place.");
     Ok(())
 }
 
 fn banner() {
-    println!("{}", style("1;34", "GREPHOUND SETUP"));
+    println!("{}", style("1;34", "REPOTRACER SETUP"));
     println!("Small models search. Big models solve.\n");
 }
 
@@ -203,7 +226,7 @@ mod tests {
 
     #[test]
     fn setup_normalizes_to_luna_and_rejects_non_gpt_endpoints() {
-        let mut legacy = GrephoundConfig::default();
+        let mut legacy = RepoTracerConfig::default();
         legacy.model.backend = "ollama".into();
         legacy.model.model = "fastcontext".into();
         let selected = gpt_config(&legacy).unwrap();

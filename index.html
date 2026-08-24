@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RepoTracer — get up to 60% more from your Codex limits</title>
+<meta name="description" content="RepoTracer is an open-source MCP server for Codex. A cheaper Luna model searches your repository and hands Codex verified file:line citations, cutting whole-task provider cost up to 60% in measured benchmarks. MIT, written in Rust.">
+<link rel="canonical" href="https://repotracer.dev/">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RepoTracer">
+<meta property="og:url" content="https://repotracer.dev/">
+<meta property="og:title" content="RepoTracer — get up to 60% more from your Codex limits">
+<meta property="og:description" content="A cheaper model searches your repository so Codex stops burning turns on search. Open source, MIT, written in Rust. Benchmarks include every losing run.">
+<meta property="og:image" content="https://repotracer.dev/assets/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="RepoTracer — a repository scout for Codex">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RepoTracer — get up to 60% more from your Codex limits">
+<meta name="twitter:description" content="A cheaper model searches your repository so Codex stops burning turns on search. Open source, MIT, written in Rust.">
+<meta name="twitter:image" content="https://repotracer.dev/assets/social-preview.png">
+<link rel="icon" href="assets/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "RepoTracer",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS, Linux, Windows",
+  "description": "An MCP server for Codex. Its repo_scout tool runs a bounded Luna subagent over a repository read-only and returns validated file:line citations, reducing whole-task provider cost.",
+  "url": "https://repotracer.dev/",
+  "downloadUrl": "https://github.com/repotracer/repotracer",
+  "codeRepository": "https://github.com/repotracer/repotracer",
+  "programmingLanguage": "Rust",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "keywords": "Codex, MCP server, repository search, token cost, rate limit, AI coding agent, Rust"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "RepoTracer — a repository scout for Codex",
+  "url": "https://repotracer.dev/",
+  "sameAs": ["https://github.com/repotracer/repotracer"]
+}
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="/">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M11.4 7H8.2v18h3.2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="13.4" y="9.1" width="15.4" height="3.6" rx="1.8" fill="currentColor"/><rect x="13.4" y="14.2" width="10.2" height="3.6" rx="1.8" fill="currentColor"/><rect class="hit" x="15.6" y="19.3" width="6.6" height="3.6" rx="1.8"/></svg>
+      <span class="wordmark">RepoTracer</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="benchmarks.html">Benchmarks</a>
+      <a href="#install">Install</a>
+      <a class="gh-link" href="https://github.com/repotracer/repotracer" aria-label="RepoTracer on GitHub"><svg class="gh" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M512 0C229.12 0 0 229.12 0 512c0 226.56 146.56 417.92 350.08 485.76 25.6 4.48 35.2-10.88 35.2-24.32 0-12.16-.64-52.48-.64-95.36-128.64 23.68-161.92-31.36-172.16-60.16-5.76-14.72-30.72-60.16-52.48-72.32-17.92-9.6-43.52-33.28-.64-33.92 40.32-.64 69.12 37.12 78.72 52.48 46.08 77.44 119.68 55.68 149.12 42.24 4.48-33.28 17.92-55.68 32.64-68.48-113.92-12.8-232.96-56.96-232.96-252.8 0-55.68 19.84-101.76 52.48-137.6-5.12-12.8-23.04-65.28 5.12-135.68 0 0 42.88-13.44 140.8 52.48 40.96-11.52 84.48-17.28 128-17.28s87.04 5.76 128 17.28c97.92-66.56 140.8-52.48 140.8-52.48 28.16 70.4 10.24 122.88 5.12 135.68 32.64 35.84 52.48 81.28 52.48 137.6 0 196.48-119.68 240-233.6 252.8 18.56 16 34.56 46.72 34.56 94.72 0 68.48-.64 123.52-.64 140.8 0 13.44 9.6 29.44 35.2 24.32C877.44 929.92 1024 737.92 1024 512 1024 229.12 794.88 0 512 0"/></svg><span>GitHub</span></a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <h1>Get up to 60% more from your Codex limits</h1>
+    <p class="lede">Stop paying Sol to run grep.</p>
+    <div class="cmd" data-copy="npx repotracer setup">
+      <code><span class="dollar">$</span> npx repotracer setup</code>
+      <button class="copy" type="button" aria-label="Copy install command">Copy</button>
+    </div>
+    <p class="hero-note">MIT licensed · uses your existing Codex login · no second API key</p>
+    <figure class="hero-demo">
+      <img src="assets/demo/scout.gif" width="1240" height="860" alt="Asking RepoTracer a plain-English question about a codebase and getting back four verified file and line-range citations with a summary in 35 seconds" loading="lazy" decoding="async">
+      <figcaption>A real scout run against this repository. Plain question in, four verified <code>file:line</code> locations out — 35.6s, 3 tool calls, on the cheap model.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="stats">
+  <div class="wrap stats-in">
+    <div class="stat">
+      <div class="n">−62.7<span>%</span></div>
+      <div class="l">cost on a real bug-fix task in a production repo</div>
+    </div>
+    <div class="stat">
+      <div class="n">−74.9<span>%</span></div>
+      <div class="l">tokens into the expensive model on that same task</div>
+    </div>
+    <div class="stat">
+      <div class="n">−50.1<span>%</span></div>
+      <div class="l">cost on SWE-bench Verified, gold regression passed</div>
+    </div>
+    <div class="stat">
+      <div class="n">4/4</div>
+      <div class="l">measured studies came in cheaper, scout included</div>
+    </div>
+  </div>
+</section>
+
+<section class="story" id="why">
+  <div class="wrap narrow">
+    <h2>Why this exists</h2>
+    <p>I came across <a href="https://arxiv.org/abs/2606.14066v3">a paper from Microsoft</a> on delegating repository exploration. The short version: you can cut cost by letting a smaller model do the searching, when the task actually calls for it.</p>
+    <p>So I built a tool for myself. After a few rounds of refinement I noticed my limits were lasting a lot longer. But how I <em>feel</em> about my rate limit is not evidence, so I ran benchmarks — real prompts in real repositories I actually work in, so the numbers would reflect the real world, plus SWE-bench tasks just in case.</p>
+    <p>The results were better than the hunch. On a real bug-fix task in a production repository, the complete bill dropped <strong>62.7%</strong> and the expensive model took in <strong>74.9% fewer tokens</strong> — with Luna's own usage counted in the total.</p>
+    <p>That same run also scored slightly worse on quality. It's published on the benchmark page next to the wins, because a saving you can't audit isn't worth anything.</p>
+    <p class="aside">Worth noting the paper tested very small models. On these benchmarks the main model was Sol and the scout was Luna.</p>
+  </div>
+</section>
+
+<section class="how" id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="section-lede">Codex calls one tool. RepoTracer searches, validates every citation against the file, and hands back the locations worth opening.</p>
+
+    <div class="flow">
+      <div class="flow-col">
+        <div class="flow-label">Without RepoTracer</div>
+        <ol class="turns">
+          <li>grep</li><li>read</li><li>grep</li><li>read</li><li>grep</li><li>read</li>
+          <li class="solve">solve</li>
+        </ol>
+        <p class="flow-note">Every one of those turns is billed at the expensive model's rate.</p>
+      </div>
+      <div class="flow-col">
+        <div class="flow-label">With RepoTracer</div>
+        <ol class="turns">
+          <li class="scout">repo_scout</li>
+          <li class="solve">solve</li>
+        </ol>
+        <p class="flow-note">The search moves to Luna. Sol opens the right code and starts working.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="handoff">
+  <div class="wrap">
+    <h2>What Codex actually receives</h2>
+    <p class="section-lede">A real handoff from the benchmark suite. Every citation is checked against the file before it is returned; unresolvable ones are dropped.</p>
+    <div class="card term">
+      <div class="card-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bar-title">repo_scout — validated citations</span></div>
+      <pre><code><span class="c-path">web/server/lib/auth.ts</span><span class="c-line">:145-183</span> <span class="c-ok">✓</span>
+  Auth configuration enables email/password and verification.
+  This bounded range contains no Google social-provider config.
+
+<span class="c-path">web/app/pages/login.vue</span><span class="c-line">:1-61</span> <span class="c-ok">✓</span>
+  Login form validates email/password, verifies Turnstile,
+  and calls email/password signIn.
+
+<span class="c-path">web/scripts/auth.integration.test.mjs</span><span class="c-line">:358-375</span> <span class="c-ok">✓</span>
+  Existing regression seam; asserts Google is not configured.
+
+<span class="c-meta">scout: gpt-5.6-luna · 4 model steps · 3 tools · 5 citations</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="bench" id="benchmarks">
+  <div class="wrap">
+    <h2>Benchmarks</h2>
+    <p class="section-lede light">Every study came in cheaper — measured on the whole task, with the scout's own usage added in, not on a token counter. The rule: <strong class="hl-light">if the invoice didn't shrink, it isn't a saving.</strong></p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Run</th><th>Scope</th><th>Quality</th><th>Complete cost</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Google signup</td><td>one real implementation task</td><td class="warn">78.75 vs 83.13 — regression</td><td class="win">−62.68%</td></tr>
+          <tr><td>SWE-bench Astropy <span class="mono">13453</span></td><td>one coding task</td><td>exact regression passed, both arms</td><td class="win">−50.12%</td></tr>
+          <tr><td>Repeated natural routing</td><td>three pairs, one cross-file question</td><td>6/6 checks every arm</td><td class="win">−39.20%</td></tr>
+          <tr><td>Immediate routing</td><td>three pairs, one cross-file question</td><td>6/6 checks every arm</td><td class="win">−28.63%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="caveat">RepoTracer is a beta. It reduced complete provider cost in every run above, but the Google task also exposed a real quality regression: RepoTracer localized the right files and the parent agent then tested a duplicated fixture instead of the production module. Aggregate model input often <em>rises</em> too — the saving comes from moving search to a cheaper model, not from using fewer tokens. The launch gate of 30 independent tasks is not met.</p>
+    <a class="btn ghost-light" href="benchmarks.html">Read the full benchmark →</a>
+  </div>
+</section>
+
+<section class="safety">
+  <div class="wrap">
+    <h2>The scout cannot write</h2>
+    <p class="section-lede">Not a policy or a prompt instruction — the binary has no write tool compiled into it.</p>
+    <div class="cols">
+      <div class="card can">
+        <h3>It can</h3>
+        <ul><li>Read files</li><li>Search content</li><li>Expand globs</li><li>Return <span class="mono">file:line</span> citations</li></ul>
+      </div>
+      <div class="card cannot">
+        <h3>It cannot</h3>
+        <ul><li>Edit files</li><li>Delete files</li><li>Write patches</li><li>Push code</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="install" id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="section-lede">One command against the Codex you already have signed in.</p>
+    <div class="cmd wide" data-copy="npx repotracer setup">
+      <code><span class="dollar">$</span> npx repotracer setup</code>
+      <button class="copy" type="button" aria-label="Copy install command">Copy</button>
+    </div>
+    <p class="alt">Prefer a permanent install? <code>npm install -g repotracer</code> or <code>cargo install --git https://github.com/repotracer/repotracer --locked repotracer</code></p>
+
+    <div class="card term light-term">
+      <div class="card-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bar-title">repotracer doctor</span></div>
+      <pre><code><span class="grp">Runtime</span>
+<span class="ok">✓</span> binary — repotracer binary
+<span class="ok">✓</span> config — model=gpt-5.6-luna
+<span class="ok">✓</span> ripgrep — /Users/you/.cargo/bin/rg
+
+<span class="grp">Explorer</span>
+<span class="ok">✓</span> GPT scout CLI — GPT scout via Codex CLI
+<span class="ok">✓</span> model — GPT scout via Codex CLI ready
+
+<span class="grp">Agents</span>
+<span class="ok">✓</span> Codex — configured
+
+<span class="ready">READY</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="close">
+  <div class="wrap narrow center">
+    <h2>Your next Codex task can cost half as much.</h2>
+    <p class="section-lede">One command, your existing login, and nothing to undo — <code>repotracer uninstall</code> puts it back exactly as it was.</p>
+    <div class="cmd wide" data-copy="npx repotracer setup">
+      <code><span class="dollar">$</span> npx repotracer setup</code>
+      <button class="copy" type="button" aria-label="Copy install command">Copy</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div class="foot-brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M11.4 7H8.2v18h3.2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="13.4" y="9.1" width="15.4" height="3.6" rx="1.8" fill="currentColor"/><rect x="13.4" y="14.2" width="10.2" height="3.6" rx="1.8" fill="currentColor"/><rect class="hit" x="15.6" y="19.3" width="6.6" height="3.6" rx="1.8"/></svg>
+      <span class="wordmark">RepoTracer</span>
+    </div>
+    <nav class="foot-links">
+      <a href="benchmarks.html">Benchmarks</a>
+      <a href="./docs/ARCHITECTURE.md">Architecture</a>
+      <a href="https://arxiv.org/abs/2606.14066v3">The paper</a>
+      <a class="gh-link" href="https://github.com/repotracer/repotracer" aria-label="RepoTracer on GitHub"><svg class="gh" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M512 0C229.12 0 0 229.12 0 512c0 226.56 146.56 417.92 350.08 485.76 25.6 4.48 35.2-10.88 35.2-24.32 0-12.16-.64-52.48-.64-95.36-128.64 23.68-161.92-31.36-172.16-60.16-5.76-14.72-30.72-60.16-52.48-72.32-17.92-9.6-43.52-33.28-.64-33.92 40.32-.64 69.12 37.12 78.72 52.48 46.08 77.44 119.68 55.68 149.12 42.24 4.48-33.28 17.92-55.68 32.64-68.48-113.92-12.8-232.96-56.96-232.96-252.8 0-55.68 19.84-101.76 52.48-137.6-5.12-12.8-23.04-65.28 5.12-135.68 0 0 42.88-13.44 140.8 52.48 40.96-11.52 84.48-17.28 128-17.28s87.04 5.76 128 17.28c97.92-66.56 140.8-52.48 140.8-52.48 28.16 70.4 10.24 122.88 5.12 135.68 32.64 35.84 52.48 81.28 52.48 137.6 0 196.48-119.68 240-233.6 252.8 18.56 16 34.56 46.72 34.56 94.72 0 68.48-.64 123.52-.64 140.8 0 13.44 9.6 29.44 35.2 24.32C877.44 929.92 1024 737.92 1024 512 1024 229.12 794.88 0 512 0"/></svg><span>GitHub</span></a>
+      <a href="./LICENSE">MIT</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>

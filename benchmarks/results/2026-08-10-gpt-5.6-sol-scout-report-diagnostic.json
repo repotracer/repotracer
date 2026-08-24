@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-08-10",
   "status": "single-run forced report-injection diagnostic; not headline or routing evidence",
-  "conclusion": "All arms passed the 22 named checks. Appending pre-generated Luna-low scout reports increased complete provider cost 16.20% across four tasks. The hard-task increase came from 15 extra Sol turns, not scout inference: the Sol trajectory added 825600 cached-input tokens and 3250 output tokens while uncached input fell by 3104. This run cannot establish that scouting caused the difference because each arm ran once, all assisted tasks were forced despite already naming relevant files or symbols, and the benchmark bypassed the Grephound runtime handoff.",
+  "conclusion": "All arms passed the 22 named checks. Appending pre-generated Luna-low scout reports increased complete provider cost 16.20% across four tasks. The hard-task increase came from 15 extra Sol turns, not scout inference: the Sol trajectory added 825600 cached-input tokens and 3250 output tokens while uncached input fell by 3104. This run cannot establish that scouting caused the difference because each arm ran once, all assisted tasks were forced despite already naming relevant files or symbols, and the benchmark bypassed the RepoTracer runtime handoff.",
   "protocol": {
     "baseline": "GPT-5.6 Sol high solves the task directly.",
     "luna_report_arm": "A separate GPT-5.6 Luna low Codex session explores the repository; its complete prose report is appended to the otherwise matching GPT-5.6 Sol high task prompt.",
@@ -11,7 +11,7 @@
     "runs_per_task_per_arm": 1,
     "tasks": 4,
     "quality_contracts": 22,
-    "source_metadata": "/tmp/grephound-codex-benchmark-results.json",
+    "source_metadata": "/tmp/repotracer-codex-benchmark-results.json",
     "main_trajectory_source": "~/.codex/sessions/2026/08/10/*.jsonl",
     "billing_source": "~/.codex-lb/store.db"
   },
@@ -65,7 +65,7 @@
         "lines": 17,
         "citations": 16,
         "unique_files": 9,
-        "used_grephound_final_answer_contract": false
+        "used_repotracer_final_answer_contract": false
       }
     },
     "main_trajectory_delta": {
@@ -100,8 +100,8 @@
       }
     },
     "observed_rework": [
-      "Both trajectories first missed the grephound_model::Usage re-export and repaired the same compile error.",
-      "The assisted trajectory additionally invoked a nonexistent grephound-cli package target, then corrected it.",
+      "Both trajectories first missed the repotracer_model::Usage re-export and repaired the same compile error.",
+      "The assisted trajectory additionally invoked a nonexistent repotracer-cli package target, then corrected it.",
       "The assisted trajectory used six one-second polling calls for tests; the baseline used longer blocking test calls.",
       "The assisted trajectory attempted a git commit that the read-only disposable clone rejected.",
       "The assisted trajectory patched seven unique files in eleven file edits; the baseline patched six unique files in nine file edits."
@@ -111,7 +111,7 @@
   "routing_assessment": {
     "paper_contract": "Use the explorer for cold-start repository exploration, broad cross-file localization, or a failed direct search; skip when the issue already names the relevant file or symbol.",
     "current_tasks": "All four prompts supplied exact files, symbols, tests, or a precise change surface before the scout report was appended.",
-    "verdict": "The forced assisted arms mostly measured redundant evidence injection, not the intended Grephound routing policy."
+    "verdict": "The forced assisted arms mostly measured redundant evidence injection, not the intended RepoTracer routing policy."
   },
   "required_next_protocol": [
     "Use the same solver model, reasoning effort, agent build, base prompt, repository commit, environment, timeout, and service tier in every paired arm.",

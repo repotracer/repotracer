@@ -7,7 +7,7 @@
     "expected_scout_tasks": 20,
     "expected_skip_tasks": 14,
     "expected_path_assertions": 91,
-    "verification": "cargo run -q -p grephound-bench --bin grephound-bench -- --suite benchmarks"
+    "verification": "cargo run -q -p repotracer-bench --bin repotracer-bench -- --suite benchmarks"
   },
   "live_paired_evidence": {
     "artifact": "benchmarks/results/2026-08-10-gpt-5.6-sol-luna-repeated-optimized.json",

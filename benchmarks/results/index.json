@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_at": "2026-08-11",
-  "purpose": "Tamper-evident index of raw Grephound benchmark evidence. Raw artifacts are retained even when a candidate is rejected.",
+  "purpose": "Tamper-evident index of legacy RepoTracer benchmark evidence. Raw artifacts are retained even when a candidate is rejected.",
   "pricing_profiles": {
     "luna_subscription": {
-      "uncached_input_usd_per_million": 0.20,
+      "uncached_input_usd_per_million": 0.2,
       "cached_input_read_usd_per_million": 0.02,
-      "output_including_reasoning_usd_per_million": 1.20,
+      "output_including_reasoning_usd_per_million": 1.2,
       "cache_write": "not counted for subscription benchmarks"
     }
   },
@@ -16,62 +16,64 @@
     "blind_quality_grading": true,
     "complete_main_plus_scout_accounting": true
   },
+  "new_run_layout": "runs/<study-id>/{manifest.json,trials/,summary.json}",
+  "new_run_schema": "run.schema.json",
   "artifacts": [
     {
       "id": "luna-forced-2026-08-09",
       "file": "2026-08-09-gpt-5.6-luna-forced.json",
       "kind": "routing_diagnostic",
       "headline_eligible": false,
-      "sha256": "033bc7c7f130ff36ddd798d124d659db46730dd5b052641d3a96d65fd6057cc3"
+      "sha256": "beb2d623b8148d028d4a22ab3fab4b96c3287f4793320526fe5340d2bec526f3"
     },
     {
       "id": "luna-natural-2026-08-09",
       "file": "2026-08-09-gpt-5.6-luna-low-natural.json",
       "kind": "routing_diagnostic",
       "headline_eligible": false,
-      "sha256": "446a255c4cac58d7be53a048aac3b3e6ee999fe607a33b8e9ab9a8c05a5d7c88"
+      "sha256": "18d90b549bcf8532816bf04faecdad01fe0a809bc4062270526a10e938f1d2d9"
     },
     {
       "id": "swebench-astropy-13453",
       "file": "2026-08-09-gpt-5.6-sol-swebench-astropy-13453.json",
       "kind": "coding_task_three_arm",
       "headline_eligible": false,
-      "sha256": "e0484eaaf96cb4e9d78d0b059d5c7057c98ab0678ae94eae8881aec8f3682a67"
+      "sha256": "4e68e4fae44629bb46f585f00f78f665420f107ca269a496f40dd4578b578d6e"
     },
     {
       "id": "natural-routing-2026-08-10",
       "file": "2026-08-10-gpt-5.6-sol-luna-natural.json",
       "kind": "paired_routing_diagnostic",
       "headline_eligible": false,
-      "sha256": "1aa882ea1790180358b4dd62e51665bff5b1a9fbf23195958bb4b78b754b8c8e"
+      "sha256": "cabb78fe7fe671fb1d4d0d45b180edc3683f55930837121cc1341a1ea65fad9d"
     },
     {
       "id": "repeated-routing-optimized-2026-08-10",
       "file": "2026-08-10-gpt-5.6-sol-luna-repeated-optimized.json",
       "kind": "randomized_paired_ablation",
       "headline_eligible": false,
-      "sha256": "5fdca75528bc2cffe66bb06866cc715ae66415a916b033e75050cb4031986ba9"
+      "sha256": "26c11ae5ab28337450d4a3c9ba09603fc0b3985f308a9472b0c8e8b0d03e2811"
     },
     {
       "id": "savecostmax-2026-08-10",
       "file": "2026-08-10-gpt-5.6-sol-luna-savecostmax.json",
       "kind": "paired_routing_diagnostic",
       "headline_eligible": false,
-      "sha256": "806b19ce40bcb8ecddc97308d1e99bf8c90c601e673825380dbce781db15f0f1"
+      "sha256": "cc7f129b65a976f020fb1a775ea880b53e63113ec49596697fc27e78b8d6e3f8"
     },
     {
       "id": "forced-scout-report-2026-08-10",
       "file": "2026-08-10-gpt-5.6-sol-scout-report-diagnostic.json",
       "kind": "report_injection_diagnostic",
       "headline_eligible": false,
-      "sha256": "5420ee5ca2f674a78d5fb378b2e44d24b4bc7c7280937147e6e25ad6ae8c23c8"
+      "sha256": "750c339b64e59fbdf30283baa9fe0f502dfd793a1b46e3f2ec6806bf0e38c3b6"
     },
     {
       "id": "extended-timeout-2026-08-11",
       "file": "2026-08-11-extended-timeout-diagnostics.json",
       "kind": "configuration_diagnostic",
       "headline_eligible": false,
-      "sha256": "3b3ab37a500f27649d165753796861bfb3fbbedbe81b77c1661dfbfb1ca8b608"
+      "sha256": "220bf303148d185c56f421d0a9b45384d5c00ad88024642e36d20ba2f78cd465"
     },
     {
       "id": "native-map-ablation-2026-08-11",
@@ -79,21 +81,21 @@
       "kind": "randomized_paired_ablation",
       "headline_eligible": false,
       "decision": "rejected",
-      "sha256": "5c2f75907f5acf795da7112ab22484b7294cf3284fb05007e0be325e40570a8d"
+      "sha256": "ee3c61c33a78b6ff23a45f8a57d1cfd128b9f972d791acc59745edd5af821a05"
     },
     {
       "id": "reasoning-stage-b-local-2026-08-11",
       "file": "2026-08-11-reasoning-stage-b-local.json",
       "kind": "configuration_ablation",
       "headline_eligible": false,
-      "sha256": "5b9d9e009c6030a4a700dd39777ab5042e77b317ff3eeb8f142c71339e47eae4"
+      "sha256": "1126964c43cdf2fb27e806faf666fd3106ce78235bb5949bfe529432886cc81e"
     },
     {
       "id": "routing-suite-summary-2026-08-11",
       "file": "2026-08-11-routing-suite-summary.json",
       "kind": "suite_inventory",
       "headline_eligible": false,
-      "sha256": "14c66c6b18fdbc26bea59fb6d87c27abef5d7b54b38d977c026124404486ef43"
+      "sha256": "ee9b99f35b5f2e7ea67ca61a77667290474ebc58f32f509f8ae4fe2b9e2e96c8"
     },
     {
       "id": "sol-request-token-analysis-2026-08-11",
@@ -109,7 +111,7 @@
       "kind": "randomized_paired_ablation",
       "headline_eligible": false,
       "decision": "retained for Sol-token objective",
-      "sha256": "e58d538100823f614880d2817ebc22cb948044db5cf734660bc20386db71f324"
+      "sha256": "ecf2ff520f9057d4b97424f87cea8e28b2c1427519503f4eb4d81389036ef7a5"
     },
     {
       "id": "tool-output-footprint-2026-08-11",
@@ -119,5 +121,6 @@
       "decision": "retained",
       "sha256": "e13116b539cf31de9fa53e228cd39b1b535d5e3205329064768c6663978959fb"
     }
-  ]
+  ],
+  "sanitization_note": "Before first publication: absolute local paths were made repository-relative and the pre-rename project name was updated to RepoTracer. Digests are for the published files."
 }

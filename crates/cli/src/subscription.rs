@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use grephound_core::{
-    validate_citations, Citation, GrephoundConfig, ScoutBackend, ScoutRequest, ScoutResult,
+use repotracer_core::{
+    validate_citations, Citation, RepoTracerConfig, ScoutBackend, ScoutRequest, ScoutResult,
     ScoutStats,
 };
 use serde::Deserialize;
@@ -19,7 +19,7 @@ static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const GPT_SCOUT_LABEL: &str = "GPT scout via Codex CLI";
 
-pub fn is_subscription_backend(cfg: &GrephoundConfig) -> bool {
+pub fn is_subscription_backend(cfg: &RepoTracerConfig) -> bool {
     matches!(
         cfg.model.backend.to_ascii_lowercase().as_str(),
         "codex" | "codex-cli"
@@ -34,7 +34,7 @@ pub struct CliScout {
 }
 
 impl CliScout {
-    pub fn from_config(cfg: &GrephoundConfig) -> Result<Self> {
+    pub fn from_config(cfg: &RepoTracerConfig) -> Result<Self> {
         if !is_subscription_backend(cfg) {
             bail!("unsupported GPT backend `{}`", cfg.model.backend);
         }
@@ -47,7 +47,7 @@ impl CliScout {
         let model = match cfg.model.model.trim() {
             "" | "default" | "account-default" => None,
             model if model.starts_with("gpt-") => Some(model.to_string()),
-            model => bail!("unsupported model `{model}`; Grephound currently supports GPT models"),
+            model => bail!("unsupported model `{model}`; RepoTracer currently supports GPT models"),
         };
         let reasoning_effort = match cfg.model.reasoning_effort.trim() {
             effort @ ("low" | "medium" | "high") => effort.to_string(),
@@ -217,7 +217,7 @@ impl CliScout {
         command
             .args(args)
             .current_dir(cwd)
-            .env("GREPHOUND_SUBPROCESS", "1")
+            .env("REPOTRACER_SUBPROCESS", "1")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -474,7 +474,7 @@ impl TempRunDir {
     fn create() -> Result<Self> {
         for _ in 0..10 {
             let id = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!("grephound-{}-{id}", std::process::id()));
+            let path = std::env::temp_dir().join(format!("repotracer-{}-{id}", std::process::id()));
             match std::fs::create_dir(&path) {
                 Ok(()) => return Ok(Self { path }),
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -494,10 +494,10 @@ impl Drop for TempRunDir {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use grephound_core::ModelSettings;
+    use repotracer_core::ModelSettings;
 
-    fn config(provider: &str, executable: &Path) -> GrephoundConfig {
-        GrephoundConfig {
+    fn config(provider: &str, executable: &Path) -> RepoTracerConfig {
+        RepoTracerConfig {
             model: ModelSettings {
                 backend: provider.into(),
                 executable: Some(executable.display().to_string()),
@@ -505,7 +505,7 @@ mod tests {
                 timeout_ms: 2_000,
                 ..ModelSettings::default()
             },
-            ..GrephoundConfig::default()
+            ..RepoTracerConfig::default()
         }
     }
 

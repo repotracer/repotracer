@@ -5,7 +5,7 @@
   "expected_paths": [
     ".github/workflows/release.yml",
     "packages/npm/scripts/fetch-binary.js",
-    "packages/npm/bin/grephound.js",
+    "packages/npm/bin/repotracer.js",
     "packages/npm/package.json"
   ]
 }

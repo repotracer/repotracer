@@ -1,6 +1,6 @@
 {
   "id": "route-cli-05",
-  "prompt": "Prevent a release from publishing an npm wrapper whose version does not match the native Grephound binary or release tag. Enforce one release version across the workspace and package, and publish only after all native artifacts and checksums are available.",
+  "prompt": "Prevent a release from publishing an npm wrapper whose version does not match the native RepoTracer binary or release tag. Enforce one release version across the workspace and package, and publish only after all native artifacts and checksums are available.",
   "expected_scout": true,
   "expected_paths": [
     "Cargo.toml",

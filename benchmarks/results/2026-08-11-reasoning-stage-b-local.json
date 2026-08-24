@@ -3,12 +3,12 @@
   "date": "2026-08-11",
   "status": "optimization-stage diagnostics; one repeated read-only question; not launch evidence",
   "capability_interpretation_corrected_by": "benchmarks/results/2026-08-11-extended-timeout-diagnostics.json",
-  "question": "Explain how `grephound setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
+  "question": "Explain how `repotracer setup` detects, selects, configures, dry-runs, and uninstalls coding-agent integrations. Use the project's tools naturally. Do not edit any files. Return a concise explanation with citations.",
   "changes_evaluated": {
     "stage_a": "cost-aware immediate routing (rejected and separately recorded)",
     "reasoning_levels": "restored routing, forced exactly one scout call to isolate low/medium/high, 120-second scout timeout",
     "stage_b": "medium reasoning plus prompt-led two-operation default, optional third operation, adaptive 3/3KiB to 5/6KiB handoff (rejected and reverted)",
-    "stage_c": "FastContext 4B Q4 through Grephound native Read/Glob/Grep after benchmark-only Ollama reasoning/tool compatibility fixes"
+    "stage_c": "FastContext 4B Q4 through RepoTracer native Read/Glob/Grep after benchmark-only Ollama reasoning/tool compatibility fixes"
   },
   "reasoning_ablation": {
     "protocol": {

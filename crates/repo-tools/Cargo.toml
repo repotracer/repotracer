@@ -1,9 +1,9 @@
 [package]
-name = "grephound-repo-tools"
+name = "repotracer-repo-tools"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Read/Glob/Grep tools for grephound"
+description = "Read/Glob/Grep tools for repotracer"
 repository.workspace = true
 
 [dependencies]

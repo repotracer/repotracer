@@ -6,7 +6,7 @@
   "protocol": {
     "mode": "forced",
     "normal_arm": "GPT-5.6 Luna explores and answers with native read-only repository tools.",
-    "grephound_arm": "The same GPT-5.6 Luna must call repo_scout once before native exploration, then may fall back to native read-only tools if scout evidence is insufficient.",
+    "repotracer_arm": "The same GPT-5.6 Luna must call repo_scout once before native exploration, then may fall back to native read-only tools if scout evidence is insufficient.",
     "held_constant": [
       "gpt-5.6-luna",
       "medium reasoning",
@@ -29,7 +29,7 @@
   },
   "tasks": [
     {
-      "repository": "grephound",
+      "repository": "repotracer",
       "query": "Trace a local Ollama scout request from CLI setup and configuration through the OpenAI-compatible model call, concurrent repository tool execution, final-answer parsing, and citation validation. Identify failure handling at each boundary.",
       "expected_paths": [
         "crates/cli/src/setup.rs",
@@ -67,7 +67,7 @@
   ],
   "rows": [
     {
-      "repository": "grephound",
+      "repository": "repotracer",
       "normal": {
         "wall_ms": 65502,
         "input_tokens": 317048,
@@ -79,7 +79,7 @@
         "valid_citations": 16,
         "usable": true
       },
-      "grephound_forced": {
+      "repotracer_forced": {
         "wall_ms": 63421,
         "input_tokens": 145581,
         "cached_input_tokens": 100608,
@@ -123,7 +123,7 @@
         "valid_citations": 14,
         "usable": true
       },
-      "grephound_forced": {
+      "repotracer_forced": {
         "wall_ms": 256347,
         "input_tokens": 455741,
         "cached_input_tokens": 384000,
@@ -167,7 +167,7 @@
         "valid_citations": 16,
         "usable": true
       },
-      "grephound_forced": {
+      "repotracer_forced": {
         "wall_ms": 131512,
         "input_tokens": 328085,
         "cached_input_tokens": 250368,
@@ -211,7 +211,7 @@
       "expected_paths_recalled": 17,
       "expected_paths_total": 18
     },
-    "grephound_forced": {
+    "repotracer_forced": {
       "wall_ms": 451280,
       "input_tokens": 929407,
       "cached_input_tokens": 734976,
@@ -239,10 +239,10 @@
   "limitations": [
     "One run per task per arm; this cannot support a public headline.",
     "All repo_scout calls completed, but none returned validated citations; the assisted agent performed fallback exploration.",
-    "Gigo timed out before Grephound emitted explorer usage, so complete all-model token consumption is unknown.",
-    "The 2.10% frontier cost reduction cannot be attributed to Grephound because no scout evidence reached the frontier agent.",
+    "Gigo timed out before RepoTracer emitted explorer usage, so complete all-model token consumption is unknown.",
+    "The 2.10% frontier cost reduction cannot be attributed to RepoTracer because no scout evidence reached the frontier agent.",
     "Repositories were measured at their current local working-tree state, not pinned clean revisions.",
     "The local scout was the community Q4_K_M GGUF FastContext conversion served by Ollama."
   ],
-  "local_raw_artifacts": "/tmp/grephound-bench-20260809"
+  "local_raw_artifacts": "/tmp/repotracer-bench-20260809"
 }

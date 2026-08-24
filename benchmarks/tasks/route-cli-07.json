@@ -1,6 +1,6 @@
 {
   "id": "route-cli-07",
-  "prompt": "In `crates/cli/src/config.rs`, change `default_config_path` so an empty `GREPHOUND_CONFIG` value is ignored instead of being treated as the config path.",
+  "prompt": "In `crates/cli/src/config.rs`, change `default_config_path` so an empty `REPOTRACER_CONFIG` value is ignored instead of being treated as the config path.",
   "expected_scout": false,
   "expected_paths": [
     "crates/cli/src/config.rs"

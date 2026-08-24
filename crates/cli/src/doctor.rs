@@ -1,17 +1,17 @@
 use crate::agents;
 use crate::subscription::{is_subscription_backend, CliScout};
-use anyhow::Result;
-use grephound_core::GrephoundConfig;
-use grephound_model::{ModelBackend, ModelConfig, OpenAiCompatBackend};
-use grephound_repo_tools::{RepoTools, ToolCall};
+use anyhow::{bail, Result};
+use repotracer_core::RepoTracerConfig;
+use repotracer_model::{ModelBackend, ModelConfig, OpenAiCompatBackend};
+use repotracer_repo_tools::{RepoTools, ToolCall};
 use serde_json::json;
 use std::path::Path;
 use std::time::Instant;
 
-pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<()> {
+pub async fn run(root: &Path, cfg: &RepoTracerConfig, json_mode: bool) -> Result<()> {
     let mut checks: Vec<Check> = Vec::new();
 
-    checks.push(Check::ok("binary", "grephound binary"));
+    checks.push(Check::ok("binary", "repotracer binary"));
     checks.push(Check::ok("config", &format!("model={}", cfg.model.model)));
     checks.push(if root.exists() {
         Check::ok("repository", &root.display().to_string())
@@ -99,8 +99,8 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
         });
         match backend {
             Ok(backend) => {
-                let request = grephound_model::ModelRequest {
-                    messages: vec![grephound_model::ChatMessage::user("Reply with ok.")],
+                let request = repotracer_model::ModelRequest {
+                    messages: vec![repotracer_model::ChatMessage::user("Reply with ok.")],
                     tools: vec![],
                     temperature: 0.0,
                     max_tokens: Some(8),
@@ -118,14 +118,17 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
     }
 
     // MCP
-    checks.push(Check::ok("MCP", "grephound serve"));
+    checks.push(Check::ok("MCP", "repotracer serve"));
 
     // Agents
     for a in agents::detect(root) {
         if a.configured {
             checks.push(Check::ok(&a.name, "configured"));
         } else {
-            checks.push(Check::warn(&a.name, "not configured — run grephound setup"));
+            checks.push(Check::warn(
+                &a.name,
+                "not configured — run repotracer setup",
+            ));
         }
     }
 
@@ -139,10 +142,13 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
                 "checks": checks,
             }))?
         );
+        if !ready {
+            bail!("installation is not ready");
+        }
         return Ok(());
     }
 
-    println!("grephound doctor\n");
+    println!("repotracer doctor\n");
     println!("Runtime");
     for c in checks.iter().filter(|c| {
         matches!(
@@ -155,7 +161,7 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
     println!("\nExplorer");
     for check in checks
         .iter()
-        .filter(|check| matches!(check.name.as_str(), "subscription CLI" | "model"))
+        .filter(|check| matches!(check.name.as_str(), "GPT scout CLI" | "model"))
     {
         print_check(check);
     }
@@ -186,10 +192,11 @@ pub async fn run(root: &Path, cfg: &GrephoundConfig, json_mode: bool) -> Result<
     println!();
     if ready {
         println!("READY");
+        Ok(())
     } else {
-        println!("NOT READY — fix the ✗ items above, then re-run: grephound doctor");
+        println!("NOT READY — fix the ✗ items above, then re-run: repotracer doctor");
+        bail!("installation is not ready")
     }
-    Ok(())
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

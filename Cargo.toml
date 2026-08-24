@@ -14,17 +14,17 @@ default-members = ["crates/cli"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/grephound/grephound"
-homepage = "https://github.com/grephound/grephound"
-authors = ["Grephound Contributors"]
+repository = "https://github.com/repotracer/repotracer"
+homepage = "https://github.com/repotracer/repotracer"
+authors = ["RepoTracer Contributors"]
 rust-version = "1.80"
 
 [workspace.dependencies]
-grephound-core = { path = "crates/core" }
-grephound-repo-tools = { path = "crates/repo-tools" }
-grephound-model = { path = "crates/model" }
-grephound-mcp = { path = "crates/mcp" }
-grephound-bench = { path = "crates/bench" }
+repotracer-core = { path = "crates/core" }
+repotracer-repo-tools = { path = "crates/repo-tools" }
+repotracer-model = { path = "crates/model" }
+repotracer-mcp = { path = "crates/mcp" }
+repotracer-bench = { path = "crates/bench" }
 
 anyhow = "1"
 async-trait = "0.1"

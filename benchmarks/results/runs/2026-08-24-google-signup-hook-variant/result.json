@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-24-google-signup-hook-variant",
+  "status": "completed",
+  "headline_eligible": false,
+  "task": "Google sign-up is broken. Diagnose and fix the root cause without changing working email or OTP authentication, and add the smallest regression check that proves the failure is gone.",
+  "variant": "SessionStart/UserPromptSubmit hook injects RepoTracer routing plus writing guidance for Codex Sol.",
+  "outcome": "reject",
+  "quality_score_100": 62.0,
+  "control_quality_score_100": 80.25,
+  "quality_delta_points": -18.25,
+  "wall_seconds": 494.35,
+  "wall_delta_vs_current_percent": 49.66,
+  "complete_input_tokens": 2131520,
+  "input_delta_vs_current_percent": 146.08,
+  "complete_output_tokens": 19002,
+  "output_delta_vs_current_percent": 37.9,
+  "reasoning_tokens": 8488,
+  "reasoning_delta_vs_current_percent": 67.32,
+  "requests": 51,
+  "requests_delta_vs_current_percent": 24.39,
+  "complete_cost_usd": 2.1104008,
+  "cost_delta_vs_current_percent": 71.64,
+  "verification": {
+    "auth_tests": "11/11 pass",
+    "nuxt_typecheck": "pass",
+    "blind_graders": "2/2 ranked variant last"
+  },
+  "diagnosis": [
+    "The hook successfully caused RepoTracer to be called first.",
+    "The agent still ran broad repository searches after the handoff, so the awareness text did not enforce the intended bounded workflow.",
+    "The scout handoff scoped the application auth flow but did not surface the production blue-green deployment file; the implementation updated compose.yaml while missing the actual production x-web-env block.",
+    "The regression check proved an extracted provider helper, not the production auth.ts composition, and therefore could not catch removal of production wiring."
+  ],
+  "decision": "Do not ship this hook variant. It increased cost and latency while materially reducing end-to-end correctness."
+}
