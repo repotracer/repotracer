@@ -1,0 +1,48 @@
+{
+  "summary": "The gap is in two leaf paths:\n\n- `ScoutStats` has no cache-write or total-token fields, while all usage fields are optional; add `cache_write_input_tokens` and `total_tokens` as `Option<u32>` so unreported provider values remain absent. [crates/core/src/types.rs:29-47](crates/core/src/types.rs:29)\n- The OpenAI-compatible parser currently retains only prompt, completion, and total—and converts omitted values to `0`; extend its usage deserialization for cached input, cache-write input, and reasoning output, preserving `None`. [crates/model/src/openai.rs:90-108](crates/model/src/openai.rs:90) [crates/model/src/openai.rs:227-232](crates/model/src/openai.rs:227)\n- Multi-turn Codex metrics currently replace usage on every `turn.completed`, so aggregate each reported field across turns with optional-preserving sums. [crates/cli/src/subscription.rs:314-330](crates/cli/src/subscription.rs:314)\n- Existing coverage is single-turn CLI parsing only; add tests for multi-turn accumulation, all four new fields, and providers omitting each field. [crates/cli/src/subscription.rs:645-686](crates/cli/src/subscription.rs:645)",
+  "citations": [
+    {
+      "path": "crates/core/src/types.rs",
+      "start_line": 29,
+      "end_line": 47,
+      "reason": "Shows the current optional ScoutStats token fields and missing cache-write/total fields."
+    },
+    {
+      "path": "crates/model/src/openai.rs",
+      "start_line": 90,
+      "end_line": 108,
+      "reason": "Shows OpenAI usage mapping and the zero-default behavior that loses absent-value semantics."
+    },
+    {
+      "path": "crates/model/src/openai.rs",
+      "start_line": 227,
+      "end_line": 232,
+      "reason": "Shows the limited OpenAI-compatible usage schema."
+    },
+    {
+      "path": "crates/cli/src/subscription.rs",
+      "start_line": 314,
+      "end_line": 330,
+      "reason": "Shows turn usage being overwritten instead of accumulated, plus the current usage model."
+    },
+    {
+      "path": "crates/cli/src/subscription.rs",
+      "start_line": 645,
+      "end_line": 686,
+      "reason": "Shows existing single-turn usage test coverage."
+    }
+  ],
+  "stats": {
+    "turns": 4,
+    "tool_calls": 3,
+    "command_execution_used": true,
+    "temporary_script_used": false,
+    "duration_ms": 37415,
+    "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+    "prompt_tokens": 73099,
+    "cached_prompt_tokens": 40448,
+    "completion_tokens": 1512,
+    "reasoning_output_tokens": 601
+  },
+  "raw_final": "{\"answer\":\"The gap is in two leaf paths:\\n\\n- `ScoutStats` has no cache-write or total-token fields, while all usage fields are optional; add `cache_write_input_tokens` and `total_tokens` as `Option<u32>` so unreported provider values remain absent. [crates/core/src/types.rs:29-47](crates/core/src/types.rs:29)\\n- The OpenAI-compatible parser currently retains only prompt, completion, and total—and converts omitted values to `0`; extend its usage deserialization for cached input, cache-write input, and reasoning output, preserving `None`. [crates/model/src/openai.rs:90-108](crates/model/src/openai.rs:90) [crates/model/src/openai.rs:227-232](crates/model/src/openai.rs:227)\\n- Multi-turn Codex metrics currently replace usage on every `turn.completed`, so aggregate each reported field across turns with optional-preserving sums. [crates/cli/src/subscription.rs:314-330](crates/cli/src/subscription.rs:314)\\n- Existing coverage is single-turn CLI parsing only; add tests for multi-turn accumulation, all four new fields, and providers omitting each field. [crates/cli/src/subscription.rs:645-686](crates/cli/src/subscription.rs:645)\",\"citations\":[{\"end_line\":47,\"path\":\"crates/core/src/types.rs\",\"reason\":\"Shows the current optional ScoutStats token fields and missing cache-write/total fields.\",\"start_line\":29},{\"end_line\":108,\"path\":\"crates/model/src/openai.rs\",\"reason\":\"Shows OpenAI usage mapping and the zero-default behavior that loses absent-value semantics.\",\"start_line\":90},{\"end_line\":232,\"path\":\"crates/model/src/openai.rs\",\"reason\":\"Shows the limited OpenAI-compatible usage schema.\",\"start_line\":227},{\"end_line\":330,\"path\":\"crates/cli/src/subscription.rs\",\"reason\":\"Shows turn usage being overwritten instead of accumulated, plus the current usage model.\",\"start_line\":314},{\"end_line\":686,\"path\":\"crates/cli/src/subscription.rs\",\"reason\":\"Shows existing single-turn usage test coverage.\",\"start_line\":645}]}"
+}

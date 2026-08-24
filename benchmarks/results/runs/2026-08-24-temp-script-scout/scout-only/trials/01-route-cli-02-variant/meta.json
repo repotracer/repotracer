@@ -1,0 +1,15 @@
+{
+  "task_id": "route-cli-02",
+  "arm": "variant",
+  "order": 1,
+  "started_at": "2026-08-24T18:52:14Z",
+  "finished_at": "2026-08-24T18:53:00Z",
+  "prompt_sha256": "64dc3fd8f0c4b8de437afac81ab225738293e5e3b29889f9c91ee0848e25b4ec",
+  "repository_commit": "9079bfdea02e6db5418429faa90baabf13dbe8cb",
+  "binary_sha256": "1c5df2bb7f60a7e67c3151d9741f98de24c6545ebdf66b782e732e3416e07447",
+  "exit_code": 0,
+  "wall_ms": 46240,
+  "repository_changed": false,
+  "home_policy": "new mktemp HOME/CODEX_HOME; auth.json and config.toml copied; Codex --ignore-user-config",
+  "temp_home_root": "/tmp/repotracer-bench-home.ViBWkr"
+}

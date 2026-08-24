@@ -1,0 +1,12 @@
+{
+  "task_id": "route-runtime-03",
+  "arm": "current",
+  "order": 2,
+  "started_at": "2026-08-24T19:23:16Z",
+  "finished_at": "2026-08-24T19:30:29Z",
+  "prompt_sha256": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+  "repository_commit": "9079bfdea02e6db5418429faa90baabf13dbe8cb",
+  "clone": "/tmp/repotracer-temp-script-bench.w5jUSa/sol/current/repository",
+  "exit_code": 0,
+  "wall_ms": 433361
+}

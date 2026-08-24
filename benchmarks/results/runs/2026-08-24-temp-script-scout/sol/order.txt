@@ -1,0 +1,2 @@
+SOL_RANDOM_BYTE=237
+SOL_ORDER=variant current

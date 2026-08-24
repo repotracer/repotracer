@@ -1,0 +1,42 @@
+{
+  "summary": "The repository does not yet support this requirement. `agents::detect` returns only Codex, and considers any file containing “repotracer” healthy; it does not validate the configured executable or version, so stale entries are misclassified. Setup always configures only Codex. Doctor likewise reports only the detected list, with no stale-versus-healthy state. Existing tests cover Codex setup and preservation of unrelated TOML/AGENTS content, but no stale-entry repair or other-agent integrations.\n\nImplement an integration descriptor per supported agent (Claude Code, Codex, Cursor, Copilot, etc.) containing detection, read/parse, health validation, managed repair, and diagnostics. During setup, repair only RepoTracer-owned entries/blocks and preserve all unrelated settings. Add tests for every agent, stale executable replacement, healthy no-op/idempotence, and preservation of user content.",
+  "citations": [
+    {
+      "path": "crates/cli/src/agents.rs",
+      "start_line": 18,
+      "end_line": 44,
+      "reason": "Shows that detection returns only Codex and treats any file containing RepoTracer as configured."
+    },
+    {
+      "path": "crates/cli/src/agents.rs",
+      "start_line": 70,
+      "end_line": 111,
+      "reason": "Shows setup installs only the Codex MCP section and routing instructions, with targeted TOML section replacement."
+    },
+    {
+      "path": "crates/cli/src/doctor.rs",
+      "start_line": 123,
+      "end_line": 133,
+      "reason": "Shows diagnostics iterate over the detector output and distinguish only configured versus not configured, not stale versus healthy."
+    },
+    {
+      "path": "crates/cli/tests/setup.rs",
+      "start_line": 72,
+      "end_line": 117,
+      "reason": "Shows current integration coverage is limited to Codex setup and preservation checks."
+    }
+  ],
+  "stats": {
+    "turns": 4,
+    "tool_calls": 3,
+    "command_execution_used": true,
+    "temporary_script_used": false,
+    "duration_ms": 46132,
+    "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+    "prompt_tokens": 86519,
+    "cached_prompt_tokens": 44544,
+    "completion_tokens": 1329,
+    "reasoning_output_tokens": 356
+  },
+  "raw_final": "{\"answer\":\"The repository does not yet support this requirement. `agents::detect` returns only Codex, and considers any file containing “repotracer” healthy; it does not validate the configured executable or version, so stale entries are misclassified. Setup always configures only Codex. Doctor likewise reports only the detected list, with no stale-versus-healthy state. Existing tests cover Codex setup and preservation of unrelated TOML/AGENTS content, but no stale-entry repair or other-agent integrations.\\n\\nImplement an integration descriptor per supported agent (Claude Code, Codex, Cursor, Copilot, etc.) containing detection, read/parse, health validation, managed repair, and diagnostics. During setup, repair only RepoTracer-owned entries/blocks and preserve all unrelated settings. Add tests for every agent, stale executable replacement, healthy no-op/idempotence, and preservation of user content.\",\"citations\":[{\"end_line\":44,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Shows that detection returns only Codex and treats any file containing RepoTracer as configured.\" ,\"start_line\":18},{\"end_line\":111,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Shows setup installs only the Codex MCP section and routing instructions, with targeted TOML section replacement.\" ,\"start_line\":70},{\"end_line\":133,\"path\":\"crates/cli/src/doctor.rs\",\"reason\":\"Shows diagnostics iterate over the detector output and distinguish only configured versus not configured, not stale versus healthy.\" ,\"start_line\":123},{\"end_line\":117,\"path\":\"crates/cli/tests/setup.rs\",\"reason\":\"Shows current integration coverage is limited to Codex setup and preservation checks.\" ,\"start_line\":72}]}"
+}

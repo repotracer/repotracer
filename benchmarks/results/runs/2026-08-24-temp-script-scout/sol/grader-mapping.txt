@@ -1,0 +1,2 @@
+RANDOM_BYTE=109
+A=variant B=current

@@ -1,0 +1,25 @@
+REPOTRACER SETUP
+Small models search. Big models solve.
+
+
+1 / 4  Environment
+  ✓ Apple Silicon
+  ✓ Git repository
+  ✓ ripgrep (optional with GPT scouts)
+  ✓ Codex detected
+
+2 / 4  GPT scout
+  ✓ GPT scout via Codex CLI ready (gpt-5.6-luna)
+
+3 / 4  Codex integration
+  ✓ configured Codex MCP + automatic routing (/tmp/repotracer-temp-script-bench.w5jUSa/sol/current/home/.codex/config.toml)
+
+4 / 4  RepoTracer configuration
+  ✓ config written (/tmp/repotracer-temp-script-bench.w5jUSa/sol/current/home/.repotracer/config.toml)
+  ✓ binary (/Users/mac/orca/workspaces/tool/temp-script-scout/target/debug/repotracer)
+
+READY — small models search, big models solve
+
+Restart configured agents, then ask a multi-file repository question.
+Verify any time:  repotracer doctor
+Remove it again:  repotracer uninstall --yes

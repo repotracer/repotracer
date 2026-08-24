@@ -1,0 +1,21 @@
+   Compiling repotracer-repo-tools v0.1.0 (/Users/mac/orca/workspaces/tool/temp-script-scout/crates/repo-tools)
+   Compiling repotracer-core v0.1.0 (/Users/mac/orca/workspaces/tool/temp-script-scout/crates/core)
+   Compiling repotracer-mcp v0.1.0 (/Users/mac/orca/workspaces/tool/temp-script-scout/crates/mcp)
+   Compiling repotracer v0.1.0 (/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.70s
+     Running unittests src/main.rs (target/debug/deps/repotracer-4ad753f1455d9bd7)
+
+running 4 tests
+test subscription::tests::rejects_unknown_reasoning_effort ... ok
+test subscription::tests::scout_prompt_requests_a_ranked_bounded_handoff ... ok
+test subscription::tests::provider_args_are_read_only_and_isolated ... ok
+test subscription::tests::fake_codex_result_is_validated_and_timeout_kills_child ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.09s
+
+     Running tests/setup.rs (target/debug/deps/setup-4651fbb9f3831766)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+

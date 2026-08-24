@@ -1,0 +1,42 @@
+{
+  "summary": "The gap is in `crates/repo-tools/src/exec.rs`: `execute_tools` records completed futures, but the outer scout deadline drops the entire `call_many` future, losing those results; outstanding futures are not explicitly cancelled. Per-tool timeouts do mark failures and record `duration_ms`, but deadline-generated scout results discard tool-level metadata. `spawn_blocking` subprocess work may also outlive async cancellation. Existing tests cover concurrency/order only, not deadline retention or cancellation. The fix should use deadline-aware execution that preserves completed results, explicitly aborts outstanding tasks, and emits consistent failed/duration metadata for retained and cancelled work.",
+  "citations": [
+    {
+      "path": "crates/core/src/engine.rs",
+      "start_line": 35,
+      "end_line": 65,
+      "reason": "Shows the total scout timeout wrapping the entire inner run and returning a separate empty timeout result."
+    },
+    {
+      "path": "crates/repo-tools/src/exec.rs",
+      "start_line": 15,
+      "end_line": 63,
+      "reason": "Shows concurrent futures, result collection, per-tool timeout metadata, and absence of explicit deadline cancellation/partial-result return."
+    },
+    {
+      "path": "crates/repo-tools/src/exec.rs",
+      "start_line": 65,
+      "end_line": 89,
+      "reason": "Shows the existing concurrency test, which verifies speed, concurrency, success, and ordering but not deadline behavior."
+    },
+    {
+      "path": "crates/repo-tools/src/types.rs",
+      "start_line": 30,
+      "end_line": 37,
+      "reason": "Defines the only per-tool failure and duration metadata fields that must remain consistent."
+    }
+  ],
+  "stats": {
+    "turns": 4,
+    "tool_calls": 3,
+    "command_execution_used": true,
+    "temporary_script_used": false,
+    "duration_ms": 36340,
+    "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+    "prompt_tokens": 51983,
+    "cached_prompt_tokens": 23040,
+    "completion_tokens": 1317,
+    "reasoning_output_tokens": 456
+  },
+  "raw_final": "{\"answer\":\"The gap is in `crates/repo-tools/src/exec.rs`: `execute_tools` records completed futures, but the outer scout deadline drops the entire `call_many` future, losing those results; outstanding futures are not explicitly cancelled. Per-tool timeouts do mark failures and record `duration_ms`, but deadline-generated scout results discard tool-level metadata. `spawn_blocking` subprocess work may also outlive async cancellation. Existing tests cover concurrency/order only, not deadline retention or cancellation. The fix should use deadline-aware execution that preserves completed results, explicitly aborts outstanding tasks, and emits consistent failed/duration metadata for retained and cancelled work.\",\"citations\":[{\"end_line\":65,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Shows the total scout timeout wrapping the entire inner run and returning a separate empty timeout result.\" ,\"start_line\":35},{\"end_line\":63,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Shows concurrent futures, result collection, per-tool timeout metadata, and absence of explicit deadline cancellation/partial-result return.\",\"start_line\":15},{\"end_line\":89,\"path\":\"crates/repo-tools/src/exec.rs\",\"reason\":\"Shows the existing concurrency test, which verifies speed, concurrency, success, and ordering but not deadline behavior.\",\"start_line\":65},{\"end_line\":37,\"path\":\"crates/repo-tools/src/types.rs\",\"reason\":\"Defines the only per-tool failure and duration metadata fields that must remain consistent.\",\"start_line\":30}]}"
+}

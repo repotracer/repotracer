@@ -1,0 +1,29 @@
+{
+  "read_only": {
+    "sandbox": "read-only",
+    "command_execution_used": true,
+    "temporary_script_created": false,
+    "temporary_script_executed": false,
+    "error": "PermissionError: [Errno 1] Operation not permitted",
+    "repository_status_before": "",
+    "repository_status_after": "",
+    "temporary_directory_contents_after": []
+  },
+  "workspace_write": {
+    "sandbox": "workspace-write",
+    "command_execution_used": true,
+    "temporary_script_created": true,
+    "temporary_script_executed": true,
+    "temporary_script_deleted": true,
+    "observed_sha256": "3646ddbe157c8408f9214f54aab2ae6657cf7f61537b5c24552019d584cf317d",
+    "repository_status_before": "",
+    "repository_status_after": "",
+    "temporary_directory_contents_after": []
+  },
+  "live_regression": {
+    "test": "subscription::tests::temporary_script_experiment_leaves_repository_unchanged",
+    "result": "pass",
+    "repository_status_sha256_before": "c3c6c8adf2ea033d93ed5a5e0d88c913fc52b027793e3991222b853e810eed7c",
+    "repository_status_sha256_after": "c3c6c8adf2ea033d93ed5a5e0d88c913fc52b027793e3991222b853e810eed7c"
+  }
+}

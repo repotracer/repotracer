@@ -1,0 +1,116 @@
+{
+  "decision": "reject",
+  "production_default_changed": false,
+  "capability": {
+    "read_only_command_execution": true,
+    "read_only_temporary_script": false,
+    "read_only_failure": "sandbox EPERM writing under the OS temporary directory",
+    "workspace_write_temporary_script": true,
+    "workspace_write_script_deleted": true,
+    "live_regression_passed": true
+  },
+  "scout_only": {
+    "tasks": 3,
+    "current": {
+      "main_input_tokens": 0,
+      "scout_input_tokens": 198675,
+      "scout_cached_input_tokens": 102400,
+      "scout_output_tokens": 4301,
+      "scout_reasoning_tokens": 1483,
+      "provider_cost_usd": 0.0264642,
+      "wall_ms": 111199,
+      "command_execution_trials": 3,
+      "temporary_script_trials": 0,
+      "validated_citations": 13,
+      "citation_valid_trials": 3,
+      "expected_path_hits": 9,
+      "expected_path_total": 13,
+      "blind_quality_mean": 7.8666666667,
+      "blind_wins": 2
+    },
+    "variant": {
+      "main_input_tokens": 0,
+      "scout_input_tokens": 225923,
+      "scout_cached_input_tokens": 124672,
+      "scout_output_tokens": 4182,
+      "scout_reasoning_tokens": 1476,
+      "provider_cost_usd": 0.02776204,
+      "wall_ms": 126361,
+      "command_execution_trials": 3,
+      "temporary_script_trials": 0,
+      "validated_citations": 12,
+      "citation_valid_trials": 3,
+      "expected_path_hits": 9,
+      "expected_path_total": 13,
+      "blind_quality_mean": 7.6333333333,
+      "blind_wins": 1
+    },
+    "variant_delta_percent": {
+      "input_tokens": 13.7148609538,
+      "output_tokens": -2.766798419,
+      "reasoning_tokens": -0.4720161834,
+      "provider_cost": 4.9041346423,
+      "wall_time": 13.6350147034,
+      "blind_quality": -2.9661016949
+    },
+    "grader_cost_usd": 0.0028968
+  },
+  "end_to_end_sol": {
+    "task": "route-runtime-03",
+    "current": {
+      "main_input_tokens": 681111,
+      "main_cached_input_tokens": 595200,
+      "main_output_tokens": 12385,
+      "main_reasoning_tokens": 6872,
+      "scout_input_tokens": 67442,
+      "scout_cached_input_tokens": 39936,
+      "scout_output_tokens": 1762,
+      "scout_reasoning_tokens": 599,
+      "complete_input_tokens": 748553,
+      "complete_output_tokens": 14147,
+      "complete_reasoning_tokens": 7471,
+      "provider_cost_usd": 1.10711932,
+      "wall_ms": 433361,
+      "temporary_script_used": false,
+      "changed_files_by_main": 2,
+      "focused_test": "15 passed",
+      "blind_quality": 5,
+      "quality_passed": false
+    },
+    "variant": {
+      "main_input_tokens": 570488,
+      "main_cached_input_tokens": 508416,
+      "main_output_tokens": 9699,
+      "main_reasoning_tokens": 4851,
+      "scout_input_tokens": 78925,
+      "scout_cached_input_tokens": 50944,
+      "scout_output_tokens": 2081,
+      "scout_reasoning_tokens": 868,
+      "complete_input_tokens": 649413,
+      "complete_output_tokens": 11780,
+      "complete_reasoning_tokens": 5719,
+      "provider_cost_usd": 0.86465028,
+      "wall_ms": 417002,
+      "temporary_script_used": false,
+      "changed_files_by_main": 2,
+      "focused_test": "14 passed",
+      "blind_quality": 4,
+      "quality_passed": false
+    },
+    "variant_delta_percent": {
+      "complete_input_tokens": -13.2442191802,
+      "complete_output_tokens": -16.7314625009,
+      "complete_reasoning_tokens": -23.450675947,
+      "provider_cost": -21.9008950183,
+      "wall_time": -3.7749128325,
+      "blind_quality": -20.0
+    },
+    "grader_cost_usd": 0.0059848,
+    "quality_conclusion": "Neither patch passes: both fail to propagate the real scout deadline and both replace independent per-tool timeouts with a shared batch timer."
+  },
+  "limitation_classification": {
+    "read_only_probe": "sandbox policy",
+    "forced_workspace_write_probe": "capability available when prompt and sandbox permit it",
+    "natural_benchmark": "Luna used command execution but did not need temporary code in any variant trial"
+  }
+}

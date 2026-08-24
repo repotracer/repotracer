@@ -1,0 +1,570 @@
+diff --git a/crates/core/src/engine.rs b/crates/core/src/engine.rs
+index cb39531..7f8fbaa 100644
+--- a/crates/core/src/engine.rs
++++ b/crates/core/src/engine.rs
+@@ -7,7 +7,8 @@ use repotracer_repo_tools::{resolve_in_root, RepoTools, ToolCall};
+ use std::collections::{HashMap, HashSet};
+ use std::path::Path;
+ use std::sync::Arc;
+-use std::time::Instant;
++use std::time::{Duration, Instant};
++use tokio::time::{timeout_at, Instant as TokioInstant};
+ use tracing::{debug, warn};
+ 
+ pub struct ScoutEngine {
+@@ -38,38 +39,21 @@ impl ScoutEngine {
+         let total_timeout = request
+             .timeout
+             .unwrap_or_else(|| self.budget.total_timeout());
++        let deadline = TokioInstant::now() + total_timeout;
+ 
+-        let run = self.scout_inner(request, max_turns);
+-        match tokio::time::timeout(total_timeout, run).await {
+-            Ok(res) => {
+-                let mut r = res?;
+-                r.stats.duration_ms = started.elapsed().as_millis() as u64;
+-                Ok(r)
+-            }
+-            Err(_) => Ok(ScoutResult {
+-                summary: format!("Scout timed out after {}s.", total_timeout.as_secs()),
+-                citations: vec![],
+-                stats: ScoutStats {
+-                    turns: 0,
+-                    tool_calls: 0,
+-                    command_execution_used: false,
+-                    temporary_script_used: false,
+-                    duration_ms: started.elapsed().as_millis() as u64,
+-                    model: self.model.name().to_string(),
+-                    prompt_tokens: None,
+-                    cached_prompt_tokens: None,
+-                    completion_tokens: None,
+-                    reasoning_output_tokens: None,
+-                },
+-                raw_final: None,
+-            }),
+-        }
++        let mut result = self
++            .scout_inner(request, max_turns, deadline, total_timeout)
++            .await?;
++        result.stats.duration_ms = started.elapsed().as_millis() as u64;
++        Ok(result)
+     }
+ 
+     async fn scout_inner(
+         &self,
+         request: ScoutRequest,
+         max_turns: u32,
++        deadline: TokioInstant,
++        total_timeout: Duration,
+     ) -> anyhow::Result<ScoutResult> {
+         let root = request.root.clone();
+         let system = build_system_prompt(&root);
+@@ -116,9 +100,9 @@ impl ScoutEngine {
+                 ));
+             }
+ 
+-            let response = self
+-                .model
+-                .complete(ModelRequest {
++            let response = match timeout_at(
++                deadline,
++                self.model.complete(ModelRequest {
+                     messages: messages.clone(),
+                     tools: if final_turn {
+                         Vec::new()
+@@ -127,8 +111,22 @@ impl ScoutEngine {
+                     },
+                     temperature: self.model.temperature(),
+                     max_tokens: None,
+-                })
+-                .await?;
++                }),
++            )
++            .await
++            {
++                Ok(response) => response?,
++                Err(_) => {
++                    return Ok(timeout_result(
++                        total_timeout,
++                        turns,
++                        tool_calls_total,
++                        self.model.name(),
++                        prompt_tokens,
++                        completion_tokens,
++                    ));
++                }
++            };
+ 
+             if let Some(u) = &response.usage {
+                 prompt_tokens = prompt_tokens.saturating_add(u.prompt_tokens);
+@@ -173,7 +171,7 @@ impl ScoutEngine {
+                     }
+ 
+                     debug!(count = fresh_calls.len(), "executing tools concurrently");
+-                    let results = self.tools.call_many(&fresh_calls).await;
++                    let results = self.tools.call_many_until(&fresh_calls, deadline).await;
+                     tool_calls_total += results.len() as u32;
+                     let mut results: HashMap<_, _> = results
+                         .into_iter()
+@@ -188,6 +186,16 @@ impl ScoutEngine {
+                         };
+                         messages.push(ChatMessage::tool(call.id, output));
+                     }
++                    if TokioInstant::now() >= deadline {
++                        return Ok(timeout_result(
++                            total_timeout,
++                            turns,
++                            tool_calls_total,
++                            self.model.name(),
++                            prompt_tokens,
++                            completion_tokens,
++                        ));
++                    }
+                     continue;
+                 }
+             }
+@@ -327,11 +335,32 @@ fn empty_result(
+     }
+ }
+ 
++fn timeout_result(
++    total_timeout: Duration,
++    turns: u32,
++    tool_calls: u32,
++    model: &str,
++    prompt_tokens: u32,
++    completion_tokens: u32,
++) -> ScoutResult {
++    empty_result(
++        &format!("Scout timed out after {}s.", total_timeout.as_secs()),
++        turns,
++        tool_calls,
++        model,
++        prompt_tokens,
++        completion_tokens,
++    )
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+-    use repotracer_model::{MockModel, MockScript, MockStep};
++    use repotracer_model::{
++        FunctionCall, MockModel, MockScript, MockStep, ModelError, ModelResponse,
++    };
+     use std::fs;
++    use std::sync::atomic::{AtomicUsize, Ordering};
+     use std::sync::Arc;
+     use tempfile::tempdir;
+ 
+@@ -443,6 +472,63 @@ mod tests {
+         assert_eq!(result.citations.len(), 1);
+     }
+ 
++    struct SlowAfterRead {
++        calls: AtomicUsize,
++    }
++
++    #[async_trait::async_trait]
++    impl ModelBackend for SlowAfterRead {
++        fn name(&self) -> &str {
++            "slow-after-read"
++        }
++
++        async fn complete(&self, _request: ModelRequest) -> Result<ModelResponse, ModelError> {
++            if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
++                return Ok(ModelResponse {
++                    message: ChatMessage::assistant_tools(
++                        None,
++                        vec![FunctionCall {
++                            id: "read_0".into(),
++                            name: "Read".into(),
++                            arguments: r#"{"path":"a.rs"}"#.into(),
++                        }],
++                    ),
++                    model: self.name().into(),
++                    usage: None,
++                });
++            }
++
++            std::future::pending().await
++        }
++    }
++
++    #[tokio::test]
++    async fn timeout_preserves_completed_progress_and_elapsed_duration() {
++        let dir = tempdir().unwrap();
++        fs::write(dir.path().join("a.rs"), "fn setup() {}\n").unwrap();
++        let model = Arc::new(SlowAfterRead {
++            calls: AtomicUsize::new(0),
++        });
++        let engine = ScoutEngine::new(model, RepoTools::new(dir.path()), ExplorerBudget::default());
++
++        let result = engine
++            .scout(ScoutRequest {
++                query: "find setup".into(),
++                root: dir.path().into(),
++                focus: None,
++                max_turns: Some(4),
++                timeout: Some(Duration::from_millis(75)),
++            })
++            .await
++            .unwrap();
++
++        assert_eq!(result.summary, "Scout timed out after 0s.");
++        assert_eq!(result.stats.turns, 2);
++        assert_eq!(result.stats.tool_calls, 1);
++        assert!(result.stats.duration_ms >= 50);
++        assert!(result.stats.duration_ms < 500);
++    }
++
+     #[tokio::test]
+     async fn malformed_final_answer_gets_one_correction_turn() {
+         let dir = tempdir().unwrap();
+diff --git a/crates/repo-tools/src/exec.rs b/crates/repo-tools/src/exec.rs
+index d0ab343..c113d46 100644
+--- a/crates/repo-tools/src/exec.rs
++++ b/crates/repo-tools/src/exec.rs
+@@ -1,9 +1,10 @@
+ use crate::types::{ToolCall, ToolResult};
+ use futures::future::BoxFuture;
+ use futures::stream::{FuturesUnordered, StreamExt};
++use futures::FutureExt;
+ use std::future::Future;
+-use std::time::Duration;
+-use tokio::time::timeout;
++use std::time::{Duration, Instant as StdInstant};
++use tokio::time::{sleep_until, timeout, Instant};
+ 
+ pub const DEFAULT_CONCURRENCY: usize = 8;
+ pub const DEFAULT_TOOL_TIMEOUT: Duration = Duration::from_secs(10);
+@@ -19,6 +20,38 @@ pub async fn execute_tools<E: ToolExecutor + Sync>(
+     executor: &E,
+     concurrency: usize,
+     tool_timeout: Duration,
++) -> Vec<ToolResult> {
++    execute_tools_inner(calls, executor, concurrency, tool_timeout, None).await
++}
++
++/// Run tool calls until an absolute batch deadline.
++///
++/// Calls that finish before the deadline retain their results. Any calls still
++/// running (or waiting for a concurrency slot) are returned as failed results
++/// after their futures have been canceled.
++pub async fn execute_tools_until<E: ToolExecutor + Sync>(
++    calls: &[ToolCall],
++    executor: &E,
++    concurrency: usize,
++    tool_timeout: Duration,
++    deadline: Instant,
++) -> Vec<ToolResult> {
++    execute_tools_inner(
++        calls,
++        executor,
++        concurrency,
++        tool_timeout,
++        Some(deadline),
++    )
++    .await
++}
++
++async fn execute_tools_inner<E: ToolExecutor + Sync>(
++    calls: &[ToolCall],
++    executor: &E,
++    concurrency: usize,
++    tool_timeout: Duration,
++    deadline: Option<Instant>,
+ ) -> Vec<ToolResult> {
+     if calls.is_empty() {
+         return Vec::new();
+@@ -26,15 +59,22 @@ pub async fn execute_tools<E: ToolExecutor + Sync>(
+ 
+     let concurrency = concurrency.max(1);
+     let mut results: Vec<Option<ToolResult>> = (0..calls.len()).map(|_| None).collect();
++    let mut started_at: Vec<Option<StdInstant>> = (0..calls.len()).map(|_| None).collect();
+     let mut in_flight: FuturesUnordered<BoxFuture<'_, (usize, ToolResult)>> =
+         FuturesUnordered::new();
+     let mut next = 0usize;
++    let mut deadline_expired = false;
+ 
+     while next < calls.len() || !in_flight.is_empty() {
+-        while next < calls.len() && in_flight.len() < concurrency {
++        while next < calls.len()
++            && in_flight.len() < concurrency
++            && !deadline.is_some_and(|deadline| Instant::now() >= deadline)
++        {
+             let idx = next;
+             next += 1;
+             let call = &calls[idx];
++            let call_started = StdInstant::now();
++            started_at[idx] = Some(call_started);
+             in_flight.push(Box::pin(async move {
+                 let res = match timeout(tool_timeout, executor.execute(call)).await {
+                     Ok(r) => r,
+@@ -47,21 +87,74 @@ pub async fn execute_tools<E: ToolExecutor + Sync>(
+                             tool_timeout.as_secs()
+                         ),
+                         failed: true,
+-                        duration_ms: tool_timeout.as_millis() as u64,
++                        duration_ms: elapsed_ms(call_started),
+                     },
+                 };
+                 (idx, res)
+             }));
+         }
+ 
+-        if let Some((idx, res)) = in_flight.next().await {
++        if in_flight.is_empty() {
++            deadline_expired = next < calls.len();
++            break;
++        }
++
++        let completed = if let Some(deadline) = deadline {
++            tokio::select! {
++                biased;
++                completed = in_flight.next() => completed,
++                _ = sleep_until(deadline) => {
++                    deadline_expired = true;
++                    None
++                }
++            }
++        } else {
++            in_flight.next().await
++        };
++
++        match completed {
++            Some((idx, res)) => results[idx] = Some(res),
++            None => break,
++        }
++    }
++
++    if deadline_expired {
++        // The deadline and one or more executor futures can become ready in
++        // the same scheduler turn. Drain every result that is already ready
++        // before dropping the remaining work, otherwise the deadline branch
++        // can discard successfully completed siblings.
++        while let Some(Some((idx, res))) = in_flight.next().now_or_never() {
+             results[idx] = Some(res);
+         }
++
++        // Dropping the futures cancels the executor work before failures are
++        // synthesized. Executors that own subprocesses must kill them on drop.
++        in_flight.clear();
++        for (idx, result) in results.iter_mut().enumerate() {
++            if result.is_none() {
++                let duration_ms = started_at[idx].map(elapsed_ms).unwrap_or(0);
++                let call = &calls[idx];
++                *result = Some(ToolResult {
++                    tool_call_id: call.id.clone(),
++                    name: call.name.clone(),
++                    output: format!(
++                        "<system-reminder>Tool `{}` was canceled because the batch deadline expired.</system-reminder>",
++                        call.name
++                    ),
++                    failed: true,
++                    duration_ms,
++                });
++            }
++        }
+     }
+ 
+     results.into_iter().map(|r| r.expect("filled")).collect()
+ }
+ 
++fn elapsed_ms(started: StdInstant) -> u64 {
++    started.elapsed().as_millis() as u64
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+@@ -126,4 +219,146 @@ mod tests {
+             assert_eq!(r.tool_call_id, format!("c{i}"));
+         }
+     }
++
++    struct CancelGuard(Arc<AtomicUsize>);
++
++    impl Drop for CancelGuard {
++        fn drop(&mut self) {
++            self.0.fetch_sub(1, Ordering::SeqCst);
++        }
++    }
++
++    struct OneFastOneBlocked {
++        active: Arc<AtomicUsize>,
++    }
++
++    impl ToolExecutor for OneFastOneBlocked {
++        async fn execute(&self, call: &ToolCall) -> ToolResult {
++            self.active.fetch_add(1, Ordering::SeqCst);
++            let _guard = CancelGuard(self.active.clone());
++            if call.id == "fast" {
++                tokio::time::sleep(Duration::from_millis(10)).await;
++                ToolResult {
++                    tool_call_id: call.id.clone(),
++                    name: call.name.clone(),
++                    output: "completed".into(),
++                    failed: false,
++                    duration_ms: 10,
++                }
++            } else {
++                std::future::pending().await
++            }
++        }
++    }
++
++    #[tokio::test]
++    async fn deadline_retains_completed_results_and_cancels_siblings() {
++        let active = Arc::new(AtomicUsize::new(0));
++        let exec = OneFastOneBlocked {
++            active: active.clone(),
++        };
++        let calls = vec![
++            ToolCall {
++                id: "fast".into(),
++                name: "Grep".into(),
++                arguments: "{}".into(),
++            },
++            ToolCall {
++                id: "blocked".into(),
++                name: "Grep".into(),
++                arguments: "{}".into(),
++            },
++        ];
++
++        let started = Instant::now();
++        let results = execute_tools_until(
++            &calls,
++            &exec,
++            2,
++            Duration::from_secs(5),
++            tokio::time::Instant::now() + Duration::from_millis(75),
++        )
++        .await;
++
++        assert!(started.elapsed() < Duration::from_millis(500));
++        assert_eq!(active.load(Ordering::SeqCst), 0);
++        assert_eq!(results.len(), 2);
++        assert_eq!(results[0].output, "completed");
++        assert!(!results[0].failed);
++        assert_eq!(results[0].duration_ms, 10);
++        assert!(results[1].failed);
++        assert!(results[1].output.contains("batch deadline expired"));
++        assert!(results[1].duration_ms >= 50);
++    }
++
++    struct ReadyAsDeadlineExpires {
++        active: Arc<AtomicUsize>,
++    }
++
++    impl ToolExecutor for ReadyAsDeadlineExpires {
++        async fn execute(&self, call: &ToolCall) -> ToolResult {
++            self.active.fetch_add(1, Ordering::SeqCst);
++            let _guard = CancelGuard(self.active.clone());
++            if call.id == "ready" {
++                let mut first_poll = true;
++                std::future::poll_fn(move |cx| {
++                    if first_poll {
++                        first_poll = false;
++                        std::thread::sleep(Duration::from_millis(20));
++                        cx.waker().wake_by_ref();
++                        std::task::Poll::Pending
++                    } else {
++                        std::task::Poll::Ready(())
++                    }
++                })
++                .await;
++                ToolResult {
++                    tool_call_id: call.id.clone(),
++                    name: call.name.clone(),
++                    output: "completed at deadline".into(),
++                    failed: false,
++                    duration_ms: 20,
++                }
++            } else {
++                std::future::pending().await
++            }
++        }
++    }
++
++    #[tokio::test]
++    async fn deadline_drains_results_that_become_ready_with_deadline() {
++        let active = Arc::new(AtomicUsize::new(0));
++        let exec = ReadyAsDeadlineExpires {
++            active: active.clone(),
++        };
++        let calls = vec![
++            ToolCall {
++                id: "ready".into(),
++                name: "Grep".into(),
++                arguments: "{}".into(),
++            },
++            ToolCall {
++                id: "blocked".into(),
++                name: "Grep".into(),
++                arguments: "{}".into(),
++            },
++        ];
++
++        let results = execute_tools_until(
++            &calls,
++            &exec,
++            2,
++            Duration::from_secs(5),
++            tokio::time::Instant::now() + Duration::from_millis(5),
++        )
++        .await;
++
++        assert_eq!(active.load(Ordering::SeqCst), 0);
++        assert_eq!(results[0].output, "completed at deadline");
++        assert!(!results[0].failed);
++        assert_eq!(results[0].duration_ms, 20);
++        assert!(results[1].failed);
++        assert!(results[1].output.contains("batch deadline expired"));
++        assert!(results[1].duration_ms > 0);
++    }
+ }
+diff --git a/crates/repo-tools/src/grep.rs b/crates/repo-tools/src/grep.rs
+index 6755eb2..eeaae9b 100644
+--- a/crates/repo-tools/src/grep.rs
++++ b/crates/repo-tools/src/grep.rs
+@@ -145,6 +145,7 @@ impl GrepTool {
+         // Never leave the repo via rg globs; constrain to path.
+         cmd.current_dir(&self.root);
+         cmd.stdin(Stdio::null());
++        cmd.kill_on_drop(true);
+ 
+         match mode {
+             "content" => {
+diff --git a/crates/repo-tools/src/lib.rs b/crates/repo-tools/src/lib.rs
+index 8f159b4..a8c9b21 100644
+--- a/crates/repo-tools/src/lib.rs
++++ b/crates/repo-tools/src/lib.rs
+@@ -8,7 +8,9 @@ mod pathutil;
+ mod read;
+ mod types;
+ 
+-pub use exec::{execute_tools, ToolExecutor, DEFAULT_CONCURRENCY, DEFAULT_TOOL_TIMEOUT};
++pub use exec::{
++    execute_tools, execute_tools_until, ToolExecutor, DEFAULT_CONCURRENCY, DEFAULT_TOOL_TIMEOUT,
++};
+ pub use glob_tool::GlobTool;
+ pub use grep::GrepTool;
+ pub use pathutil::{is_within_root, resolve_in_root, PathError};
+@@ -104,6 +106,15 @@ impl RepoTools {
+     pub async fn call_many(&self, calls: &[ToolCall]) -> Vec<ToolResult> {
+         execute_tools(calls, self, self.concurrency, self.timeout).await
+     }
++
++    /// Execute tool calls concurrently, canceling unfinished calls at `deadline`.
++    pub async fn call_many_until(
++        &self,
++        calls: &[ToolCall],
++        deadline: tokio::time::Instant,
++    ) -> Vec<ToolResult> {
++        execute_tools_until(calls, self, self.concurrency, self.timeout, deadline).await
++    }
+ }
+ 
+ impl ToolExecutor for RepoTools {

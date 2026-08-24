@@ -1,0 +1,42 @@
+{
+  "summary": "The deadline is enforced only around the whole scout run. When it expires, `ScoutEngine::scout` drops `scout_inner`, returns a new timeout result with empty citations and zero work counters, so completed batch siblings cannot be retained; duration is measured consistently there. [crates/core/src/engine.rs:38](crates/core/src/engine.rs:38)\n\n`RepoTools::call_many` delegates batching to `execute_tools` and only returns after that executor finishes, with no deadline or partial-result contract at this layer. [crates/repo-tools/src/lib.rs:101](crates/repo-tools/src/lib.rs:101)\n\nThe leaf Grep implementation awaits `cmd.output()` without an explicit child-kill policy, so cancellation of the surrounding future does not clearly terminate a slow `rg` subprocess. [crates/repo-tools/src/grep.rs:142](crates/repo-tools/src/grep.rs:142)\n\nThe subscription backend demonstrates the required subprocess behavior: `kill_on_drop(true)`, a timeout branch that kills the process tree, waits for output drains, and reports timeout text with duration captured by the caller. [crates/cli/src/subscription.rs:246](crates/cli/src/subscription.rs:246)",
+  "citations": [
+    {
+      "path": "crates/core/src/engine.rs",
+      "start_line": 38,
+      "end_line": 63,
+      "reason": "Shows the outer deadline, empty timeout result, and duration metadata."
+    },
+    {
+      "path": "crates/repo-tools/src/lib.rs",
+      "start_line": 81,
+      "end_line": 109,
+      "reason": "Shows the batch API waits for the executor and exposes no partial/deadline result."
+    },
+    {
+      "path": "crates/repo-tools/src/grep.rs",
+      "start_line": 142,
+      "end_line": 238,
+      "reason": "Shows the leaf subprocess execution and direct output wait."
+    },
+    {
+      "path": "crates/cli/src/subscription.rs",
+      "start_line": 246,
+      "end_line": 281,
+      "reason": "Shows the existing process cancellation and timeout-reporting pattern."
+    }
+  ],
+  "stats": {
+    "turns": 4,
+    "tool_calls": 3,
+    "command_execution_used": true,
+    "temporary_script_used": false,
+    "duration_ms": 39227,
+    "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+    "prompt_tokens": 52023,
+    "cached_prompt_tokens": 37888,
+    "completion_tokens": 1366,
+    "reasoning_output_tokens": 551
+  },
+  "raw_final": "{\"answer\":\"The deadline is enforced only around the whole scout run. When it expires, `ScoutEngine::scout` drops `scout_inner`, returns a new timeout result with empty citations and zero work counters, so completed batch siblings cannot be retained; duration is measured consistently there. [crates/core/src/engine.rs:38](crates/core/src/engine.rs:38)\\n\\n`RepoTools::call_many` delegates batching to `execute_tools` and only returns after that executor finishes, with no deadline or partial-result contract at this layer. [crates/repo-tools/src/lib.rs:101](crates/repo-tools/src/lib.rs:101)\\n\\nThe leaf Grep implementation awaits `cmd.output()` without an explicit child-kill policy, so cancellation of the surrounding future does not clearly terminate a slow `rg` subprocess. [crates/repo-tools/src/grep.rs:142](crates/repo-tools/src/grep.rs:142)\\n\\nThe subscription backend demonstrates the required subprocess behavior: `kill_on_drop(true)`, a timeout branch that kills the process tree, waits for output drains, and reports timeout text with duration captured by the caller. [crates/cli/src/subscription.rs:246](crates/cli/src/subscription.rs:246)\",\"citations\":[{\"end_line\":63,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Shows the outer deadline, empty timeout result, and duration metadata.\" ,\"start_line\":38},{\"end_line\":109,\"path\":\"crates/repo-tools/src/lib.rs\",\"reason\":\"Shows the batch API waits for the executor and exposes no partial/deadline result.\" ,\"start_line\":81},{\"end_line\":238,\"path\":\"crates/repo-tools/src/grep.rs\",\"reason\":\"Shows the leaf subprocess execution and direct output wait.\" ,\"start_line\":142},{\"end_line\":281,\"path\":\"crates/cli/src/subscription.rs\",\"reason\":\"Shows the existing process cancellation and timeout-reporting pattern.\" ,\"start_line\":246}]}"
+}

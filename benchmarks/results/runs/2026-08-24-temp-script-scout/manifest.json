@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-24-temp-script-scout",
+  "generated_at": "2026-08-24T19:34:10Z",
+  "status": "complete",
+  "decision": "reject",
+  "implementation_commit": "9079bfdea02e6db5418429faa90baabf13dbe8cb",
+  "binary_sha256": "1c5df2bb7f60a7e67c3151d9741f98de24c6545ebdf66b782e732e3416e07447",
+  "agent_version": "codex-cli 0.149.1",
+  "arms": {
+    "current": {
+      "sandbox": "read-only",
+      "prompt": "production prompt unchanged",
+      "environment": "REPOTRACER_EXPERIMENTAL_TEMP_SCRIPTS absent"
+    },
+    "variant": {
+      "sandbox": "workspace-write",
+      "prompt": "production prompt plus temp-only, no-network, cleanup instructions",
+      "environment": "REPOTRACER_EXPERIMENTAL_TEMP_SCRIPTS=1"
+    }
+  },
+  "model": {
+    "scout": "gpt-5.6-luna",
+    "scout_reasoning_effort": "medium",
+    "main": "gpt-5.6-sol",
+    "main_reasoning_effort": "high",
+    "service_tier": "default",
+    "provider": "codex-lb"
+  },
+  "protocol": {
+    "repository_commit": "9079bfdea02e6db5418429faa90baabf13dbe8cb",
+    "scout_only_tasks": ["route-cli-02", "route-runtime-03", "usage-accounting"],
+    "end_to_end_task": "route-runtime-03",
+    "repeats_per_arm": 1,
+    "order_policy": "independently randomized arm order; raw bytes and mappings retained",
+    "prompt_policy": "The task/query bytes and model settings match within each pair. The variant's internal scout preamble differs only by the experiment-required temp-only instructions; the current preamble is unchanged.",
+    "cache_policy": "new mktemp HOME and CODEX_HOME per trial; auth.json and provider config copied; Codex scout uses --ignore-user-config and --ephemeral",
+    "network_policy": "provider access only; scout browser/apps/network tools disabled and prompt forbids network",
+    "repository_write_policy": "scout-only trials compare exact pre/post git status; Sol runs use separate clones; scout is the first repository operation",
+    "billing_source": "codex-lb request_logs rows bracketed by request id for each sequential trial"
+  },
+  "prompt_sha256": {
+    "route-cli-02": "64dc3fd8f0c4b8de437afac81ab225738293e5e3b29889f9c91ee0848e25b4ec",
+    "route-runtime-03": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+    "usage-accounting": "9aa23d6291b6fa3f860cb25328d70c9de0d044d7bee73f4303a4ddbff887e06a"
+  },
+  "invalid_attempts": [
+    {
+      "path": "invalid/sol-shared-worktree",
+      "excluded": true,
+      "reason": "codex exec omitted -C clone; both arms edited one shared worktree and the second inherited the first patch"
+    }
+  ]
+}

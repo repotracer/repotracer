@@ -1,0 +1,42 @@
+{
+  "summary": "Usage accounting is incomplete in two paths:\n\n- The OpenAI-compatible backend only parses `prompt_tokens`, `completion_tokens`, and `total_tokens`, then converts missing fields to `0`; it does not expose cached input, cache-write input, or reasoning output. [crates/model/src/openai.rs:96-106] [crates/model/src/openai.rs:224-231]\n- The shared `Usage` type has no cache or reasoning fields, while `ScoutStats` has no total-token field. [crates/model/src/types.rs:100-114] [crates/core/src/types.rs:36-47]\n- Core multi-turn aggregation sums only prompt and completion tokens and explicitly leaves the other stats absent. [crates/core/src/engine.rs:90-96] [crates/core/src/engine.rs:130-135] [crates/core/src/engine.rs:218-234]\n- The Codex CLI path overwrites usage on every `turn.completed` event, so multi-turn runs retain only the final turn’s usage. [crates/cli/src/subscription.rs:303-330]\n\nImplement provider-optional usage fields end-to-end—cached input, cache-write input, reasoning output, and total tokens—and aggregate each reported field across turns while preserving `None` when no turn/provider reports it. Add multi-turn tests for both OpenAI-compatible responses and Codex event streams; the existing CLI test only verifies a single usage event. [crates/cli/src/subscription.rs:660-686]",
+  "citations": [
+    {
+      "path": "crates/model/src/openai.rs",
+      "start_line": 96,
+      "end_line": 106,
+      "reason": "Shows the OpenAI-compatible response mapping only three usage values and coercing missing values to zero."
+    },
+    {
+      "path": "crates/model/src/types.rs",
+      "start_line": 100,
+      "end_line": 114,
+      "reason": "Shows the shared Usage model lacks cache and reasoning fields."
+    },
+    {
+      "path": "crates/core/src/engine.rs",
+      "start_line": 90,
+      "end_line": 218,
+      "reason": "Shows multi-turn aggregation only tracks prompt and completion totals."
+    },
+    {
+      "path": "crates/cli/src/subscription.rs",
+      "start_line": 303,
+      "end_line": 330,
+      "reason": "Shows Codex usage is replaced on each completed turn rather than accumulated."
+    }
+  ],
+  "stats": {
+    "turns": 4,
+    "tool_calls": 3,
+    "command_execution_used": true,
+    "temporary_script_used": false,
+    "duration_ms": 40722,
+    "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+    "prompt_tokens": 69231,
+    "cached_prompt_tokens": 42240,
+    "completion_tokens": 1487,
+    "reasoning_output_tokens": 569
+  },
+  "raw_final": "{\"answer\":\"Usage accounting is incomplete in two paths:\\n\\n- The OpenAI-compatible backend only parses `prompt_tokens`, `completion_tokens`, and `total_tokens`, then converts missing fields to `0`; it does not expose cached input, cache-write input, or reasoning output. [crates/model/src/openai.rs:96-106] [crates/model/src/openai.rs:224-231]\\n- The shared `Usage` type has no cache or reasoning fields, while `ScoutStats` has no total-token field. [crates/model/src/types.rs:100-114] [crates/core/src/types.rs:36-47]\\n- Core multi-turn aggregation sums only prompt and completion tokens and explicitly leaves the other stats absent. [crates/core/src/engine.rs:90-96] [crates/core/src/engine.rs:130-135] [crates/core/src/engine.rs:218-234]\\n- The Codex CLI path overwrites usage on every `turn.completed` event, so multi-turn runs retain only the final turn’s usage. [crates/cli/src/subscription.rs:303-330]\\n\\nImplement provider-optional usage fields end-to-end—cached input, cache-write input, reasoning output, and total tokens—and aggregate each reported field across turns while preserving `None` when no turn/provider reports it. Add multi-turn tests for both OpenAI-compatible responses and Codex event streams; the existing CLI test only verifies a single usage event. [crates/cli/src/subscription.rs:660-686]\",\"citations\":[{\"end_line\":106,\"path\":\"crates/model/src/openai.rs\",\"reason\":\"Shows the OpenAI-compatible response mapping only three usage values and coercing missing values to zero.\" ,\"start_line\":96},{\"end_line\":114,\"path\":\"crates/model/src/types.rs\",\"reason\":\"Shows the shared Usage model lacks cache and reasoning fields.\" ,\"start_line\":100},{\"end_line\":218,\"path\":\"crates/core/src/engine.rs\",\"reason\":\"Shows multi-turn aggregation only tracks prompt and completion totals.\" ,\"start_line\":90},{\"end_line\":330,\"path\":\"crates/cli/src/subscription.rs\",\"reason\":\"Shows Codex usage is replaced on each completed turn rather than accumulated.\" ,\"start_line\":303}]}"
+}

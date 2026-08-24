@@ -1,0 +1,5 @@
+{
+  "command": "git diff --check && cargo test -p repotracer-repo-tools",
+  "exit_code": 0,
+  "wall_ms": 991
+}

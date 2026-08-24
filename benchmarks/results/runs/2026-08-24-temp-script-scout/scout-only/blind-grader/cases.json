@@ -1,0 +1,213 @@
+[
+  {
+    "task_id": "route-cli-02",
+    "question": "After RepoTracer is upgraded or moved, coding agents can keep invoking the old executable. Make onboarding detect and repair stale RepoTracer entries for every supported agent without changing unrelated user settings, and surface stale versus healthy integrations in diagnostics.",
+    "expected_paths": [
+      "crates/cli/src/agents.rs",
+      "crates/cli/src/setup.rs",
+      "crates/cli/src/doctor.rs",
+      "crates/cli/tests/setup.rs"
+    ],
+    "A": {
+      "summary": "The repository does not yet implement this fully. `agents::detect` supports only Codex, and marks an integration configured when its config merely contains `repotracer`; it does not validate that the command points to the current executable. Thus upgraded/moved binaries can remain stale while appearing configured. [`crates/cli/src/agents.rs:14`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/agents.rs:14)\n\nImplement the repair in each agent’s leaf installer/detector: compare the configured RepoTracer command (including equivalent paths) with `agents::current_binary()`, classify it as healthy/stale/missing, and rewrite only the managed RepoTracer entry or marked block. Preserve all unrelated TOML and instruction content using the existing section/block replacement helpers. [`crates/cli/src/agents.rs:99`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/agents.rs:99)\n\nMake setup call repair for every detected/supported agent, including stale ones, and extend doctor/status output to expose `healthy`, `stale`, and `missing` rather than reducing everything to configured/not configured. Doctor currently emits only “configured” or “not configured.” [`crates/cli/src/doctor.rs:105`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/doctor.rs:105) [`crates/cli/src/main.rs:240`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/main.rs:240)\n\nAdd tests covering stale-path repair, preservation of unrelated settings, all supported agents, and diagnostic labels. Existing tests cover dry-run non-mutation and Codex setup, but not stale repair or multi-agent coverage. [`crates/cli/tests/setup.rs:5`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/tests/setup.rs:5)",
+      "citations": [
+        {
+          "path": "crates/cli/src/agents.rs",
+          "start_line": 14,
+          "end_line": 42,
+          "reason": "Shows AgentInfo state and that detection currently supports only Codex, with configured based on a loose substring check."
+        },
+        {
+          "path": "crates/cli/src/agents.rs",
+          "start_line": 99,
+          "end_line": 128,
+          "reason": "Shows Codex installation rewriting only its RepoTracer TOML section and managed instruction block, the preservation mechanism to reuse for targeted repair."
+        },
+        {
+          "path": "crates/cli/src/doctor.rs",
+          "start_line": 105,
+          "end_line": 128,
+          "reason": "Shows diagnostics currently collapsing agent state into configured versus not configured."
+        },
+        {
+          "path": "crates/cli/tests/setup.rs",
+          "start_line": 5,
+          "end_line": 112,
+          "reason": "Shows current setup tests cover dry-run and Codex setup, without stale-path or every-agent assertions."
+        }
+      ]
+    },
+    "B": {
+      "summary": "The repository does not yet support this requirement. `agents::detect` returns only Codex, and considers any file containing “repotracer” healthy; it does not validate the configured executable or version, so stale entries are misclassified. Setup always configures only Codex. Doctor likewise reports only the detected list, with no stale-versus-healthy state. Existing tests cover Codex setup and preservation of unrelated TOML/AGENTS content, but no stale-entry repair or other-agent integrations.\n\nImplement an integration descriptor per supported agent (Claude Code, Codex, Cursor, Copilot, etc.) containing detection, read/parse, health validation, managed repair, and diagnostics. During setup, repair only RepoTracer-owned entries/blocks and preserve all unrelated settings. Add tests for every agent, stale executable replacement, healthy no-op/idempotence, and preservation of user content.",
+      "citations": [
+        {
+          "path": "crates/cli/src/agents.rs",
+          "start_line": 18,
+          "end_line": 44,
+          "reason": "Shows that detection returns only Codex and treats any file containing RepoTracer as configured."
+        },
+        {
+          "path": "crates/cli/src/agents.rs",
+          "start_line": 70,
+          "end_line": 111,
+          "reason": "Shows setup installs only the Codex MCP section and routing instructions, with targeted TOML section replacement."
+        },
+        {
+          "path": "crates/cli/src/doctor.rs",
+          "start_line": 123,
+          "end_line": 133,
+          "reason": "Shows diagnostics iterate over the detector output and distinguish only configured versus not configured, not stale versus healthy."
+        },
+        {
+          "path": "crates/cli/tests/setup.rs",
+          "start_line": 72,
+          "end_line": 117,
+          "reason": "Shows current integration coverage is limited to Codex setup and preservation checks."
+        }
+      ]
+    }
+  },
+  {
+    "task_id": "route-runtime-03",
+    "question": "When a scout deadline expires during a batch of repository searches, completed sibling results are lost and slow subprocesses may keep running. Cancel outstanding work at the deadline, retain results that already completed when possible, and report failure and duration metadata consistently.",
+    "expected_paths": [
+      "crates/core/src/engine.rs",
+      "crates/repo-tools/src/exec.rs",
+      "crates/repo-tools/src/grep.rs",
+      "crates/repo-tools/src/types.rs"
+    ],
+    "A": {
+      "summary": "The deadline is enforced only around the whole scout run. When it expires, `ScoutEngine::scout` drops `scout_inner`, returns a new timeout result with empty citations and zero work counters, so completed batch siblings cannot be retained; duration is measured consistently there. [crates/core/src/engine.rs:38](crates/core/src/engine.rs:38)\n\n`RepoTools::call_many` delegates batching to `execute_tools` and only returns after that executor finishes, with no deadline or partial-result contract at this layer. [crates/repo-tools/src/lib.rs:101](crates/repo-tools/src/lib.rs:101)\n\nThe leaf Grep implementation awaits `cmd.output()` without an explicit child-kill policy, so cancellation of the surrounding future does not clearly terminate a slow `rg` subprocess. [crates/repo-tools/src/grep.rs:142](crates/repo-tools/src/grep.rs:142)\n\nThe subscription backend demonstrates the required subprocess behavior: `kill_on_drop(true)`, a timeout branch that kills the process tree, waits for output drains, and reports timeout text with duration captured by the caller. [crates/cli/src/subscription.rs:246](crates/cli/src/subscription.rs:246)",
+      "citations": [
+        {
+          "path": "crates/core/src/engine.rs",
+          "start_line": 38,
+          "end_line": 63,
+          "reason": "Shows the outer deadline, empty timeout result, and duration metadata."
+        },
+        {
+          "path": "crates/repo-tools/src/lib.rs",
+          "start_line": 81,
+          "end_line": 109,
+          "reason": "Shows the batch API waits for the executor and exposes no partial/deadline result."
+        },
+        {
+          "path": "crates/repo-tools/src/grep.rs",
+          "start_line": 142,
+          "end_line": 238,
+          "reason": "Shows the leaf subprocess execution and direct output wait."
+        },
+        {
+          "path": "crates/cli/src/subscription.rs",
+          "start_line": 246,
+          "end_line": 281,
+          "reason": "Shows the existing process cancellation and timeout-reporting pattern."
+        }
+      ]
+    },
+    "B": {
+      "summary": "The gap is in `crates/repo-tools/src/exec.rs`: `execute_tools` records completed futures, but the outer scout deadline drops the entire `call_many` future, losing those results; outstanding futures are not explicitly cancelled. Per-tool timeouts do mark failures and record `duration_ms`, but deadline-generated scout results discard tool-level metadata. `spawn_blocking` subprocess work may also outlive async cancellation. Existing tests cover concurrency/order only, not deadline retention or cancellation. The fix should use deadline-aware execution that preserves completed results, explicitly aborts outstanding tasks, and emits consistent failed/duration metadata for retained and cancelled work.",
+      "citations": [
+        {
+          "path": "crates/core/src/engine.rs",
+          "start_line": 35,
+          "end_line": 65,
+          "reason": "Shows the total scout timeout wrapping the entire inner run and returning a separate empty timeout result."
+        },
+        {
+          "path": "crates/repo-tools/src/exec.rs",
+          "start_line": 15,
+          "end_line": 63,
+          "reason": "Shows concurrent futures, result collection, per-tool timeout metadata, and absence of explicit deadline cancellation/partial-result return."
+        },
+        {
+          "path": "crates/repo-tools/src/exec.rs",
+          "start_line": 65,
+          "end_line": 89,
+          "reason": "Shows the existing concurrency test, which verifies speed, concurrency, success, and ordering but not deadline behavior."
+        },
+        {
+          "path": "crates/repo-tools/src/types.rs",
+          "start_line": 30,
+          "end_line": 37,
+          "reason": "Defines the only per-tool failure and duration metadata fields that must remain consistent."
+        }
+      ]
+    }
+  },
+  {
+    "task_id": "usage-accounting",
+    "question": "RepoTracer's usage stats are incomplete for OpenAI-compatible providers. Include cached input, cache-write input, reasoning output, and total tokens across multi-turn scout runs, but leave values absent when a provider does not report them.",
+    "expected_paths": [
+      "crates/model/src/types.rs",
+      "crates/model/src/openai.rs",
+      "crates/core/src/types.rs",
+      "crates/core/src/engine.rs",
+      "crates/cli/src/subscription.rs"
+    ],
+    "A": {
+      "summary": "The gap is in two leaf paths:\n\n- `ScoutStats` has no cache-write or total-token fields, while all usage fields are optional; add `cache_write_input_tokens` and `total_tokens` as `Option<u32>` so unreported provider values remain absent. [crates/core/src/types.rs:29-47](crates/core/src/types.rs:29)\n- The OpenAI-compatible parser currently retains only prompt, completion, and total—and converts omitted values to `0`; extend its usage deserialization for cached input, cache-write input, and reasoning output, preserving `None`. [crates/model/src/openai.rs:90-108](crates/model/src/openai.rs:90) [crates/model/src/openai.rs:227-232](crates/model/src/openai.rs:227)\n- Multi-turn Codex metrics currently replace usage on every `turn.completed`, so aggregate each reported field across turns with optional-preserving sums. [crates/cli/src/subscription.rs:314-330](crates/cli/src/subscription.rs:314)\n- Existing coverage is single-turn CLI parsing only; add tests for multi-turn accumulation, all four new fields, and providers omitting each field. [crates/cli/src/subscription.rs:645-686](crates/cli/src/subscription.rs:645)",
+      "citations": [
+        {
+          "path": "crates/core/src/types.rs",
+          "start_line": 29,
+          "end_line": 47,
+          "reason": "Shows the current optional ScoutStats token fields and missing cache-write/total fields."
+        },
+        {
+          "path": "crates/model/src/openai.rs",
+          "start_line": 90,
+          "end_line": 108,
+          "reason": "Shows OpenAI usage mapping and the zero-default behavior that loses absent-value semantics."
+        },
+        {
+          "path": "crates/model/src/openai.rs",
+          "start_line": 227,
+          "end_line": 232,
+          "reason": "Shows the limited OpenAI-compatible usage schema."
+        },
+        {
+          "path": "crates/cli/src/subscription.rs",
+          "start_line": 314,
+          "end_line": 330,
+          "reason": "Shows turn usage being overwritten instead of accumulated, plus the current usage model."
+        },
+        {
+          "path": "crates/cli/src/subscription.rs",
+          "start_line": 645,
+          "end_line": 686,
+          "reason": "Shows existing single-turn usage test coverage."
+        }
+      ]
+    },
+    "B": {
+      "summary": "Usage accounting is incomplete in two paths:\n\n- The OpenAI-compatible backend only parses `prompt_tokens`, `completion_tokens`, and `total_tokens`, then converts missing fields to `0`; it does not expose cached input, cache-write input, or reasoning output. [crates/model/src/openai.rs:96-106] [crates/model/src/openai.rs:224-231]\n- The shared `Usage` type has no cache or reasoning fields, while `ScoutStats` has no total-token field. [crates/model/src/types.rs:100-114] [crates/core/src/types.rs:36-47]\n- Core multi-turn aggregation sums only prompt and completion tokens and explicitly leaves the other stats absent. [crates/core/src/engine.rs:90-96] [crates/core/src/engine.rs:130-135] [crates/core/src/engine.rs:218-234]\n- The Codex CLI path overwrites usage on every `turn.completed` event, so multi-turn runs retain only the final turn’s usage. [crates/cli/src/subscription.rs:303-330]\n\nImplement provider-optional usage fields end-to-end—cached input, cache-write input, reasoning output, and total tokens—and aggregate each reported field across turns while preserving `None` when no turn/provider reports it. Add multi-turn tests for both OpenAI-compatible responses and Codex event streams; the existing CLI test only verifies a single usage event. [crates/cli/src/subscription.rs:660-686]",
+      "citations": [
+        {
+          "path": "crates/model/src/openai.rs",
+          "start_line": 96,
+          "end_line": 106,
+          "reason": "Shows the OpenAI-compatible response mapping only three usage values and coercing missing values to zero."
+        },
+        {
+          "path": "crates/model/src/types.rs",
+          "start_line": 100,
+          "end_line": 114,
+          "reason": "Shows the shared Usage model lacks cache and reasoning fields."
+        },
+        {
+          "path": "crates/core/src/engine.rs",
+          "start_line": 90,
+          "end_line": 218,
+          "reason": "Shows multi-turn aggregation only tracks prompt and completion totals."
+        },
+        {
+          "path": "crates/cli/src/subscription.rs",
+          "start_line": 303,
+          "end_line": 330,
+          "reason": "Shows Codex usage is replaced on each completed turn rather than accumulated."
+        }
+      ]
+    }
+  }
+]

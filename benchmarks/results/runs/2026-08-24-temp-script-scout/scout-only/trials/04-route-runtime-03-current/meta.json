@@ -1,0 +1,15 @@
+{
+  "task_id": "route-runtime-03",
+  "arm": "current",
+  "order": 4,
+  "started_at": "2026-08-24T18:54:18Z",
+  "finished_at": "2026-08-24T18:54:55Z",
+  "prompt_sha256": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+  "repository_commit": "9079bfdea02e6db5418429faa90baabf13dbe8cb",
+  "binary_sha256": "1c5df2bb7f60a7e67c3151d9741f98de24c6545ebdf66b782e732e3416e07447",
+  "exit_code": 0,
+  "wall_ms": 36409,
+  "repository_changed": false,
+  "home_policy": "new mktemp HOME/CODEX_HOME; auth.json and config.toml copied; Codex --ignore-user-config",
+  "temp_home_root": "/tmp/repotracer-bench-home.P7HF2A"
+}

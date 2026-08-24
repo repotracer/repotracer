@@ -1,0 +1,42 @@
+{
+  "summary": "The repository does not yet implement this fully. `agents::detect` supports only Codex, and marks an integration configured when its config merely contains `repotracer`; it does not validate that the command points to the current executable. Thus upgraded/moved binaries can remain stale while appearing configured. [`crates/cli/src/agents.rs:14`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/agents.rs:14)\n\nImplement the repair in each agent’s leaf installer/detector: compare the configured RepoTracer command (including equivalent paths) with `agents::current_binary()`, classify it as healthy/stale/missing, and rewrite only the managed RepoTracer entry or marked block. Preserve all unrelated TOML and instruction content using the existing section/block replacement helpers. [`crates/cli/src/agents.rs:99`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/agents.rs:99)\n\nMake setup call repair for every detected/supported agent, including stale ones, and extend doctor/status output to expose `healthy`, `stale`, and `missing` rather than reducing everything to configured/not configured. Doctor currently emits only “configured” or “not configured.” [`crates/cli/src/doctor.rs:105`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/doctor.rs:105) [`crates/cli/src/main.rs:240`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/main.rs:240)\n\nAdd tests covering stale-path repair, preservation of unrelated settings, all supported agents, and diagnostic labels. Existing tests cover dry-run non-mutation and Codex setup, but not stale repair or multi-agent coverage. [`crates/cli/tests/setup.rs:5`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/tests/setup.rs:5)",
+  "citations": [
+    {
+      "path": "crates/cli/src/agents.rs",
+      "start_line": 14,
+      "end_line": 42,
+      "reason": "Shows AgentInfo state and that detection currently supports only Codex, with configured based on a loose substring check."
+    },
+    {
+      "path": "crates/cli/src/agents.rs",
+      "start_line": 99,
+      "end_line": 128,
+      "reason": "Shows Codex installation rewriting only its RepoTracer TOML section and managed instruction block, the preservation mechanism to reuse for targeted repair."
+    },
+    {
+      "path": "crates/cli/src/doctor.rs",
+      "start_line": 105,
+      "end_line": 128,
+      "reason": "Shows diagnostics currently collapsing agent state into configured versus not configured."
+    },
+    {
+      "path": "crates/cli/tests/setup.rs",
+      "start_line": 5,
+      "end_line": 112,
+      "reason": "Shows current setup tests cover dry-run and Codex setup, without stale-path or every-agent assertions."
+    }
+  ],
+  "stats": {
+    "turns": 4,
+    "tool_calls": 3,
+    "command_execution_used": true,
+    "temporary_script_used": false,
+    "duration_ms": 36997,
+    "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+    "prompt_tokens": 55443,
+    "cached_prompt_tokens": 38912,
+    "completion_tokens": 1472,
+    "reasoning_output_tokens": 426
+  },
+  "raw_final": "{\"answer\":\"The repository does not yet implement this fully. `agents::detect` supports only Codex, and marks an integration configured when its config merely contains `repotracer`; it does not validate that the command points to the current executable. Thus upgraded/moved binaries can remain stale while appearing configured. [`crates/cli/src/agents.rs:14`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/agents.rs:14)\\n\\nImplement the repair in each agent’s leaf installer/detector: compare the configured RepoTracer command (including equivalent paths) with `agents::current_binary()`, classify it as healthy/stale/missing, and rewrite only the managed RepoTracer entry or marked block. Preserve all unrelated TOML and instruction content using the existing section/block replacement helpers. [`crates/cli/src/agents.rs:99`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/agents.rs:99)\\n\\nMake setup call repair for every detected/supported agent, including stale ones, and extend doctor/status output to expose `healthy`, `stale`, and `missing` rather than reducing everything to configured/not configured. Doctor currently emits only “configured” or “not configured.” [`crates/cli/src/doctor.rs:105`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/doctor.rs:105) [`crates/cli/src/main.rs:240`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/src/main.rs:240)\\n\\nAdd tests covering stale-path repair, preservation of unrelated settings, all supported agents, and diagnostic labels. Existing tests cover dry-run non-mutation and Codex setup, but not stale repair or multi-agent coverage. [`crates/cli/tests/setup.rs:5`](/Users/mac/orca/workspaces/tool/temp-script-scout/crates/cli/tests/setup.rs:5)\",\"citations\":[{\"end_line\":42,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Shows AgentInfo state and that detection currently supports only Codex, with configured based on a loose substring check.\" ,\"start_line\":14},{\"end_line\":128,\"path\":\"crates/cli/src/agents.rs\",\"reason\":\"Shows Codex installation rewriting only its RepoTracer TOML section and managed instruction block, the preservation mechanism to reuse for targeted repair.\",\"start_line\":99},{\"end_line\":128,\"path\":\"crates/cli/src/doctor.rs\",\"reason\":\"Shows diagnostics currently collapsing agent state into configured versus not configured.\",\"start_line\":105},{\"end_line\":112,\"path\":\"crates/cli/tests/setup.rs\",\"reason\":\"Shows current setup tests cover dry-run and Codex setup, without stale-path or every-agent assertions.\",\"start_line\":5}]}"
+}

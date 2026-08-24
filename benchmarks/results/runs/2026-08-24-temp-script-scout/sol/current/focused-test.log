@@ -1,0 +1,28 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (target/debug/deps/repotracer_repo_tools-9aeff14518bfac86)
+
+running 15 tests
+test grep::tests::count_mode_maps_correctly ... ok
+test pathutil::tests::allows_relative_inside ... ok
+test pathutil::tests::blocks_parent_escape ... ok
+test pathutil::tests::blocks_symlink_escape ... ok
+test read::tests::rejects_escape ... ok
+test read::tests::reads_with_line_numbers ... ok
+test read::tests::bounds_output_and_gives_next_offset ... ok
+test grep::tests::count_mode_works ... ok
+test grep::tests::greps_content ... ok
+test grep::tests::bounds_content_output_with_continuation_guidance ... ok
+test glob_tool::tests::finds_by_pattern ... ok
+test glob_tool::tests::bounds_paths_and_reports_how_to_continue ... ok
+test exec::tests::deadline_retains_completed_results_and_cancels_the_rest ... ok
+test grep::tests::dropping_search_future_kills_ripgrep_child ... ok
+test exec::tests::parallel_is_much_faster_than_sequential ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+   Doc-tests repotracer_repo_tools
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

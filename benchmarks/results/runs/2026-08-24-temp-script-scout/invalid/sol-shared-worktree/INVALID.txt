@@ -1,0 +1,1 @@
+invalid_reason=codex exec omitted -C clone; both arms edited the shared experiment worktree; second arm inherited first patch; excluded
