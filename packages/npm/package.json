@@ -1,6 +1,6 @@
 {
   "name": "repotracer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local repository scout for AI coding agents. Small models search. Big models solve.",
   "bin": {
     "repotracer": "bin/repotracer.js"

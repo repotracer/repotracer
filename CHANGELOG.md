@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 — 2026-08-24
+
+### Added
+- `setup` presents an arrow-key menu when it finds an existing install: update or uninstall, Enter to confirm, Esc to cancel. Falls back to a numbered prompt where raw mode is unavailable, and skips the prompt entirely for non-interactive callers
+
+### Fixed
+- Docs no longer claim setup installs a "Codex routing skill"; it writes a managed block to `~/.codex/AGENTS.md` and removes any leftover skill file
+- The npm launcher no longer falls back to a bare `repotracer` on `PATH`, which could silently run an unrelated build
+
 ## Unreleased
 
 ### Added
