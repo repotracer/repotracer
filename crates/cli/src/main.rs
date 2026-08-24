@@ -1,6 +1,7 @@
 mod agents;
 mod config;
 mod doctor;
+mod select;
 mod setup;
 mod subscription;
 

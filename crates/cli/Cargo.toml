@@ -30,6 +30,9 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 which.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"

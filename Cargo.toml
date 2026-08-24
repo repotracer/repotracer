@@ -34,6 +34,7 @@ dirs = "6"
 futures = "0.3"
 globset = "0.4"
 ignore = "0.4"
+libc = "0.2"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }

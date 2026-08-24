@@ -4,7 +4,7 @@ I came across Microsoft's [FastContext paper](https://arxiv.org/abs/2606.14066v3
 
 I wanted that workflow in Codex, so I built RepoTracer.
 
-RepoTracer is an MCP server. Its `repo_scout` tool starts an isolated GPT-5.6 Luna process with read-only Read, Glob, and Grep tools. RepoTracer validates the returned paths and line ranges, then sends the citations, excerpts, and findings back to Codex Sol. A routing skill tells Sol when the task is broad enough to use it.
+RepoTracer is an MCP server. Its `repo_scout` tool starts an isolated GPT-5.6 Luna process with read-only Read, Glob, and Grep tools. RepoTracer validates the returned paths and line ranges, then sends the citations, excerpts, and findings back to Codex Sol. A managed block in `~/.codex/AGENTS.md` tells Sol when the task is broad enough to use it.
 
 ```text
 Sol → MCP repo_scout → Luna → Read / Glob / Grep
@@ -28,7 +28,7 @@ Every number includes Luna's usage. The repository keeps the losing runs and raw
 npx repotracer setup
 ```
 
-Codex must already be installed and signed in. RepoTracer reuses that login, installs the MCP server and routing skill, and requires no second API key.
+Codex must already be installed and signed in. RepoTracer reuses that login, installs the MCP server and routing instructions, and requires no second API key.
 
 - Repository: https://github.com/repotracer/repotracer
 - Benchmarks: https://github.com/repotracer/repotracer/blob/main/BENCHMARKS.md

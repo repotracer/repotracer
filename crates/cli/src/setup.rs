@@ -3,7 +3,7 @@ use crate::config;
 use crate::subscription::{is_subscription_backend, CliScout};
 use anyhow::{bail, Context, Result};
 use repotracer_core::RepoTracerConfig;
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, IsTerminal};
 use std::path::Path;
 use std::process::Command;
 
@@ -125,30 +125,16 @@ enum ExistingChoice {
 /// Ask what to do about an existing install. Non-interactive callers (CI, a piped
 /// `npx` run) must never block, so they get the safe default of refreshing.
 fn prompt_existing_install() -> Result<ExistingChoice> {
-    if !io::stdin().is_terminal() {
-        return Ok(ExistingChoice::Update);
-    }
-
-    println!("\n{}", style("1;33", "RepoTracer is already configured."));
-    println!("  {} Update the configuration (default)", style("1", "1"));
-    println!("  {} Uninstall RepoTracer", style("1", "2"));
-    println!("  {} Cancel", style("1", "3"));
-    print!("\nChoose [1]: ");
-    io::stdout().flush().ok();
-
-    let mut answer = String::new();
-    if io::stdin().read_line(&mut answer).is_err() {
-        return Ok(ExistingChoice::Update);
-    }
-    Ok(parse_existing_choice(&answer))
-}
-
-fn parse_existing_choice(answer: &str) -> ExistingChoice {
-    match answer.trim() {
-        "2" | "u" | "uninstall" => ExistingChoice::Uninstall,
-        "3" | "c" | "cancel" | "q" => ExistingChoice::Cancel,
-        _ => ExistingChoice::Update,
-    }
+    let choice = crate::select::select(
+        "RepoTracer is already configured.",
+        &["Update the configuration", "Uninstall RepoTracer"],
+        "Use arrow keys, then Enter. Esc to cancel.",
+    )?;
+    Ok(match choice {
+        Some(0) => ExistingChoice::Update,
+        Some(1) => ExistingChoice::Uninstall,
+        _ => ExistingChoice::Cancel,
+    })
 }
 
 fn gpt_config(cfg: &RepoTracerConfig) -> Result<RepoTracerConfig> {
@@ -271,30 +257,6 @@ fn os_label(os: &str, arch: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn existing_install_choice_defaults_to_update() {
-        // Anything unrecognised, including a bare Enter, must refresh rather than
-        // silently uninstall.
-        for answer in ["", "1", "x", "\n", "update"] {
-            assert!(matches!(
-                parse_existing_choice(answer),
-                ExistingChoice::Update
-            ));
-        }
-        for answer in ["2", "u", "uninstall"] {
-            assert!(matches!(
-                parse_existing_choice(answer),
-                ExistingChoice::Uninstall
-            ));
-        }
-        for answer in ["3", "c", "cancel", "q"] {
-            assert!(matches!(
-                parse_existing_choice(answer),
-                ExistingChoice::Cancel
-            ));
-        }
-    }
 
     #[test]
     fn setup_normalizes_to_luna_and_rejects_non_gpt_endpoints() {
