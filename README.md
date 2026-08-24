@@ -28,7 +28,7 @@ npx repotracer setup
 
 No Rust toolchain, second API key, background service, or hand-written config is required.
 
-**Changed your mind?** Run the same command again and pick *Uninstall*:
+**Don't want more limits and faster outputs for some reason?** Run the same command again and pick *Uninstall*:
 
 ```bash
 npx repotracer setup
