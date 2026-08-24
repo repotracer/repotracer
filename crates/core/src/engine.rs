@@ -241,6 +241,22 @@ impl crate::types::ScoutBackend for ScoutEngine {
     }
 }
 
+/// Whether a path the *model* produced looks absolute.
+///
+/// `Path::is_absolute` answers for the host, not the model, and gets this wrong
+/// in both directions: Windows rejects `/guessed/auth` for lacking a drive
+/// letter, and Unix rejects `C:\guessed`. Either way an invented path would be
+/// passed straight through to the tool instead of broadened to the repository
+/// root, so decide from the shape of the string rather than the host.
+fn model_path_is_absolute(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    let drive_prefixed = bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'/' | b'\\');
+    path.starts_with('/') || path.starts_with('\\') || drive_prefixed
+}
+
 fn sandbox_search_arguments(name: &str, arguments: &str, root: &Path) -> String {
     let field = match name {
         "Read" | "Grep" => "path",
@@ -271,7 +287,7 @@ fn sandbox_search_arguments(name: &str, arguments: &str, root: &Path) -> String 
     if let Some(relative) = relative {
         value[field] = relative.into();
         debug!(field, "normalized model path inside repository root");
-    } else if Path::new(path).is_absolute() && resolve_in_root(root, path).is_err() {
+    } else if model_path_is_absolute(path) && resolve_in_root(root, path).is_err() {
         if name == "Read" {
             value[field] = trimmed.into();
             debug!(
@@ -462,6 +478,17 @@ mod tests {
 
         assert_eq!(result.stats.turns, 2);
         assert_eq!(result.citations.len(), 1);
+    }
+
+    #[test]
+    fn model_paths_are_absolute_regardless_of_host_platform() {
+        // Windows' own is_absolute rejects these, but the model emits them on
+        // every platform, so they must still be treated as escapes.
+        assert!(model_path_is_absolute("/guessed/auth"));
+        assert!(model_path_is_absolute("\\guessed\\auth"));
+        assert!(model_path_is_absolute("C:\\guessed"));
+        assert!(!model_path_is_absolute("src/main.rs"));
+        assert!(!model_path_is_absolute("./src"));
     }
 
     #[test]
