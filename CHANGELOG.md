@@ -9,7 +9,7 @@
 - Docs no longer claim setup installs a "Codex routing skill"; it writes a managed block to `~/.codex/AGENTS.md` and removes any leftover skill file
 - The npm launcher no longer falls back to a bare `repotracer` on `PATH`, which could silently run an unrelated build
 
-## Unreleased
+## 0.1.2 — 2026-08-24
 
 ### Changed
 - `setup` runs `doctor` itself instead of printing instructions to run it. A failing check reports what to fix but does not fail the command, since setup still succeeded
