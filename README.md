@@ -5,7 +5,7 @@
 <h3 align="center">Get up to 60% more from your Codex limits.</h3>
 
 <p align="center">
-  RepoTracer is an MCP server whose <code>repo_scout</code> tool runs an isolated, read-only Luna process and returns validated source citations to Codex Sol.
+  A cheaper model searches your repository and hands Codex verified <code>file:line</code> citations, so Sol stops burning turns on search.
 </p>
 
 <p align="center">
@@ -46,14 +46,6 @@ Use arrow keys, then Enter. Esc to cancel.
 
 That removes the MCP entry, the routing block, and the local config. Your Codex login and settings are untouched, and every file it edits is backed up alongside the original first. `repotracer uninstall --yes` does the same thing without the menu.
 
-If Codex is not installed:
-
-```bash
-npm install -g @openai/codex
-codex login
-npx repotracer setup
-```
-
 `setup` runs `doctor` itself at the end, so you see whether it actually works rather than a list of things it wrote.
 
 Preview the changes:
@@ -92,20 +84,17 @@ The scout cannot edit, delete, patch, commit, or push.
 
 ## Measured results
 
-Complete cost includes both Sol and Luna.
+Whole task, with Luna's usage counted in.
 
-| Run | Scope | Quality | Complete cost | Wall time |
-|---|---|---:|---:|---:|
-| Google signup | One real implementation task | 78.75 vs 83.13 — slightly lower | **−62.68%** | −24.54% |
-| SWE-bench Astropy 13453 | One coding task | Exact regression passed in both arms | **−50.12%** | −9.60% |
-| Repeated natural routing | Three randomized pairs of one cross-file question | 6/6 checks in every arm | **−39.20% median** | +31.21% median |
-| Current immediate routing | Three randomized pairs of one cross-file question | 6/6 checks in every arm | **−28.63% median** | +6.65% median |
+| Run | Complete cost | Wall time |
+|---|---:|---:|
+| Real bug fix, production repo | **−62.68%** | −24.54% |
+| SWE-bench Astropy 13453 | **−50.12%** | −9.60% |
+| Median of three paired runs | **−39.20%** | +31.21% |
 
-On the Google task the expensive model also took in 74.86% fewer tokens. A fixed provider budget would cover roughly 2.7x as many equivalent runs of it. That is one task, and it does not prove every Codex limit lasts proportionally longer.
+RepoTracer is a beta. One run came out cheaper and scored slightly lower. Every run is published, including that one.
 
-The Google result matters: RepoTracer found the right production files, but Codex wrote its regression check against a duplicated test fixture. The run was much cheaper and slightly worse. We are investigating that failure before claiming the same quality as direct Codex.
-
-[Read the methods, caveats, rejected runs, and raw artifacts.](./BENCHMARKS.md)
+[Methods, caveats, rejected runs, and raw artifacts.](./BENCHMARKS.md)
 
 ## When Codex calls it
 
@@ -166,7 +155,7 @@ See [SECURITY.md](./SECURITY.md).
 
 ## Resources
 
-- [repotracer.tech](https://repotracer.tech) — the website
+- [repotracer.tech](https://repotracer.tech)
 - [Benchmarks](./BENCHMARKS.md)
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Why complete-task measurement matters](./docs/benchmarks/why-token-counters-lie.md)

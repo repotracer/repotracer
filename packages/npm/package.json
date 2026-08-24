@@ -1,7 +1,7 @@
 {
   "name": "repotracer",
   "version": "0.1.2",
-  "description": "Local repository scout for AI coding agents. Small models search. Big models solve.",
+  "description": "Get up to 60% more from your Codex limits. A cheaper model searches your repo so Codex stops burning turns on it.",
   "bin": {
     "repotracer": "bin/repotracer.js"
   },
@@ -16,11 +16,14 @@
   },
   "keywords": [
     "mcp",
-    "coding-agent",
     "codex",
-    "repository",
+    "openai-codex",
+    "coding-agent",
     "code-search",
-    "local-ai"
+    "repository",
+    "token-cost",
+    "rate-limit",
+    "rust"
   ],
   "license": "MIT",
   "homepage": "https://github.com/repotracer/repotracer#readme",
