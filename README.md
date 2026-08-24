@@ -172,3 +172,4 @@ cargo run -p repotracer -- scout "where is config loaded?" --mock
 ## License
 
 MIT. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
+
