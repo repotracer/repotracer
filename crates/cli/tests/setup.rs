@@ -21,10 +21,9 @@ fn dry_run_plans_zero_question_gpt_setup_without_writes() {
         ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("2 / 4  GPT scout"))
         .stdout(predicate::str::contains("gpt-5.6-luna"))
         .stdout(predicate::str::contains("Codex MCP + automatic routing"))
-        .stdout(predicate::str::contains("DRY RUN COMPLETE"));
+        .stdout(predicate::str::contains("Dry run. Nothing was changed."));
 
     assert!(!config.exists());
     assert!(!home.path().join(".codex").exists());
@@ -99,8 +98,8 @@ fn setup_uses_existing_codex_login_without_prompts() {
         .args(["--root", root.path().to_str().unwrap(), "setup"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("GPT scout via Codex CLI ready"))
-        .stdout(predicate::str::contains("READY"));
+        .stdout(predicate::str::contains("Codex found and signed in"))
+        .stdout(predicate::str::contains("Ready. Restart Codex"));
 
     assert!(std::fs::read_to_string(&config)
         .unwrap()
@@ -172,4 +171,47 @@ reasoning_effort = "medium"
         .assert()
         .failure()
         .stdout(predicate::str::contains("\"ready\": false"));
+}
+
+/// Setup is a global install and must not touch the working directory.
+///
+/// A user ran `npx repotracer setup` from their Windows home folder. Setup was
+/// running the full doctor, which globbed the whole of `C:\Users\pc` and then
+/// made a live model call, so it appeared to hang for minutes. Nothing in setup
+/// should depend on, or scan, the directory it happens to be run from.
+#[test]
+fn setup_is_fast_and_does_not_scan_the_working_directory() {
+    let home = tempfile::tempdir().unwrap();
+    let cwd = tempfile::tempdir().unwrap();
+
+    // A working directory that would be expensive to walk.
+    for i in 0..300 {
+        let dir = cwd.path().join(format!("dir{i}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("file.txt"), "x").unwrap();
+    }
+
+    let started = std::time::Instant::now();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_repotracer"))
+        .args(["setup", "--dry-run"])
+        .current_dir(cwd.path())
+        .env("HOME", home.path())
+        .env("USERPROFILE", home.path())
+        .env("CODEX_HOME", home.path().join(".codex"))
+        .env("NO_COLOR", "1")
+        .output()
+        .unwrap();
+    let elapsed = started.elapsed();
+
+    assert!(output.status.success(), "setup --dry-run failed");
+    assert!(
+        elapsed < std::time::Duration::from_secs(10),
+        "setup took {elapsed:?}; it must not scan the working directory or call a model"
+    );
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !text.contains("Git repository"),
+        "setup must not report on the working directory: {text}"
+    );
 }

@@ -13,102 +13,59 @@ pub async fn run(
     cfg: &RepoTracerConfig,
     dry_run: bool,
 ) -> Result<()> {
-    banner();
-    section("1 / 4  Environment");
-    item(
-        true,
-        &os_label(std::env::consts::OS, std::env::consts::ARCH),
-    );
-    item(root.join(".git").exists(), "Git repository");
-    item(
-        which::which("rg").is_ok(),
-        "ripgrep (optional with GPT scouts)",
-    );
-
+    // Setup is a global install: it writes to the Codex home and ~/.repotracer.
+    // Nothing here depends on the current directory, so nothing here inspects it.
     let detected = agents::detect(root);
-    for agent in &detected {
-        if agent.configured {
-            item(
-                true,
-                &format!("{} detected — already configured", agent.name),
-            );
-        } else {
-            item(agent.detected, &format!("{} detected", agent.name));
-        }
-    }
     let already_installed = detected.iter().any(|agent| agent.configured);
 
-    // An existing install is the one case where setup is not the obvious action,
-    // so offer the alternative instead of only mentioning it after the fact.
     if already_installed && !dry_run {
         match prompt_existing_install()? {
             ExistingChoice::Update => {}
             ExistingChoice::Uninstall => return uninstall(root, true),
             ExistingChoice::Cancel => {
-                println!("\nCancelled. Nothing was changed.");
+                println!("Cancelled. Nothing was changed.");
                 return Ok(());
             }
         }
     }
 
-    section("2 / 4  GPT scout");
     let selected_cfg = gpt_config(cfg)?;
     if is_subscription_backend(&selected_cfg) {
         verify_codex(&selected_cfg, dry_run)?;
-    } else if dry_run {
-        plan(&format!(
-            "would use {} at {}",
-            selected_cfg.model.model, selected_cfg.model.base_url
-        ));
-    } else {
+    }
+
+    let binary = agents::current_binary();
+    let codex_message = agents::install_codex(&binary, dry_run)
+        .map_err(|error| anyhow::anyhow!("Codex configuration failed: {error}"))?;
+
+    if dry_run {
+        // A preview's whole job is showing what would be configured.
+        println!("{}", style("1;34", "Dry run. Nothing was changed."));
         item(
             true,
             &format!(
-                "GPT endpoint configured ({} at {})",
+                "scout: {} via {}",
                 selected_cfg.model.model, selected_cfg.model.base_url
             ),
         );
+        item(true, &codex_message);
+        item(true, &format!("would write {}", cfg_path.display()));
+        return Ok(());
     }
 
-    section("3 / 4  Codex integration");
-    let binary = agents::current_binary();
-    match agents::install_codex(&binary, dry_run) {
-        Ok(message) => item(true, &message),
-        Err(error) => bail!("Codex configuration failed: {error}"),
+    if let Some(parent) = cfg_path.parent() {
+        std::fs::create_dir_all(parent)?;
     }
+    selected_cfg.save_to(cfg_path)?;
 
-    section("4 / 4  RepoTracer configuration");
-    if dry_run {
-        plan(&format!("would write {}", cfg_path.display()));
-    } else {
-        if let Some(parent) = cfg_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        selected_cfg.save_to(cfg_path)?;
-        item(true, &format!("config written ({})", cfg_path.display()));
-    }
-    item(true, &format!("binary ({})", binary.display()));
-
+    item(true, "Codex found and signed in");
+    item(true, &codex_message);
+    item(true, &format!("installed at {}", binary.display()));
     println!();
-    if dry_run {
-        println!(
-            "{}",
-            style("1;34", "DRY RUN COMPLETE — no files or services changed")
-        );
-        return Ok(());
-    }
-
-    // Setup's own checkmarks say what was written, not whether it works, so run
-    // the real verification. A failing check does not undo a successful setup —
-    // doctor already prints what to fix — so its error must not fail this command.
-    if crate::doctor::run(root, &selected_cfg, false)
-        .await
-        .is_err()
-    {
-        println!("\nSetup finished. Fix the items above, then: repotracer doctor");
-        return Ok(());
-    }
-    println!("\nRestart Codex, then ask a question that spans several files.");
+    println!(
+        "{}",
+        style("1;32", "Ready. Restart Codex and keep prompting normally.")
+    );
     Ok(())
 }
 
@@ -185,10 +142,6 @@ fn verify_codex(cfg: &RepoTracerConfig, dry_run: bool) -> Result<()> {
     if !output.status.success() {
         bail!("Codex is not signed in; run `codex login`, then rerun `repotracer setup`");
     }
-    item(
-        true,
-        &format!("{} ready ({})", scout.label(), cfg.model.model),
-    );
     Ok(())
 }
 
@@ -210,15 +163,6 @@ pub fn uninstall(root: &Path, yes: bool) -> Result<()> {
     Ok(())
 }
 
-fn banner() {
-    println!("{}", style("1;34", "REPOTRACER SETUP"));
-    println!("Small models search. Big models solve.\n");
-}
-
-fn section(title: &str) {
-    println!("\n{}", style("1", title));
-}
-
 fn item(success: bool, text: &str) {
     let (color, mark) = if success {
         ("1;32", "✓")
@@ -237,16 +181,6 @@ fn style(code: &str, text: &str) -> String {
         format!("\x1b[{code}m{text}\x1b[0m")
     } else {
         text.to_string()
-    }
-}
-
-fn os_label(os: &str, arch: &str) -> String {
-    match (os, arch) {
-        ("macos", "aarch64") => "Apple Silicon".into(),
-        ("macos", _) => format!("macOS {arch}"),
-        ("linux", _) => format!("Linux {arch}"),
-        ("windows", _) => format!("Windows {arch}"),
-        _ => format!("{os} {arch}"),
     }
 }
 
