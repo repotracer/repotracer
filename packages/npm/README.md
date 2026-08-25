@@ -5,7 +5,7 @@ RepoTracer is an MCP server whose `repo_scout` tool runs an isolated, read-only 
 ## Setup
 
 ```bash
-npx repotracer setup
+npx repotracer@latest setup
 ```
 
 The installer downloads the native binary, verifies its SHA-256 checksum, copies it to `~/.repotracer/bin/repotracer`, registers the stdio MCP server, and adds a managed routing block to `~/.codex/AGENTS.md`.
@@ -15,14 +15,14 @@ Codex must already be installed and signed in. RepoTracer reuses that login and 
 ```bash
 npm install -g @openai/codex
 codex login
-npx repotracer setup
+npx repotracer@latest setup
 repotracer doctor
 ```
 
 Preview without changing files:
 
 ```bash
-npx repotracer setup --dry-run
+npx repotracer@latest setup --dry-run
 ```
 
 ## Commands

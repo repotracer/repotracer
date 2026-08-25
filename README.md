@@ -21,7 +21,7 @@
 ## Install
 
 ```bash
-npx repotracer setup
+npx repotracer@latest setup
 ```
 
 `setup` downloads the native binary, verifies its SHA-256 checksum, installs it under `~/.repotracer/bin`, registers the MCP server, and adds a managed routing block to `~/.codex/AGENTS.md`. It reuses your existing Codex login.
@@ -31,7 +31,7 @@ No Rust toolchain, second API key, background service, or hand-written config is
 **Don't want more limits and faster outputs for some reason?** Run the same command again and pick *Uninstall*:
 
 ```bash
-npx repotracer setup
+npx repotracer@latest setup
 ```
 
 ```text
@@ -49,7 +49,7 @@ That removes the MCP entry, the routing block, and the local config. Your Codex 
 Preview the changes:
 
 ```bash
-npx repotracer setup --dry-run
+npx repotracer@latest setup --dry-run
 ```
 
 Want the `repotracer` command in your own shell too?
@@ -58,6 +58,15 @@ Want the `repotracer` command in your own shell too?
 npm install -g repotracer
 # or
 cargo install --git https://github.com/repotracer/repotracer --locked repotracer
+```
+
+## Updating
+
+Run the install command again. `@latest` is what matters: without it npx serves
+whatever version it cached first.
+
+```bash
+npx repotracer@latest setup
 ```
 
 ## How it works
