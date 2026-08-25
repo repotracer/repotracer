@@ -9,6 +9,15 @@
 - Docs no longer claim setup installs a "Codex routing skill"; it writes a managed block to `~/.codex/AGENTS.md` and removes any leftover skill file
 - The npm launcher no longer falls back to a bare `repotracer` on `PATH`, which could silently run an unrelated build
 
+## 0.1.3 — 2026-08-25
+
+### Fixed
+- `setup` no longer scans the working directory or runs `doctor`. Run from a non-repository such as a home folder it could appear to hang for minutes while it walked the whole tree and made a live model call
+- Model path escapes are detected from the string rather than the host platform, so a POSIX path on Windows or a drive-lettered path on Unix is broadened to the repository root as intended
+
+### Changed
+- `setup` output is three lines instead of a four-section report
+
 ## 0.1.2 — 2026-08-24
 
 ### Changed
