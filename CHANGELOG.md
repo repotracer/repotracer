@@ -9,7 +9,7 @@
 - Docs no longer claim setup installs a "Codex routing skill"; it writes a managed block to `~/.codex/AGENTS.md` and removes any leftover skill file
 - The npm launcher no longer falls back to a bare `repotracer` on `PATH`, which could silently run an unrelated build
 
-## Unreleased
+## 0.1.4 — 2026-08-25
 
 ### Added
 - The `repo_scout` handoff tells the user once a day when a newer release exists, with one line on what changed. Tested against real Codex: the MCP `notifications/message` channel is parsed and silently dropped, and a bare statement of fact is ignored, so the handoff must explicitly ask Codex to relay it
