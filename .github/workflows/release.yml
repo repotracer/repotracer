@@ -92,8 +92,11 @@ jobs:
           # The first prose line of the tag message becomes the release body,
           # which is what the update notice reads and relays to users. Write the
           # tag message for a human: one plain sentence saying what changed.
-          body=$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}")
-          [ -n "$body" ] || body=$(git tag -l --format='%(contents:subject)' "${GITHUB_REF_NAME}")
+          # checkout leaves a lightweight ref, so %(contents:body) would return
+          # the commit message instead of the annotation. Fetch the tag object.
+          git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          body=$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents:body)')
+          [ -n "$body" ] || body=$(git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)')
           {
             echo 'body<<RELEASE_BODY'
             echo "$body"
