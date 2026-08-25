@@ -72,6 +72,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Needed to read the tag annotation for the release body.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -82,7 +86,21 @@ jobs:
           find . -type f -print0 | sort -z | xargs -0 sha256sum > "${RUNNER_TEMP}/SHA256SUMS"
           mv "${RUNNER_TEMP}/SHA256SUMS" SHA256SUMS
           cat SHA256SUMS
+      - name: Release notes from the tag annotation
+        id: notes
+        run: |
+          # The first prose line of the tag message becomes the release body,
+          # which is what the update notice reads and relays to users. Write the
+          # tag message for a human: one plain sentence saying what changed.
+          body=$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}")
+          [ -n "$body" ] || body=$(git tag -l --format='%(contents:subject)' "${GITHUB_REF_NAME}")
+          {
+            echo 'body<<RELEASE_BODY'
+            echo "$body"
+            echo 'RELEASE_BODY'
+          } >> "$GITHUB_OUTPUT"
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
+          body: ${{ steps.notes.outputs.body }}
           generate_release_notes: true

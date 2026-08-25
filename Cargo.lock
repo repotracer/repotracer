@@ -1215,6 +1215,7 @@ version = "0.1.3"
 dependencies = [
  "anyhow",
  "repotracer-core",
+ "reqwest",
  "serde",
  "serde_json",
  "tempfile",

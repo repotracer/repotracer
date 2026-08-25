@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{debug, error};
 
+mod release;
 mod update_notice;
 
 const PROTOCOL_VERSION: &str = "2024-11-05";
@@ -34,6 +35,8 @@ impl McpServer {
 
     /// Serve MCP over stdin/stdout until EOF.
     pub async fn serve_stdio(&self) -> anyhow::Result<()> {
+        // Warm the release cache once, off the request path.
+        release::refresh_in_background();
         let stdin = std::io::stdin();
         let mut reader = BufReader::new(stdin.lock());
         let mut stdout = std::io::stdout();
@@ -155,12 +158,6 @@ impl McpServer {
     }
 }
 
-/// The newer release, if one is known. Wired to a real version check separately;
-/// returning None keeps the notice inert until then.
-fn pending_update() -> Option<(&'static str, &'static str)> {
-    None
-}
-
 fn handoff_response(root: &Path, mut result: ScoutResult) -> Value {
     let omitted = result.citations.len().saturating_sub(MAX_HANDOFF_CITATIONS);
     result.citations.truncate(MAX_HANDOFF_CITATIONS);
@@ -178,7 +175,10 @@ fn handoff_response(root: &Path, mut result: ScoutResult) -> Value {
             if omitted == 1 { " was" } else { "s were" }
         ));
     }
-    if let Some(line) = update_notice::notice(pending_update()) {
+    let pending = release::pending_update(SERVER_VERSION);
+    if let Some(line) =
+        update_notice::notice(pending.as_ref().map(|(v, c)| (v.as_str(), c.as_str())))
+    {
         text.push_str(&line);
     }
     let structured = json!({
