@@ -7,6 +7,27 @@ pub struct RepoTracerConfig {
     pub model: ModelSettings,
     #[serde(default)]
     pub explorer: ExplorerBudget,
+    #[serde(default)]
+    pub notifications: NotificationSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationSettings {
+    /// Whether the scout handoff may tell the user a newer release exists.
+    #[serde(default = "default_true")]
+    pub update_available: bool,
+}
+
+impl Default for NotificationSettings {
+    fn default() -> Self {
+        Self {
+            update_available: true,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl RepoTracerConfig {

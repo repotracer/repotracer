@@ -234,7 +234,8 @@ async fn cmd_scout(
 async fn cmd_serve(root: &std::path::Path, cfg: &RepoTracerConfig, mock: bool) -> Result<()> {
     // Logs must not touch stdout.
     let engine = build_scout(root, cfg, mock)?;
-    let server = McpServer::new(engine, root.to_path_buf());
+    let server = McpServer::new(engine, root.to_path_buf())
+        .with_update_notices(cfg.notifications.update_available);
     server.serve_stdio().await
 }
 

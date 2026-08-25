@@ -29,7 +29,15 @@ pub async fn run(
         }
     }
 
-    let selected_cfg = gpt_config(cfg)?;
+    let mut selected_cfg = gpt_config(cfg)?;
+    if !dry_run {
+        // Default on, but never hold up an install waiting for an answer.
+        selected_cfg.notifications.update_available = crate::select::confirm_with_timeout(
+            "Let Codex mention it when a RepoTracer update is available?",
+            cfg.notifications.update_available,
+            std::time::Duration::from_secs(4),
+        );
+    }
     if is_subscription_backend(&selected_cfg) {
         verify_codex(&selected_cfg, dry_run)?;
     }
@@ -61,6 +69,9 @@ pub async fn run(
     item(true, "Codex found and signed in");
     item(true, &codex_message);
     item(true, &format!("installed at {}", binary.display()));
+    if !selected_cfg.notifications.update_available {
+        item(true, "update notices off");
+    }
     println!();
     println!(
         "{}",

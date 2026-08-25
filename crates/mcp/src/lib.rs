@@ -26,17 +26,29 @@ const REPO_SCOUT_DESC: &str = "Use repo_scout only when it replaces broad reposi
 pub struct McpServer {
     scout: Arc<dyn ScoutBackend>,
     root: PathBuf,
+    /// Whether the handoff may mention a newer release. Set from config, so a
+    /// user who declined at setup is never told again.
+    update_notices: bool,
 }
 
 impl McpServer {
     pub fn new(scout: Arc<dyn ScoutBackend>, root: PathBuf) -> Self {
-        Self { scout, root }
+        Self {
+            scout,
+            root,
+            update_notices: true,
+        }
+    }
+
+    pub fn with_update_notices(mut self, allowed: bool) -> Self {
+        self.update_notices = allowed;
+        self
     }
 
     /// Serve MCP over stdin/stdout until EOF.
     pub async fn serve_stdio(&self) -> anyhow::Result<()> {
         // Warm the release cache once, off the request path.
-        release::refresh_in_background();
+        release::refresh_in_background(self.update_notices);
         let stdin = std::io::stdin();
         let mut reader = BufReader::new(stdin.lock());
         let mut stdout = std::io::stdout();
@@ -154,11 +166,11 @@ impl McpServer {
             .await
             .map_err(|e| rpc_error(-32000, e.to_string()))?;
 
-        Ok(handoff_response(&self.root, result))
+        Ok(handoff_response(&self.root, result, self.update_notices))
     }
 }
 
-fn handoff_response(root: &Path, mut result: ScoutResult) -> Value {
+fn handoff_response(root: &Path, mut result: ScoutResult, update_notices: bool) -> Value {
     let omitted = result.citations.len().saturating_sub(MAX_HANDOFF_CITATIONS);
     result.citations.truncate(MAX_HANDOFF_CITATIONS);
     let next_action = if result.citations.is_empty() {
@@ -175,7 +187,7 @@ fn handoff_response(root: &Path, mut result: ScoutResult) -> Value {
             if omitted == 1 { " was" } else { "s were" }
         ));
     }
-    let pending = release::pending_update(SERVER_VERSION);
+    let pending = release::pending_update(SERVER_VERSION, update_notices);
     if let Some(line) =
         update_notice::notice(pending.as_ref().map(|(v, c)| (v.as_str(), c.as_str())))
     {
@@ -489,7 +501,7 @@ mod tests {
 
     #[test]
     fn successful_handoff_caps_evidence_and_stops_broad_search() {
-        let response = handoff_response(Path::new("."), scout_result(10));
+        let response = handoff_response(Path::new("."), scout_result(10), false);
         let structured = &response["structuredContent"];
         assert_eq!(structured["citations"].as_array().unwrap().len(), 5);
         assert!(structured["next_action"]
@@ -508,7 +520,7 @@ mod tests {
         result.citations[0].path = "Cargo.toml".into();
         result.citations[0].start_line = 1;
         result.citations[0].end_line = 17;
-        let response = handoff_response(Path::new(env!("CARGO_MANIFEST_DIR")), result);
+        let response = handoff_response(Path::new(env!("CARGO_MANIFEST_DIR")), result, false);
         let text = response["content"][0]["text"].as_str().unwrap();
         assert!(text.contains("Evidence excerpts"));
         assert!(text.contains("1: [package]"));
@@ -540,7 +552,7 @@ mod tests {
 
     #[test]
     fn empty_handoff_explicitly_allows_normal_exploration() {
-        let response = handoff_response(Path::new("."), scout_result(0));
+        let response = handoff_response(Path::new("."), scout_result(0), false);
         assert_eq!(response["structuredContent"]["next_action"], EMPTY_HANDOFF);
         assert!(response["content"][0]["text"]
             .as_str()

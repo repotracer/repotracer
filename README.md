@@ -62,6 +62,12 @@ cargo install --git https://github.com/repotracer/repotracer --locked repotracer
 
 ## Updating
 
+Setup asks once whether Codex may mention future updates. It defaults to yes and
+continues after four seconds if you say nothing. To change it later, set
+`notifications.update_available` in `~/.repotracer/config.toml`, or set
+`REPOTRACER_NO_UPDATE_CHECK=1`.
+
+
 Run the install command again. `@latest` is what matters: without it npx serves
 whatever version it cached first.
 

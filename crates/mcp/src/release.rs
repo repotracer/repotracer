@@ -59,8 +59,8 @@ fn read_cache() -> Option<Cached> {
 /// The release to advertise, if the running binary is behind it.
 ///
 /// Reads only the cache, so this is a file read and never a network call.
-pub fn pending_update(running: &str) -> Option<(String, String)> {
-    if disabled() {
+pub fn pending_update(running: &str, config_allows: bool) -> Option<(String, String)> {
+    if !config_allows || disabled() {
         return None;
     }
     let cached = read_cache()?;
@@ -74,8 +74,8 @@ pub fn pending_update(running: &str) -> Option<(String, String)> {
 ///
 /// Failure is silent by design: an unreachable release feed is not the user's
 /// problem and must not surface as an error during a coding session.
-pub fn refresh_in_background() {
-    if disabled() {
+pub fn refresh_in_background(config_allows: bool) {
+    if !config_allows || disabled() {
         return;
     }
     let fresh = read_cache()
@@ -187,6 +187,11 @@ fn is_newer(candidate: &str, current: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_config_switch_silences_it() {
+        assert!(pending_update("0.0.1", false).is_none());
+    }
 
     #[test]
     fn version_comparison_handles_the_shapes_we_publish() {

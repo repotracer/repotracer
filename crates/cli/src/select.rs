@@ -7,6 +7,7 @@
 //! the command still works everywhere.
 
 use std::io::{self, IsTerminal, Write};
+use std::time::Duration;
 
 /// Ask the user to pick one of `options`, returning its index.
 ///
@@ -195,4 +196,74 @@ impl Drop for RawMode {
         let _ = write!(io::stdout(), "\x1b[?25h");
         let _ = io::stdout().flush();
     }
+}
+
+/// Ask a yes/no question, but never hold up an install for an answer.
+///
+/// Setup is meant to be one command that finishes. If nobody is watching, or
+/// the user simply does not care, the default applies after `timeout` and the
+/// install continues.
+pub fn confirm_with_timeout(question: &str, default_yes: bool, timeout: Duration) -> bool {
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        return default_yes;
+    }
+    let hint = if default_yes { "[Y/n]" } else { "[y/N]" };
+    print!("{question} {hint} ");
+    io::stdout().flush().ok();
+
+    let answered = read_line_with_timeout(timeout);
+    match answered.as_deref().map(str::trim) {
+        Some("y") | Some("Y") | Some("yes") => {
+            println!();
+            true
+        }
+        Some("n") | Some("N") | Some("no") => {
+            println!();
+            false
+        }
+        Some("") => {
+            println!();
+            default_yes
+        }
+        _ => {
+            // Timed out. Say so, otherwise the default looks like a silent decision.
+            println!("\n  no answer, keeping the default");
+            default_yes
+        }
+    }
+}
+
+#[cfg(unix)]
+fn read_line_with_timeout(timeout: Duration) -> Option<String> {
+    use std::os::unix::io::AsRawFd;
+    let fd = io::stdin().as_raw_fd();
+    // SAFETY: a zeroed fd_set and a select() on a valid fd we own.
+    let ready = unsafe {
+        let mut set: libc::fd_set = std::mem::zeroed();
+        libc::FD_ZERO(&mut set);
+        libc::FD_SET(fd, &mut set);
+        let mut tv = libc::timeval {
+            tv_sec: timeout.as_secs() as libc::time_t,
+            tv_usec: timeout.subsec_micros() as libc::suseconds_t,
+        };
+        libc::select(
+            fd + 1,
+            &mut set,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut tv,
+        )
+    };
+    if ready <= 0 {
+        return None;
+    }
+    let mut line = String::new();
+    io::stdin().read_line(&mut line).ok().map(|_| line)
+}
+
+#[cfg(not(unix))]
+fn read_line_with_timeout(_timeout: Duration) -> Option<String> {
+    // No select() on stdin here; block rather than skip the question.
+    let mut line = String::new();
+    io::stdin().read_line(&mut line).ok().map(|_| line)
 }
