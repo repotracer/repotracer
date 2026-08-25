@@ -30,7 +30,7 @@ pub struct CliScout {
     executable: PathBuf,
     model: Option<String>,
     reasoning_effort: String,
-    timeout: Duration,
+    timeout: Option<Duration>,
 }
 
 impl CliScout {
@@ -59,7 +59,8 @@ impl CliScout {
             executable,
             model,
             reasoning_effort,
-            timeout: Duration::from_millis(cfg.model.timeout_ms),
+            timeout: (cfg.model.timeout_ms > 0)
+                .then(|| Duration::from_millis(cfg.model.timeout_ms)),
         })
     }
 
@@ -78,7 +79,11 @@ impl CliScout {
                 root: root.to_path_buf(),
                 focus: None,
                 max_turns: Some(2),
-                timeout: Some(self.timeout.min(Duration::from_secs(60))),
+                timeout: Some(
+                    self.timeout
+                        .unwrap_or(Duration::from_secs(60))
+                        .min(Duration::from_secs(60)),
+                ),
             })
             .await?;
         if result.citations.is_empty() {
@@ -166,7 +171,7 @@ impl CliScout {
             .run_process(
                 self.codex_args(&schema, &output, &self.prompt(&request)),
                 &request.root,
-                request.timeout.unwrap_or(self.timeout),
+                request.timeout.or(self.timeout),
             )
             .await?;
         if !process.status.success() {
@@ -211,7 +216,7 @@ impl CliScout {
         &self,
         args: Vec<OsString>,
         cwd: &Path,
-        timeout: Duration,
+        timeout: Option<Duration>,
     ) -> Result<ProcessOutput> {
         let mut command = Command::new(&self.executable);
         command
@@ -232,18 +237,22 @@ impl CliScout {
         let stdout_task = tokio::spawn(drain_limited(stdout, MAX_CAPTURE_BYTES));
         let stderr_task = tokio::spawn(drain_limited(stderr, MAX_CAPTURE_BYTES));
 
-        let status = match tokio::time::timeout(timeout, child.wait()).await {
-            Ok(status) => status?,
-            Err(_) => {
-                kill_process_tree(&mut child).await;
-                let _ = stdout_task.await;
-                let _ = stderr_task.await;
-                bail!(
-                    "{} timed out after {}s",
-                    self.label(),
-                    timeout.as_secs_f32()
-                );
+        let status = if let Some(timeout) = timeout {
+            match tokio::time::timeout(timeout, child.wait()).await {
+                Ok(status) => status?,
+                Err(_) => {
+                    kill_process_tree(&mut child).await;
+                    let _ = stdout_task.await;
+                    let _ = stderr_task.await;
+                    bail!(
+                        "{} timed out after {}s",
+                        self.label(),
+                        timeout.as_secs_f32()
+                    );
+                }
             }
+        } else {
+            child.wait().await?
         };
         let stdout = stdout_task.await.context("provider stdout task failed")??;
         let stderr = stderr_task.await.context("provider stderr task failed")??;

@@ -109,7 +109,6 @@ fn gpt_config(cfg: &RepoTracerConfig) -> Result<RepoTracerConfig> {
             if !selected.model.model.starts_with("gpt-") {
                 selected.model.model = "gpt-5.6-luna".into();
             }
-            selected.model.timeout_ms = selected.model.timeout_ms.max(120_000);
         }
         "openai" | "openai-compatible" => {
             if !selected.model.model.starts_with("gpt-") {
@@ -125,7 +124,6 @@ fn gpt_config(cfg: &RepoTracerConfig) -> Result<RepoTracerConfig> {
             selected.model.executable = None;
             selected.model.model = "gpt-5.6-luna".into();
             selected.model.api_key = None;
-            selected.model.timeout_ms = selected.model.timeout_ms.max(120_000);
         }
     }
     Ok(selected)

@@ -14,8 +14,11 @@ pub struct OpenAiCompatBackend {
 
 impl OpenAiCompatBackend {
     pub fn new(config: ModelConfig) -> Result<Self, ModelError> {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_millis(config.timeout_ms))
+        let mut builder = reqwest::Client::builder();
+        if config.timeout_ms > 0 {
+            builder = builder.timeout(Duration::from_millis(config.timeout_ms));
+        }
+        let client = builder
             .build()
             .map_err(|e| ModelError::Request(e.to_string()))?;
         Ok(Self { client, config })

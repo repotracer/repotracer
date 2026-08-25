@@ -35,33 +35,34 @@ impl ScoutEngine {
     pub async fn scout(&self, request: ScoutRequest) -> anyhow::Result<ScoutResult> {
         let started = Instant::now();
         let max_turns = request.max_turns.unwrap_or(self.budget.max_turns);
-        let total_timeout = request
-            .timeout
-            .unwrap_or_else(|| self.budget.total_timeout());
-
+        let total_timeout = request.timeout.or_else(|| self.budget.total_timeout());
         let run = self.scout_inner(request, max_turns);
-        match tokio::time::timeout(total_timeout, run).await {
-            Ok(res) => {
-                let mut r = res?;
-                r.stats.duration_ms = started.elapsed().as_millis() as u64;
-                Ok(r)
+        let mut result = if let Some(total_timeout) = total_timeout {
+            match tokio::time::timeout(total_timeout, run).await {
+                Ok(result) => result?,
+                Err(_) => {
+                    return Ok(ScoutResult {
+                        summary: format!("Scout timed out after {}s.", total_timeout.as_secs()),
+                        citations: vec![],
+                        stats: ScoutStats {
+                            turns: 0,
+                            tool_calls: 0,
+                            duration_ms: started.elapsed().as_millis() as u64,
+                            model: self.model.name().to_string(),
+                            prompt_tokens: None,
+                            cached_prompt_tokens: None,
+                            completion_tokens: None,
+                            reasoning_output_tokens: None,
+                        },
+                        raw_final: None,
+                    });
+                }
             }
-            Err(_) => Ok(ScoutResult {
-                summary: format!("Scout timed out after {}s.", total_timeout.as_secs()),
-                citations: vec![],
-                stats: ScoutStats {
-                    turns: 0,
-                    tool_calls: 0,
-                    duration_ms: started.elapsed().as_millis() as u64,
-                    model: self.model.name().to_string(),
-                    prompt_tokens: None,
-                    cached_prompt_tokens: None,
-                    completion_tokens: None,
-                    reasoning_output_tokens: None,
-                },
-                raw_final: None,
-            }),
-        }
+        } else {
+            run.await?
+        };
+        result.stats.duration_ms = started.elapsed().as_millis() as u64;
+        Ok(result)
     }
 
     async fn scout_inner(

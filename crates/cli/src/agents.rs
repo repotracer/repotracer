@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 const MANAGED_START: &str = "<!-- repotracer:start -->";
 const MANAGED_END: &str = "<!-- repotracer:end -->";
 
-const ROUTING_INSTRUCTIONS: &str = "Decide repository-scout eligibility from the request and current context before repository operations. When unfamiliar or cross-file understanding would otherwise require broad exploration, call repo_scout as the first repository operation; do not run preliminary pwd, listing, CodeGraph, Grep, Glob, Read, or shell searches. Skip it when one targeted lookup is sufficient or the relevant files, symbols, source, or precise change surface are already known. Do not call it merely because a task is difficult. Validated citations complete broad exploration; use the handoff summary and evidence excerpts, and do not repeat broad searches. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup when current-source evidence does not establish what changed. If it returns no validated citations, fall back to normal repository tools.";
+const ROUTING_INSTRUCTIONS: &str = "Classify repository scope from the request and current context before repository operations. Unknown location or an unfamiliar repository alone is not enough. Scope follows ownership boundaries, not the number of acceptance outcomes: a cache invalidation bug or request-cancellation lifecycle within one server remains localized, while a focus/root option that must propagate through prompting, repository tools, path containment, and citation or output normalization is cross-component. For a localized bug or change, use one targeted lookup first and call repo_scout only if that lookup fails to identify a precise change surface. A matching task or benchmark manifest that names an expected path is a precise change surface; follow that path with one narrow read instead of calling repo_scout. When the request explicitly spans multiple subsystems, packages, integrations, or requires broad read-only mapping, call repo_scout as the first repository operation; do not run preliminary pwd, listing, CodeGraph, Grep, Glob, Read, or shell searches. Do not call it merely because a task is difficult. Validated citations complete broad exploration; use the handoff summary and evidence excerpts, and do not repeat broad searches. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup before selecting the fix.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInfo {
@@ -271,5 +271,10 @@ mod tests {
         assert!(ROUTING_INSTRUCTIONS.contains("complete broad exploration"));
         assert!(ROUTING_INSTRUCTIONS.contains("do not repeat broad searches"));
         assert!(ROUTING_INSTRUCTIONS.contains("one targeted history lookup"));
+        assert!(ROUTING_INSTRUCTIONS.contains("Unknown location"));
+        assert!(ROUTING_INSTRUCTIONS.contains("localized bug or change"));
+        assert!(ROUTING_INSTRUCTIONS.contains("request-cancellation lifecycle"));
+        assert!(ROUTING_INSTRUCTIONS.contains("focus/root option"));
+        assert!(ROUTING_INSTRUCTIONS.contains("manifest that names an expected path"));
     }
 }

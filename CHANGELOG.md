@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5 — 2026-08-25
+
+### Fixed
+- Tiny repositories and localized single-owner changes skip `repo_scout`, while broad cross-component work still calls it first
+- Long-running scouts no longer time out by default; explicit timeout configuration remains supported
+
 ## 0.1.1 — 2026-08-24
 
 ### Added

@@ -18,10 +18,24 @@ const MAX_HANDOFF_CITATIONS: usize = 5;
 const MAX_EVIDENCE_BYTES: usize = 6 * 1024;
 const MAX_EXCERPT_BYTES: usize = 1200;
 const MAX_EXCERPT_LINES: u32 = 40;
+// ponytail: conservative economic cutoff; replace only if mixed live benchmarks justify it.
+const SMALL_REPOSITORY_FILE_LIMIT: usize = 32;
+const ROUTER_IGNORED_DIRS: &[&str] = &[
+    ".git",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    "__pycache__",
+    ".venv",
+    "venv",
+];
 const SUCCESSFUL_HANDOFF: &str = "Broad repository exploration is complete. Use the summary and included evidence excerpts. For read-only explanation or planning, you MUST answer immediately and MUST NOT make another repository tool call. For edits, read one narrow cited range only when the handoff does not resolve a specific fact needed for the change. Do not run repository-wide file listings, broad Grep/Glob searches, or unrelated documentation reads. RepoTracer cannot inspect Git history; when the task describes a regression and current-source evidence does not establish what changed, run one targeted history lookup before selecting the fix.";
 const EMPTY_HANDOFF: &str =
     "No validated evidence was returned. Fall back to normal repository exploration.";
-const REPO_SCOUT_DESC: &str = "Use repo_scout only when it replaces broad repository exploration: the relevant implementation is unknown and the task needs unfamiliar cross-file understanding, or a targeted search failed. Skip when the prompt names the relevant files or symbols, supplies a precise change surface, the code is already in context, or one targeted lookup is likely enough. A successful result completes broad exploration and includes bounded source excerpts. For read-only explanation or planning, answer immediately without another repository tool call. For edits, read one narrow cited range only for a specific unresolved fact. Do not repeat repository-wide searches or unrelated documentation reads. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup when current source does not establish what changed.";
+const REPO_SCOUT_DESC: &str = "Use repo_scout only when it replaces broad repository exploration. Unknown location or an unfamiliar repository alone is not enough. For a localized bug or change, use one targeted lookup first and call repo_scout only if that lookup fails to identify a precise change surface. Skip when the prompt names the relevant files or symbols and that is the complete change surface. Call repo_scout immediately when the request itself requires broad multi-component or cross-file tracing. A successful result completes broad exploration and includes bounded source excerpts. For read-only explanation or planning, answer immediately without another repository tool call. For edits, read one narrow cited range only for a specific unresolved fact. Do not repeat repository-wide searches or unrelated documentation reads. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup before selecting the fix.";
 
 pub struct McpServer {
     scout: Arc<dyn ScoutBackend>,
@@ -151,6 +165,24 @@ impl McpServer {
             return Ok(tool_text(
                 "Error: `focus` must be a repository-relative subdirectory.",
                 true,
+            ));
+        }
+
+        if small_repository(&self.root) {
+            return Ok(handoff_response(
+                &self.root,
+                ScoutResult {
+                    summary: format!(
+                        "RepoTracer's local router skipped the scout because this small repository has at most {SMALL_REPOSITORY_FILE_LIMIT} files. Use one targeted repository lookup instead."
+                    ),
+                    citations: Vec::new(),
+                    stats: repotracer_core::ScoutStats {
+                        model: "local router".into(),
+                        ..Default::default()
+                    },
+                    raw_final: None,
+                },
+                self.update_notices,
             ));
         }
 
@@ -301,6 +333,42 @@ fn valid_focus(path: &std::path::Path) -> bool {
         })
 }
 
+fn small_repository(root: &Path) -> bool {
+    repository_file_count(root, SMALL_REPOSITORY_FILE_LIMIT)
+        .is_ok_and(|count| count <= SMALL_REPOSITORY_FILE_LIMIT)
+}
+
+fn repository_file_count(root: &Path, limit: usize) -> std::io::Result<usize> {
+    let mut directories = vec![root.to_path_buf()];
+    let mut files = 0;
+
+    while let Some(directory) = directories.pop() {
+        for entry in std::fs::read_dir(directory)? {
+            let entry = entry?;
+            let file_type = entry.file_type()?;
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_dir() {
+                let name = entry.file_name();
+                if !ROUTER_IGNORED_DIRS
+                    .iter()
+                    .any(|ignored| name == std::ffi::OsStr::new(ignored))
+                {
+                    directories.push(entry.path());
+                }
+            } else if file_type.is_file() {
+                files += 1;
+                if files > limit {
+                    return Ok(files);
+                }
+            }
+        }
+    }
+
+    Ok(files)
+}
+
 fn repo_scout_tool_def() -> Value {
     json!({
         "name": "repo_scout",
@@ -331,7 +399,7 @@ fn repo_scout_tool_def() -> Value {
 fn repo_scout_prompt_def() -> Value {
     json!({
         "name": "repo_scout",
-        "description": "Delegate unknown-location or broad repository exploration to RepoTracer.",
+        "description": "Delegate broad cross-file repository exploration or a failed targeted lookup to RepoTracer.",
         "arguments": [{
             "name": "query",
             "description": "Precise semantic repository question or flow to trace.",
@@ -462,6 +530,8 @@ mod tests {
         let description = tool["description"].as_str().unwrap();
         assert!(description.contains("replaces broad repository exploration"));
         assert!(description.contains("prompt names the relevant files or symbols"));
+        assert!(description.contains("Unknown location"));
+        assert!(description.contains("localized bug or change"));
         assert!(description.contains("includes bounded source excerpts"));
         assert!(description.contains("Do not repeat repository-wide searches"));
         assert!(description.contains("answer immediately without another repository tool call"));
@@ -497,6 +567,87 @@ mod tests {
             stats: repotracer_core::ScoutStats::default(),
             raw_final: None,
         }
+    }
+
+    struct CountingScout {
+        calls: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    #[async_trait::async_trait]
+    impl ScoutBackend for CountingScout {
+        async fn scout(&self, _request: ScoutRequest) -> anyhow::Result<ScoutResult> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(scout_result(1))
+        }
+    }
+
+    #[tokio::test]
+    async fn tiny_repository_declines_without_starting_scout() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("main.rs"), "fn main() {}\n").unwrap();
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let server = McpServer::new(
+            Arc::new(CountingScout {
+                calls: calls.clone(),
+            }),
+            root.path().to_path_buf(),
+        );
+
+        let response = server
+            .tools_call(json!({
+                "name": "repo_scout",
+                "arguments": { "query": "Find the shared root of this narrow bug" }
+            }))
+            .await
+            .unwrap();
+
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(response["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("small repository"));
+    }
+
+    #[tokio::test]
+    async fn larger_repository_still_starts_scout() {
+        let root = tempfile::tempdir().unwrap();
+        for index in 0..=SMALL_REPOSITORY_FILE_LIMIT {
+            std::fs::write(root.path().join(format!("{index}.rs")), "// source\n").unwrap();
+        }
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let server = McpServer::new(
+            Arc::new(CountingScout {
+                calls: calls.clone(),
+            }),
+            root.path().to_path_buf(),
+        );
+
+        let response = server
+            .tools_call(json!({
+                "name": "repo_scout",
+                "arguments": { "query": "Trace a broad cross-component flow" }
+            }))
+            .await
+            .unwrap();
+
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert!(response["structuredContent"]["next_action"]
+            .as_str()
+            .unwrap()
+            .contains("Broad repository exploration is complete"));
+    }
+
+    #[test]
+    fn generated_directories_do_not_force_scouting() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("target");
+        std::fs::create_dir(&target).unwrap();
+        for index in 0..=SMALL_REPOSITORY_FILE_LIMIT {
+            std::fs::write(target.join(index.to_string()), "generated\n").unwrap();
+        }
+        std::fs::write(root.path().join("main.rs"), "fn main() {}\n").unwrap();
+
+        assert!(small_repository(root.path()));
     }
 
     #[test]

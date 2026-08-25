@@ -118,6 +118,7 @@ pub struct ModelConfig {
     pub base_url: String,
     pub model: String,
     pub api_key: Option<String>,
+    /// Whole request timeout in milliseconds. Zero disables it.
     pub timeout_ms: u64,
     pub temperature: f32,
     pub max_tokens: Option<u32>,
@@ -129,7 +130,7 @@ impl Default for ModelConfig {
             base_url: "https://api.openai.com/v1".into(),
             model: "gpt-5.6-luna".into(),
             api_key: None,
-            timeout_ms: 120_000,
+            timeout_ms: 0,
             temperature: 0.0,
             max_tokens: None,
         }

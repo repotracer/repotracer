@@ -93,7 +93,7 @@ pub async fn run(root: &Path, cfg: &RepoTracerConfig, json_mode: bool) -> Result
             base_url: cfg.model.base_url.clone(),
             model: cfg.model.model.clone(),
             api_key: cfg.model.resolved_api_key(),
-            timeout_ms: cfg.model.timeout_ms.min(10_000),
+            timeout_ms: 10_000,
             temperature: 0.0,
             max_tokens: Some(16),
         });

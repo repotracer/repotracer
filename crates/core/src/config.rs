@@ -60,7 +60,8 @@ pub struct ModelSettings {
     pub base_url: String,
     #[serde(default)]
     pub api_key: Option<String>,
-    #[serde(default = "default_timeout_ms")]
+    /// Whole model/scout timeout in milliseconds. Zero disables it.
+    #[serde(default)]
     pub timeout_ms: u64,
     #[serde(default)]
     pub temperature: f32,
@@ -86,9 +87,6 @@ fn default_reasoning_effort() -> String {
 fn default_base_url() -> String {
     "https://api.openai.com/v1".into()
 }
-fn default_timeout_ms() -> u64 {
-    120_000
-}
 
 impl Default for ModelSettings {
     fn default() -> Self {
@@ -99,7 +97,7 @@ impl Default for ModelSettings {
             reasoning_effort: default_reasoning_effort(),
             base_url: default_base_url(),
             api_key: None,
-            timeout_ms: default_timeout_ms(),
+            timeout_ms: 0,
             temperature: 0.0,
         }
     }
@@ -109,7 +107,8 @@ impl Default for ModelSettings {
 pub struct ExplorerBudget {
     #[serde(default = "default_max_turns")]
     pub max_turns: u32,
-    #[serde(default = "default_timeout_secs")]
+    /// Whole exploration timeout in seconds. Zero disables it.
+    #[serde(default)]
     pub timeout_seconds: u64,
     #[serde(default = "default_max_tool_calls")]
     pub max_tool_calls: u32,
@@ -121,9 +120,6 @@ pub struct ExplorerBudget {
 
 fn default_max_turns() -> u32 {
     6
-}
-fn default_timeout_secs() -> u64 {
-    60
 }
 fn default_max_tool_calls() -> u32 {
     40
@@ -139,7 +135,7 @@ impl Default for ExplorerBudget {
     fn default() -> Self {
         Self {
             max_turns: default_max_turns(),
-            timeout_seconds: default_timeout_secs(),
+            timeout_seconds: 0,
             max_tool_calls: default_max_tool_calls(),
             tool_timeout_seconds: default_tool_timeout_secs(),
             concurrency: default_concurrency(),
@@ -148,11 +144,23 @@ impl Default for ExplorerBudget {
 }
 
 impl ExplorerBudget {
-    pub fn total_timeout(&self) -> Duration {
-        Duration::from_secs(self.timeout_seconds)
+    pub fn total_timeout(&self) -> Option<Duration> {
+        (self.timeout_seconds > 0).then(|| Duration::from_secs(self.timeout_seconds))
     }
 
     pub fn tool_timeout(&self) -> Duration {
         Duration::from_secs(self.tool_timeout_seconds)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn whole_run_timeouts_are_opt_in() {
+        let config = RepoTracerConfig::default();
+        assert_eq!(config.model.timeout_ms, 0);
+        assert_eq!(config.explorer.total_timeout(), None);
     }
 }
