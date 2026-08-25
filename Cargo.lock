@@ -1217,6 +1217,7 @@ dependencies = [
  "repotracer-core",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
  "uuid",

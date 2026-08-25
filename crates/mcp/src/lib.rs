@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{debug, error};
 
+mod update_notice;
+
 const PROTOCOL_VERSION: &str = "2024-11-05";
 const SERVER_NAME: &str = "repotracer";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -153,6 +155,12 @@ impl McpServer {
     }
 }
 
+/// The newer release, if one is known. Wired to a real version check separately;
+/// returning None keeps the notice inert until then.
+fn pending_update() -> Option<(&'static str, &'static str)> {
+    None
+}
+
 fn handoff_response(root: &Path, mut result: ScoutResult) -> Value {
     let omitted = result.citations.len().saturating_sub(MAX_HANDOFF_CITATIONS);
     result.citations.truncate(MAX_HANDOFF_CITATIONS);
@@ -169,6 +177,9 @@ fn handoff_response(root: &Path, mut result: ScoutResult) -> Value {
             "\n\n{omitted} lower-priority citation{} omitted from the handoff.",
             if omitted == 1 { " was" } else { "s were" }
         ));
+    }
+    if let Some(line) = update_notice::notice(pending_update()) {
+        text.push_str(&line);
     }
     let structured = json!({
         "summary": result.summary,
