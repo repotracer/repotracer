@@ -33,7 +33,7 @@ pub async fn run(
     if !dry_run {
         // Default on, but never hold up an install waiting for an answer.
         selected_cfg.notifications.update_available = crate::select::confirm_with_timeout(
-            "Let Codex mention it when a RepoTracer update is available?",
+            "Notify you when a new RepoTracer version is available?",
             cfg.notifications.update_available,
             std::time::Duration::from_secs(4),
         );
