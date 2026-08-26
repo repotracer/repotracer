@@ -1,11 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.1.6 — 2026-08-26
 
 ### Added
-- RepoTracer replaces its own binary. Once a day the MCP server checks the release feed off the request path, verifies the new binary's SHA-256 against the published `SHA256SUMS`, and swaps `~/.repotracer/bin/repotracer` via `self-replace`. The new version takes effect at the next Codex start
+- RepoTracer replaces its own binary. Once a day the MCP server checks the release feed off the request path, verifies the new binary's SHA-256 against the published `SHA256SUMS`, swaps `~/.repotracer/bin/repotracer` via `self-replace`, and refreshes the managed MCP and `AGENTS.md` files. The new version takes effect at the next Codex start
 - `repotracer update` does the same thing on demand and reports what happened
-- `updates.automatic` in `~/.repotracer/config.toml` and `REPOTRACER_NO_UPDATE=1` turn it off. Setup asks once, defaults to yes, and continues after four seconds
+- Automatic updates default to on without a setup question. `updates.automatic` in `~/.repotracer/config.toml` and `REPOTRACER_NO_UPDATE=1` turn them off
+
+### Changed
+- Codex subscription scouts now use isolated `codex app-server` sessions instead of `codex exec`, avoiding the Windows read-only sandbox regression
 
 ### Removed
 - The update notice in the `repo_scout` handoff, along with `notifications.update_available`. Asking Codex to relay a message so the user could go run a command was a workaround for a binary that could not update itself

@@ -95,6 +95,9 @@ enum Commands {
     },
     /// Update the installed binary to the newest release now
     Update,
+    /// Refresh files managed by the updater
+    #[command(name = "__refresh-integration", hide = true)]
+    RefreshIntegration,
     /// Remove repotracer agent integrations and local config
     Uninstall {
         #[arg(long)]
@@ -180,6 +183,10 @@ async fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
         Commands::Update => selfupdate::run_now().await,
+        Commands::RefreshIntegration => {
+            agents::install_codex(&agents::current_binary(), false)?;
+            Ok(())
+        }
         Commands::Uninstall { yes } => setup::uninstall(&root, yes),
         Commands::Version => {
             println!("repotracer {}", env!("CARGO_PKG_VERSION"));

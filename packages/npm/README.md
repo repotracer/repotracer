@@ -25,6 +25,11 @@ Preview without changing files:
 npx repotracer@latest setup --dry-run
 ```
 
+RepoTracer updates automatically. Restart Codex after an update for it to take
+effect. To disable automatic updates, set `updates.automatic = false` in
+`~/.repotracer/config.toml` or set `REPOTRACER_NO_UPDATE=1`. Running
+`npx repotracer@latest setup` still updates a disabled installation.
+
 ## Commands
 
 ```bash

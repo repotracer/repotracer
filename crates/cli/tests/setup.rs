@@ -99,7 +99,10 @@ fn setup_uses_existing_codex_login_without_prompts() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Codex found and signed in"))
-        .stdout(predicate::str::contains("Ready. Restart Codex"));
+        .stdout(predicate::str::contains("Ready. Restart Codex"))
+        .stdout(predicate::str::contains("will update automatically"))
+        .stdout(predicate::str::contains("updates.automatic = false"))
+        .stdout(predicate::str::contains("Install RepoTracer updates automatically?").not());
 
     assert!(std::fs::read_to_string(&config)
         .unwrap()
@@ -113,6 +116,28 @@ fn setup_uses_existing_codex_login_without_prompts() {
     assert!(std::fs::read_to_string(codex_home.join("AGENTS.md"))
         .unwrap()
         .contains("Validated citations complete broad exploration"));
+}
+
+#[test]
+fn updater_refreshes_the_managed_codex_files() {
+    let home = tempfile::tempdir().unwrap();
+    let codex_home = home.path().join(".codex");
+
+    let mut command = Command::cargo_bin("repotracer").unwrap();
+    command
+        .env("HOME", home.path())
+        .env("USERPROFILE", home.path())
+        .env("CODEX_HOME", &codex_home)
+        .arg("__refresh-integration")
+        .assert()
+        .success();
+
+    assert!(std::fs::read_to_string(codex_home.join("config.toml"))
+        .unwrap()
+        .contains("mcp_servers.repotracer"));
+    assert!(std::fs::read_to_string(codex_home.join("AGENTS.md"))
+        .unwrap()
+        .contains("repotracer:start"));
 }
 
 #[test]

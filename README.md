@@ -64,12 +64,15 @@ RepoTracer updates itself. Once a day it checks the release feed, verifies the
 new binary's SHA-256 against the published checksums, and replaces the copy in
 `~/.repotracer/bin`. The new version takes effect the next time you start Codex.
 
-It only ever replaces that one binary. A `cargo install` build or a source
-checkout is left alone.
+It only ever replaces that one binary, then refreshes RepoTracer's managed MCP
+entry and `AGENTS.md` block. A `cargo install` build or source checkout is left
+alone.
 
-Setup asks once whether that is fine, defaults to yes, and continues after four
-seconds if you say nothing. To change it later, set `updates.automatic = false`
-in `~/.repotracer/config.toml` or set `REPOTRACER_NO_UPDATE=1`.
+Automatic updates are on by default. Restart Codex after an update for the new
+binary and managed integration files to take effect. To disable automatic
+updates, set `updates.automatic = false` in `~/.repotracer/config.toml` or set
+`REPOTRACER_NO_UPDATE=1`. You can still update a disabled installation with
+`npx repotracer@latest setup`.
 
 To update on the spot rather than waiting for the daily check:
 

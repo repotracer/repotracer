@@ -70,6 +70,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Install ripgrep
         run: choco install ripgrep -y
       - name: Install Codex CLI
@@ -82,3 +85,6 @@ jobs:
           codex sandbox -P :read-only -C "$PWD" git status --short --branch
       - name: Test
         run: cargo test --workspace
+      - name: Test npx updates
+        working-directory: packages/npm
+        run: npm test

@@ -51,8 +51,15 @@ function persistForSetup(bin, args, home = os.homedir()) {
       fs.renameSync(temporary, destination);
     } catch (error) {
       if (!['EEXIST', 'EPERM'].includes(error.code)) throw error;
-      fs.rmSync(destination, { force: true });
-      fs.renameSync(temporary, destination);
+      const displaced = `${destination}.old-${process.pid}`;
+      fs.renameSync(destination, displaced);
+      try {
+        fs.renameSync(temporary, destination);
+      } catch (installError) {
+        fs.renameSync(displaced, destination);
+        throw installError;
+      }
+      try { fs.rmSync(displaced, { force: true }); } catch {}
     }
   } finally {
     fs.rmSync(temporary, { force: true });

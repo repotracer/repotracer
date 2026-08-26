@@ -19,7 +19,8 @@
 //!
 //! Three rules keep this from being something the user resents:
 //!
-//! - It only ever touches the binary under `~/.repotracer/bin`. A `cargo install`
+//! - It only replaces the binary under `~/.repotracer/bin`, then asks that new
+//!   binary to refresh RepoTracer's managed Codex files. A `cargo install`
 //!   build, a source checkout, or an npx vendor copy belongs to whatever put it
 //!   there.
 //! - It never runs on the tool-call path. It is a background task at startup,
@@ -30,6 +31,7 @@
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::debug;
 
@@ -141,12 +143,23 @@ async fn stage(force: bool) -> Result<Option<Staged>> {
 
 /// Put the verified binary in place of the running one.
 fn commit(staged: Staged) -> Result<()> {
+    let target = managed_binary().context("managed binary disappeared before replacement")?;
     self_replace::self_replace(&staged.path).with_context(|| {
         format!(
             "could not replace the running binary with {}",
             staged.path.display()
         )
     })?;
+    let status = Command::new(&target)
+        .arg("__refresh-integration")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .context("binary updated, but could not start the Codex integration refresh")?;
+    if !status.success() {
+        bail!("binary updated, but the Codex integration refresh failed");
+    }
     Ok(())
 }
 
