@@ -30,7 +30,7 @@ Codex Sol
 
 ## Default Codex backend
 
-The default backend launches `codex app-server` over local stdio and creates an ephemeral GPT-5.6 Luna thread. A temporary Codex home exposes the existing authentication while excluding personal instructions, skills, hooks, plugins, and MCP servers from the scout.
+The default backend launches `codex app-server` over local stdio and creates an ephemeral GPT-5.6 Luna thread. A temporary Codex home exposes the current authentication and active model-provider settings while excluding personal instructions, skills, hooks, plugins, and MCP servers from the scout. RepoTracer rebuilds that small provider config for each scout, so provider changes are picked up without maintaining a second Codex installation.
 
 The child process receives:
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.8 — 2026-08-26
+
+### Changed
+- Automatic update checks now run whenever the RepoTracer MCP server starts instead of at most once every 24 hours
+- Isolated Codex scouts preserve the active built-in or custom model provider, provider authentication mode, and credential store without inheriting personal MCP servers, hooks, plugins, or instructions
+
 ## 0.1.7 — 2026-08-26
 
 ### Fixed
