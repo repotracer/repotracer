@@ -11,13 +11,16 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{
+    AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
+    Lines,
+};
 use tokio::process::Command;
 
 const MAX_CAPTURE_BYTES: usize = 1_048_576;
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
-
 const GPT_SCOUT_LABEL: &str = "GPT scout via Codex CLI";
+const APP_SERVER_INSTRUCTIONS: &str = "RepoTracer repository scout. Never call MCP tools, apps, hooks, plugins, browser or computer-use tools, or delegate. Never edit files or use the network.";
 
 pub fn is_subscription_backend(cfg: &RepoTracerConfig) -> bool {
     matches!(
@@ -104,13 +107,11 @@ impl CliScout {
         )
     }
 
-    fn codex_args(&self, schema: &Path, output: &Path, prompt: &str) -> Vec<OsString> {
+    fn app_server_args(&self) -> Vec<OsString> {
         let mut args: Vec<OsString> = [
-            "exec",
-            "--json",
-            "--ignore-user-config",
-            "--ignore-rules",
-            "--ephemeral",
+            "app-server",
+            "--listen",
+            "stdio://",
             "--disable",
             "apps",
             "--disable",
@@ -120,14 +121,15 @@ impl CliScout {
             "--disable",
             "image_generation",
             "--disable",
+            "hooks",
+            "--disable",
             "multi_agent",
             "--disable",
             "plugins",
-            "--sandbox",
-            "read-only",
-            "--skip-git-repo-check",
             "--config",
             "approval_policy=\"never\"",
+            "--config",
+            "default_permissions=\":read-only\"",
             "--config",
             "project_doc_max_bytes=0",
             "--config",
@@ -144,17 +146,6 @@ impl CliScout {
             )
             .into(),
         ]);
-        args.extend(codex_provider_overrides());
-        if let Some(model) = &self.model {
-            args.extend([OsString::from("--model"), model.into()]);
-        }
-        args.extend([
-            OsString::from("--output-schema"),
-            schema.as_os_str().to_owned(),
-            OsString::from("--output-last-message"),
-            output.as_os_str().to_owned(),
-            OsString::from(prompt),
-        ]);
         args
     }
 
@@ -163,29 +154,21 @@ impl CliScout {
             bail!("repository root does not exist: {}", request.root.display());
         }
         let started = Instant::now();
-        let temp = TempRunDir::create()?;
-        let schema = temp.path.join("schema.json");
-        let output = temp.path.join("result.json");
-        std::fs::write(&schema, output_schema().to_string())?;
-        let process = self
-            .run_process(
-                self.codex_args(&schema, &output, &self.prompt(&request)),
+        let response = self
+            .run_app_server(
                 &request.root,
+                &self.prompt(&request),
                 request.timeout.or(self.timeout),
             )
             .await?;
-        if !process.status.success() {
-            bail!("{} failed: {}", self.label(), process.error_text());
-        }
-        let raw = std::fs::read_to_string(&output)
-            .with_context(|| format!("{} returned no structured result", self.label()))?;
+        let raw = response.raw;
         let structured: StructuredOutput =
             serde_json::from_str(&raw).context("Codex returned malformed structured output")?;
         let citations = validate_citations(&request.root, &structured.citations);
         if !structured.citations.is_empty() && citations.is_empty() {
             bail!("{} returned only invalid citations", self.label());
         }
-        let metrics = codex_metrics(&process.stdout);
+        let metrics = response.metrics;
         Ok(ScoutResult {
             summary: truncate_utf8(structured.answer.trim(), 3_000),
             citations,
@@ -212,18 +195,20 @@ impl CliScout {
         })
     }
 
-    async fn run_process(
+    async fn run_app_server(
         &self,
-        args: Vec<OsString>,
         cwd: &Path,
+        prompt: &str,
         timeout: Option<Duration>,
-    ) -> Result<ProcessOutput> {
+    ) -> Result<AppServerResult> {
+        let codex_home = IsolatedCodexHome::create()?;
         let mut command = Command::new(&self.executable);
         command
-            .args(args)
+            .args(self.app_server_args())
             .current_dir(cwd)
+            .env("CODEX_HOME", codex_home.path())
             .env("REPOTRACER_SUBPROCESS", "1")
-            .stdin(Stdio::null())
+            .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
@@ -232,35 +217,45 @@ impl CliScout {
         let mut child = command
             .spawn()
             .with_context(|| format!("could not start `{}`", self.executable.display()))?;
+        let mut stdin = child.stdin.take().context("missing provider stdin")?;
         let stdout = child.stdout.take().context("missing provider stdout")?;
         let stderr = child.stderr.take().context("missing provider stderr")?;
-        let stdout_task = tokio::spawn(drain_limited(stdout, MAX_CAPTURE_BYTES));
         let stderr_task = tokio::spawn(drain_limited(stderr, MAX_CAPTURE_BYTES));
-
-        let status = if let Some(timeout) = timeout {
-            match tokio::time::timeout(timeout, child.wait()).await {
-                Ok(status) => status?,
-                Err(_) => {
-                    kill_process_tree(&mut child).await;
-                    let _ = stdout_task.await;
-                    let _ = stderr_task.await;
-                    bail!(
-                        "{} timed out after {}s",
-                        self.label(),
-                        timeout.as_secs_f32()
-                    );
-                }
-            }
-        } else {
-            child.wait().await?
+        let session = app_server_session(
+            &mut stdin,
+            BufReader::new(stdout).lines(),
+            cwd,
+            prompt,
+            self.model.as_deref(),
+            &self.reasoning_effort,
+        );
+        let result = match timeout {
+            Some(timeout) => match tokio::time::timeout(timeout, session).await {
+                Ok(result) => result,
+                Err(_) => Err(anyhow::anyhow!(
+                    "{} timed out after {}s",
+                    self.label(),
+                    timeout.as_secs_f32()
+                )),
+            },
+            None => session.await,
         };
-        let stdout = stdout_task.await.context("provider stdout task failed")??;
+        drop(stdin);
+        if !matches!(
+            tokio::time::timeout(Duration::from_millis(250), child.wait()).await,
+            Ok(Ok(_))
+        ) {
+            kill_process_tree(&mut child).await;
+        }
         let stderr = stderr_task.await.context("provider stderr task failed")??;
-        Ok(ProcessOutput {
-            status,
-            stdout,
-            stderr,
-        })
+        match result {
+            Ok(result) => Ok(result),
+            Err(error) if stderr.is_empty() => Err(error),
+            Err(error) => Err(anyhow::anyhow!(
+                "{error:#}; {}",
+                provider_error(self.label(), &stderr)
+            )),
+        }
     }
 }
 
@@ -279,6 +274,7 @@ struct StructuredOutput {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TokenUsage {
     #[serde(default)]
     input_tokens: Option<u32>,
@@ -296,82 +292,251 @@ struct CodexMetrics {
     tool_calls: u32,
 }
 
-fn codex_metrics(stdout: &[u8]) -> CodexMetrics {
-    let mut metrics = CodexMetrics::default();
-    for event in String::from_utf8_lossy(stdout)
-        .lines()
-        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-    {
-        if event["type"] == "turn.completed" {
-            metrics.usage = serde_json::from_value(event["usage"].clone()).ok();
-        } else if event["type"] == "item.completed"
-            && matches!(
-                event["item"]["type"].as_str(),
-                Some("command_execution" | "mcp_tool_call" | "web_search")
-            )
-        {
-            metrics.tool_calls += 1;
-        }
-    }
-    metrics
+struct AppServerResult {
+    raw: String,
+    metrics: CodexMetrics,
 }
 
-fn codex_provider_overrides() -> Vec<OsString> {
-    let home = std::env::var_os("CODEX_HOME")
-        .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")));
-    let Some(path) = home.map(|home| home.join("config.toml")) else {
-        return Vec::new();
-    };
-    let Ok(config) = std::fs::read_to_string(path)
-        .and_then(|text| toml::from_str::<toml::Value>(&text).map_err(std::io::Error::other))
-    else {
-        return Vec::new();
-    };
-    let Some(provider) = config.get("model_provider").and_then(toml::Value::as_str) else {
-        return Vec::new();
-    };
-    let Some(settings) = config
-        .get("model_providers")
-        .and_then(|providers| providers.get(provider))
-        .and_then(toml::Value::as_table)
-    else {
-        return Vec::new();
-    };
-    let mut overrides = vec![
-        OsString::from("--config"),
-        format!(
-            "model_provider={}",
-            toml::Value::String(provider.to_string())
-        )
-        .into(),
-    ];
-    let provider = if provider
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-    {
-        provider.to_string()
-    } else {
-        serde_json::to_string(provider).unwrap_or_default()
-    };
-    for key in [
-        "name",
-        "base_url",
-        "wire_api",
-        "supports_websockets",
-        "requires_openai_auth",
-        "request_max_retries",
-        "stream_max_retries",
-        "stream_idle_timeout_ms",
-    ] {
-        if let Some(value) = settings.get(key) {
-            overrides.extend([
-                OsString::from("--config"),
-                format!("model_providers.{provider}.{key}={value}").into(),
-            ]);
+async fn app_server_session<R, W>(
+    stdin: &mut W,
+    mut lines: Lines<R>,
+    cwd: &Path,
+    prompt: &str,
+    model: Option<&str>,
+    reasoning_effort: &str,
+) -> Result<AppServerResult>
+where
+    R: AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    send_message(
+        stdin,
+        &json!({"id": 1, "method": "initialize", "params": {
+            "clientInfo": {"name": "repotracer", "version": env!("CARGO_PKG_VERSION")}
+        }}),
+    )
+    .await?;
+    wait_for_response(stdin, &mut lines, 1).await?;
+    send_message(stdin, &json!({"method": "initialized", "params": {}})).await?;
+
+    send_message(
+        stdin,
+        &json!({"id": 2, "method": "thread/start", "params": {
+            "cwd": cwd,
+            "ephemeral": true,
+            "approvalPolicy": "never",
+            "developerInstructions": APP_SERVER_INSTRUCTIONS,
+            "model": model,
+            "serviceTier": "default",
+            "config": {
+                "approval_policy": "never",
+                "default_permissions": ":read-only",
+                "project_doc_max_bytes": 0
+            }
+        }}),
+    )
+    .await?;
+    let started = wait_for_response(stdin, &mut lines, 2).await?;
+    let thread_id = started["thread"]["id"]
+        .as_str()
+        .context("Codex app-server returned no thread id")?;
+
+    send_message(
+        stdin,
+        &json!({"id": 3, "method": "turn/start", "params": {
+            "threadId": thread_id,
+            "input": [{"type": "text", "text": prompt}],
+            "effort": reasoning_effort,
+            "outputSchema": output_schema()
+        }}),
+    )
+    .await?;
+    wait_for_response(stdin, &mut lines, 3).await?;
+
+    let mut raw = None;
+    let mut metrics = CodexMetrics::default();
+    loop {
+        let message = next_message(&mut lines).await?;
+        if message.get("id").is_some() && message.get("method").is_some() {
+            reject_server_request(stdin, &message).await?;
+            continue;
+        }
+        match message["method"].as_str() {
+            Some("item/completed") => {
+                let item = &message["params"]["item"];
+                match item["type"].as_str() {
+                    Some("agentMessage") => {
+                        if let Some(text) = item["text"].as_str() {
+                            raw = Some(text.to_string());
+                        }
+                    }
+                    Some("commandExecution" | "mcpToolCall" | "webSearch") => {
+                        metrics.tool_calls += 1;
+                    }
+                    _ => {}
+                }
+            }
+            Some("thread/tokenUsage/updated") => {
+                metrics.usage =
+                    serde_json::from_value(message["params"]["tokenUsage"]["last"].clone()).ok();
+            }
+            Some("turn/completed") => {
+                let turn = &message["params"]["turn"];
+                if turn["status"] != "completed" {
+                    let error = turn["error"]["message"]
+                        .as_str()
+                        .unwrap_or("Codex turn did not complete");
+                    bail!("{error}");
+                }
+                if raw.is_none() {
+                    raw = turn["items"]
+                        .as_array()
+                        .and_then(|items| {
+                            items
+                                .iter()
+                                .rev()
+                                .find(|item| item["type"] == "agentMessage")
+                        })
+                        .and_then(|item| item["text"].as_str())
+                        .map(str::to_string);
+                }
+                return Ok(AppServerResult {
+                    raw: raw.context("Codex app-server returned no structured result")?,
+                    metrics,
+                });
+            }
+            Some("error") if !message["params"]["willRetry"].as_bool().unwrap_or(false) => {
+                bail!(
+                    "{}",
+                    message["params"]["error"]["message"]
+                        .as_str()
+                        .unwrap_or("Codex app-server turn failed")
+                );
+            }
+            _ => {}
         }
     }
-    overrides
+}
+
+async fn wait_for_response<R, W>(stdin: &mut W, lines: &mut Lines<R>, id: u64) -> Result<Value>
+where
+    R: AsyncBufRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    loop {
+        let message = next_message(lines).await?;
+        if message["id"].as_u64() == Some(id) {
+            if let Some(error) = message.get("error") {
+                bail!(
+                    "Codex app-server request failed: {}",
+                    error["message"].as_str().unwrap_or("unknown error")
+                );
+            }
+            return message
+                .get("result")
+                .cloned()
+                .context("Codex app-server response had no result");
+        }
+        if message.get("id").is_some() && message.get("method").is_some() {
+            reject_server_request(stdin, &message).await?;
+        }
+    }
+}
+
+async fn next_message<R: AsyncBufRead + Unpin>(lines: &mut Lines<R>) -> Result<Value> {
+    let line = lines
+        .next_line()
+        .await?
+        .context("Codex app-server closed its output")?;
+    serde_json::from_str(&line).context("Codex app-server returned malformed JSON")
+}
+
+async fn send_message<W: AsyncWrite + Unpin>(stdin: &mut W, message: &Value) -> Result<()> {
+    stdin.write_all(message.to_string().as_bytes()).await?;
+    stdin.write_all(b"\n").await?;
+    stdin.flush().await?;
+    Ok(())
+}
+
+async fn reject_server_request<W: AsyncWrite + Unpin>(
+    stdin: &mut W,
+    request: &Value,
+) -> Result<()> {
+    send_message(
+        stdin,
+        &json!({
+            "id": request["id"],
+            "error": {"code": -32601, "message": "RepoTracer does not accept server requests"}
+        }),
+    )
+    .await
+}
+
+fn provider_error(label: &str, stderr: &[u8]) -> String {
+    let compact = String::from_utf8_lossy(stderr)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if compact.is_empty() {
+        format!("{label} failed")
+    } else {
+        format!(
+            "{label} failed: {}",
+            compact.chars().take(500).collect::<String>()
+        )
+    }
+}
+
+struct IsolatedCodexHome {
+    path: PathBuf,
+}
+
+impl IsolatedCodexHome {
+    fn create() -> Result<Self> {
+        for _ in 0..10 {
+            let id = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir()
+                .join(format!("repotracer-codex-home-{}-{id}", std::process::id()));
+            match std::fs::create_dir(&path) {
+                Ok(()) => {
+                    let source = std::env::var_os("CODEX_HOME")
+                        .map(PathBuf::from)
+                        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")))
+                        .map(|home| home.join("auth.json"));
+                    if let Some(source) = source.filter(|source| source.is_file()) {
+                        link_auth(&source, &path.join("auth.json"))?;
+                    }
+                    return Ok(Self { path });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error.into()),
+            }
+        }
+        bail!("could not create isolated Codex home")
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for IsolatedCodexHome {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
+fn link_auth(source: &Path, target: &Path) -> Result<()> {
+    #[cfg(unix)]
+    if std::os::unix::fs::symlink(source, target).is_ok() {
+        return Ok(());
+    }
+    if std::fs::hard_link(source, target).is_ok() {
+        return Ok(());
+    }
+    std::fs::copy(source, target)
+        .map(|_| ())
+        .with_context(|| "could not make Codex authentication available to isolated scout")
 }
 
 fn truncate_utf8(text: &str, max_bytes: usize) -> String {
@@ -452,54 +617,6 @@ async fn kill_process_tree(child: &mut tokio::process::Child) {
     let _ = child.wait().await;
 }
 
-struct ProcessOutput {
-    status: std::process::ExitStatus,
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
-}
-
-impl ProcessOutput {
-    fn error_text(&self) -> String {
-        let text = if self.stderr.is_empty() {
-            &self.stdout
-        } else {
-            &self.stderr
-        };
-        let text = String::from_utf8_lossy(text);
-        let compact = text.split_whitespace().collect::<Vec<_>>().join(" ");
-        if compact.is_empty() {
-            format!("process exited with {}", self.status)
-        } else {
-            compact.chars().take(500).collect()
-        }
-    }
-}
-
-struct TempRunDir {
-    path: PathBuf,
-}
-
-impl TempRunDir {
-    fn create() -> Result<Self> {
-        for _ in 0..10 {
-            let id = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!("repotracer-{}-{id}", std::process::id()));
-            match std::fs::create_dir(&path) {
-                Ok(()) => return Ok(Self { path }),
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        bail!("could not create temporary provider directory")
-    }
-}
-
-impl Drop for TempRunDir {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.path);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -525,21 +642,16 @@ mod tests {
         codex_config.model.reasoning_effort = "medium".into();
         let codex = CliScout::from_config(&codex_config).unwrap();
         let codex_args = codex
-            .codex_args(Path::new("schema"), Path::new("output"), "prompt")
+            .app_server_args()
             .into_iter()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
-        assert!(codex_args
-            .windows(2)
-            .any(|pair| pair == ["--sandbox", "read-only"]));
-        assert!(codex_args.contains(&"--ignore-rules".into()));
-        assert!(codex_args.contains(&"--ignore-user-config".into()));
-        assert!(codex_args.contains(&"--ephemeral".into()));
-        assert!(codex_args.contains(&"--json".into()));
+        assert_eq!(&codex_args[..3], ["app-server", "--listen", "stdio://"]);
         for feature in [
             "apps",
             "browser_use",
             "computer_use",
+            "hooks",
             "image_generation",
             "multi_agent",
             "plugins",
@@ -556,10 +668,10 @@ mod tests {
             .any(|pair| pair == ["--config", "project_doc_max_bytes=0"]));
         assert!(codex_args
             .windows(2)
-            .any(|pair| pair == ["--config", "service_tier=\"default\""]));
+            .any(|pair| pair == ["--config", "default_permissions=\":read-only\""]));
         assert!(codex_args
             .windows(2)
-            .any(|pair| pair == ["--model", "gpt-5.6-luna"]));
+            .any(|pair| pair == ["--config", "service_tier=\"default\""]));
         assert!(CliScout::from_config(&config("claude-cli", Path::new("claude"))).is_err());
     }
 
@@ -605,14 +717,24 @@ mod tests {
         std::fs::write(
             &fake,
             r##"#!/bin/sh
-out=""
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = "--output-last-message" ]; then shift; out="$1"; fi
-  shift
+printf '%s\n' "$@" > app-server-args
+printf '%s' "$CODEX_HOME" > child-codex-home
+i=0
+while IFS= read -r line; do
+  i=$((i + 1))
+  case "$i" in
+    1) printf '%s\n' '{"id":1,"result":{"userAgent":"fake","codexHome":"/tmp","platformFamily":"unix","platformOs":"linux"}}' ;;
+    2) ;;
+    3) printf '%s\n' '{"id":2,"result":{"thread":{"id":"thread-1"}}}' ;;
+    4)
+      printf '%s\n' '{"id":3,"result":{"turn":{"id":"turn-1","status":"inProgress","items":[]}}}'
+      printf '%s\n' '{"method":"item/completed","params":{"item":{"type":"commandExecution"},"threadId":"thread-1","turnId":"turn-1","completedAtMs":1}}'
+      printf '%s\n' '{"method":"item/completed","params":{"item":{"type":"agentMessage","text":"{\"answer\":\"found\",\"citations\":[{\"path\":\"source.rs\",\"start_line\":1,\"end_line\":1,\"reason\":\"entry\"}]}"},"threadId":"thread-1","turnId":"turn-1","completedAtMs":2}}'
+      printf '%s\n' '{"method":"thread/tokenUsage/updated","params":{"threadId":"thread-1","turnId":"turn-1","tokenUsage":{"last":{"inputTokens":100,"cachedInputTokens":40,"outputTokens":20,"reasoningOutputTokens":5,"totalTokens":120}}}}'
+      printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}}'
+      ;;
+  esac
 done
-printf '%s' '{"answer":"found","citations":[{"path":"source.rs","start_line":1,"end_line":1,"reason":"entry"}]}' > "$out"
-printf '%s\n' '{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":20,"reasoning_output_tokens":5}}'
-printf '%s\n' '{"type":"item.completed","item":{"type":"command_execution"}}'
 "##,
         )
         .unwrap();
@@ -636,6 +758,13 @@ printf '%s\n' '{"type":"item.completed","item":{"type":"command_execution"}}'
         assert_eq!(result.stats.cached_prompt_tokens, Some(40));
         assert_eq!(result.stats.completion_tokens, Some(20));
         assert_eq!(result.stats.reasoning_output_tokens, Some(5));
+        assert!(std::fs::read_to_string(dir.path().join("app-server-args"))
+            .unwrap()
+            .starts_with("app-server\n--listen\nstdio://\n"));
+        assert_ne!(
+            std::fs::read_to_string(dir.path().join("child-codex-home")).unwrap(),
+            std::env::var("CODEX_HOME").unwrap_or_default()
+        );
 
         std::fs::write(&fake, "#!/bin/sh\nsleep 5\n").unwrap();
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();

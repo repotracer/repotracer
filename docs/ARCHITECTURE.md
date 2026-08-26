@@ -6,7 +6,7 @@
 Codex Sol
   → MCP call: repo_scout(query)
     → RepoTracer MCP server
-      → isolated codex exec
+      → isolated codex app-server thread
         → GPT-5.6 Luna, medium reasoning
           → Read / Glob / Grep
       ← structured scout result
@@ -30,7 +30,7 @@ Codex Sol
 
 ## Default Codex backend
 
-The default backend launches an ephemeral `codex exec` process using GPT-5.6 Luna. It reuses the existing Codex authentication without copying provider credentials into RepoTracer.
+The default backend launches `codex app-server` over local stdio and creates an ephemeral GPT-5.6 Luna thread. A temporary Codex home exposes the existing authentication while excluding personal instructions, skills, hooks, plugins, and MCP servers from the scout.
 
 The child process receives:
 

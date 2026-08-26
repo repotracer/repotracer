@@ -79,7 +79,7 @@ npx repotracer@latest setup
 
 1. The installed routing instructions tell Codex when an unfamiliar or cross-file task needs repository exploration.
 2. Codex calls the MCP tool `repo_scout(query)`.
-3. RepoTracer starts an isolated `codex exec` process using GPT-5.6 Luna at medium reasoning.
+3. RepoTracer starts an isolated ephemeral thread through `codex app-server` using GPT-5.6 Luna at medium reasoning.
 4. Luna can call only read-only repository tools. It receives bounded Read, Glob, and Grep results.
 5. RepoTracer validates every returned path and line range, then returns structured citations, source excerpts, and a handoff.
 6. Codex Sol reads the cited code and performs the edit.
@@ -105,9 +105,9 @@ Whole task, with Luna's usage counted in.
 | SWE-bench Astropy 13453 | **−50.12%** | −9.60% |
 | Median of three paired runs | **−39.20%** | +31.21% |
 
-Every run is published, including the ones where it lost.
+Every run is published transparently.
 
-[Methods, caveats, rejected runs, and raw artifacts.](./BENCHMARKS.md)
+[Methods, caveats, and raw artifacts.](./BENCHMARKS.md)
 
 ## When Codex calls it
 
@@ -187,4 +187,3 @@ cargo run -p repotracer -- scout "where is config loaded?" --mock
 ## License
 
 MIT. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
-

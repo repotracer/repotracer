@@ -17,7 +17,7 @@ RepoTracer benchmarks record:
 2. Complete provider cost
 3. Wall time
 4. Task checks or blind quality scores
-5. Failed and rejected runs
+5. All control and experimental runs
 6. Raw artifacts and checksums
 
 This distinction matters. JetBrains measured an RTK configuration whose local counter reported 96.2 million saved tokens while complete task cost rose 7.6% at low reasoning effort. The filter reduced its own output, but the agent spent more elsewhere.
