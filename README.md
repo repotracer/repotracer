@@ -60,9 +60,10 @@ cargo install --git https://github.com/repotracer/repotracer --locked repotracer
 
 ## Updating
 
-RepoTracer updates itself. Once a day it checks the release feed, verifies the
-new binary's SHA-256 against the published checksums, and replaces the copy in
-`~/.repotracer/bin`. The new version takes effect the next time you start Codex.
+RepoTracer updates itself. Each time its MCP server starts, it checks the release
+feed, verifies the new binary's SHA-256 against the published checksums, and
+replaces the copy in `~/.repotracer/bin`. The new version takes effect the next
+time you start Codex.
 
 It only ever replaces that one binary, then refreshes RepoTracer's managed MCP
 entry and `AGENTS.md` block. A `cargo install` build or source checkout is left
@@ -74,7 +75,7 @@ updates, set `updates.automatic = false` in `~/.repotracer/config.toml` or set
 `REPOTRACER_NO_UPDATE=1`. You can still update a disabled installation with
 `npx repotracer@latest setup`.
 
-To update on the spot rather than waiting for the daily check:
+To update on the spot:
 
 ```bash
 repotracer update

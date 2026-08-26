@@ -245,9 +245,8 @@ async fn cmd_scout(
 async fn cmd_serve(root: &std::path::Path, cfg: &RepoTracerConfig, mock: bool) -> Result<()> {
     // Logs must not touch stdout.
     let engine = build_scout(root, cfg, mock)?;
-    // Off the request path and before the first message: a check that finds
-    // nothing costs one HTTP round trip a day, and the swap only ever affects
-    // the next launch.
+    // Off the request path and before the first message. The swap only ever
+    // affects the next launch.
     selfupdate::spawn(cfg.updates.automatic);
     let server = McpServer::new(engine, root.to_path_buf());
     server.serve_stdio().await

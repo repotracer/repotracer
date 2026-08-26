@@ -23,8 +23,7 @@
 //!   binary to refresh RepoTracer's managed Codex files. A `cargo install`
 //!   build, a source checkout, or an npx vendor copy belongs to whatever put it
 //!   there.
-//! - It never runs on the tool-call path. It is a background task at startup,
-//!   throttled to one check a day, the same cadence Deno and rustup use.
+//! - It never runs on the tool-call path. It is a background task at startup.
 //! - Every failure is silent. An unreachable release feed is not the user's
 //!   problem and must not surface during a coding session.
 
@@ -32,12 +31,11 @@ use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tracing::debug;
 
 const RELEASES_LATEST: &str = "https://api.github.com/repos/repotracer/repotracer/releases/latest";
 const DOWNLOAD_BASE: &str = "https://github.com/repotracer/repotracer/releases/download";
-const CHECK_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
 /// A wrong URL that returns a huge body must not fill the user's disk.
 const MAX_BINARY_BYTES: u64 = 128 * 1024 * 1024;
@@ -68,7 +66,7 @@ pub fn spawn(enabled: bool) {
         return;
     }
     tokio::spawn(async {
-        match update(false).await {
+        match update().await {
             Ok(Some(version)) => debug!(%version, "self-update applied"),
             Ok(None) => debug!("already current"),
             Err(error) => debug!(%error, "self-update skipped"),
@@ -82,7 +80,7 @@ pub async fn run_now() -> Result<()> {
         "self-update manages only the binary installed under ~/.repotracer/bin; \
          this one came from cargo, a source checkout, or npx",
     )?;
-    match update(true).await? {
+    match update().await? {
         Some(version) => {
             println!("Updated to {version}.");
             println!("Restart Codex to pick it up.");
@@ -92,10 +90,10 @@ pub async fn run_now() -> Result<()> {
     Ok(())
 }
 
-/// Check, download, verify, and swap. `force` ignores the once-a-day throttle.
+/// Check, download, verify, and swap.
 /// Returns the version installed, or `None` if there was nothing to do.
-async fn update(force: bool) -> Result<Option<String>> {
-    let Some(staged) = stage(force).await? else {
+async fn update() -> Result<Option<String>> {
+    let Some(staged) = stage().await? else {
         return Ok(None);
     };
     let version = staged.version.clone();
@@ -103,18 +101,11 @@ async fn update(force: bool) -> Result<Option<String>> {
     Ok(Some(version))
 }
 
-/// Everything up to the swap: throttle, version check, download, verify.
-async fn stage(force: bool) -> Result<Option<Staged>> {
+/// Everything up to the swap: version check, download, verify.
+async fn stage() -> Result<Option<Staged>> {
     let Some(target) = managed_binary() else {
         return Ok(None);
     };
-    let stamp = check_stamp(&target);
-    if !force && !check_is_due(&stamp, CHECK_INTERVAL) {
-        return Ok(None);
-    }
-    // Record the attempt, not the success: a release feed that is down must not
-    // cause a fresh retry on every server start.
-    record_check(&stamp);
 
     let latest = fetch_latest_version(&releases_api()).await?;
     if !is_newer(&latest, current_version()) {
@@ -298,15 +289,6 @@ pub fn managed_path(home: &Path) -> PathBuf {
     home.join(".repotracer").join("bin").join(name)
 }
 
-fn check_stamp(target: &Path) -> PathBuf {
-    // ~/.repotracer/bin/repotracer -> ~/.repotracer/update-check
-    target
-        .parent()
-        .and_then(Path::parent)
-        .unwrap_or_else(|| Path::new("."))
-        .join("update-check")
-}
-
 /// Compare through symlinks where possible; a `~/.repotracer/bin` entry can be a
 /// link on a hand-managed install.
 fn same_file(a: &Path, b: &Path) -> bool {
@@ -331,34 +313,6 @@ fn disabled_by_env() -> bool {
     ["REPOTRACER_NO_UPDATE", "REPOTRACER_NO_UPDATE_CHECK"]
         .into_iter()
         .any(|name| matches!(std::env::var(name).as_deref(), Ok("1") | Ok("true")))
-}
-
-// ---------------------------------------------------------------------------
-// Throttling
-// ---------------------------------------------------------------------------
-
-fn now_unix() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
-/// Whether enough time has passed since the last check. A missing or unreadable
-/// stamp counts as due, so a fresh install always checks.
-pub fn check_is_due(stamp: &Path, interval: Duration) -> bool {
-    let last = std::fs::read_to_string(stamp)
-        .ok()
-        .and_then(|text| text.trim().parse::<u64>().ok())
-        .unwrap_or(0);
-    now_unix().saturating_sub(last) >= interval.as_secs()
-}
-
-pub fn record_check(stamp: &Path) {
-    if let Some(parent) = stamp.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let _ = std::fs::write(stamp, now_unix().to_string());
 }
 
 // ---------------------------------------------------------------------------
@@ -567,12 +521,6 @@ mod tests {
     }
 
     #[test]
-    fn the_stamp_sits_beside_the_config_not_inside_bin() {
-        let stamp = check_stamp(&managed_path(Path::new("/home/someone")));
-        assert_eq!(stamp, Path::new("/home/someone/.repotracer/update-check"));
-    }
-
-    #[test]
     fn the_staged_file_is_a_sibling_of_the_target() {
         let target = managed_path(Path::new("/home/someone"));
         let staged = staged_path(&target);
@@ -612,24 +560,6 @@ mod tests {
             let mode = std::fs::metadata(&path).unwrap().permissions().mode();
             assert_eq!(mode & 0o111, 0o111, "mode was {mode:o}");
         }
-    }
-
-    #[test]
-    fn the_check_is_due_once_a_day_and_not_before() {
-        let dir = tempfile::tempdir().unwrap();
-        let stamp = dir.path().join("update-check");
-
-        // Never checked: must check now, or a fresh install never updates.
-        assert!(check_is_due(&stamp, CHECK_INTERVAL));
-
-        record_check(&stamp);
-        assert!(!check_is_due(&stamp, CHECK_INTERVAL));
-        // A zero interval always fires.
-        assert!(check_is_due(&stamp, Duration::from_secs(0)));
-
-        // An unreadable stamp must fail open rather than freeze updates forever.
-        std::fs::write(&stamp, "not a timestamp").unwrap();
-        assert!(check_is_due(&stamp, CHECK_INTERVAL));
     }
 
     #[test]
