@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9 - 2026-08-26
+
+### Fixed
+- Setup no longer requires an active Codex login. It verifies that Codex is installed and defers authentication until a scout runs
+
 ## 0.1.8 — 2026-08-26
 
 ### Changed
