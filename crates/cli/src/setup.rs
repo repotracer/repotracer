@@ -32,9 +32,9 @@ pub async fn run(
     let mut selected_cfg = gpt_config(cfg)?;
     if !dry_run {
         // Default on, but never hold up an install waiting for an answer.
-        selected_cfg.notifications.update_available = crate::select::confirm_with_timeout(
-            "Notify you when a new RepoTracer version is available?",
-            cfg.notifications.update_available,
+        selected_cfg.updates.automatic = crate::select::confirm_with_timeout(
+            "Install RepoTracer updates automatically?",
+            cfg.updates.automatic,
             std::time::Duration::from_secs(4),
         );
     }
@@ -69,8 +69,8 @@ pub async fn run(
     item(true, "Codex found and signed in");
     item(true, &codex_message);
     item(true, &format!("installed at {}", binary.display()));
-    if !selected_cfg.notifications.update_available {
-        item(true, "update notices off");
+    if !selected_cfg.updates.automatic {
+        item(true, "automatic updates off");
     }
     println!();
     println!(
