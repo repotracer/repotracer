@@ -44,8 +44,6 @@ Use arrow keys, then Enter. Esc to cancel.
 
 That removes the MCP entry, the routing block, and the local config. Your Codex login and settings are untouched, and every file it edits is backed up alongside the original first. `repotracer uninstall --yes` does the same thing without the menu.
 
-`setup` runs `doctor` itself at the end, so you see whether it actually works rather than a list of things it wrote.
-
 Preview the changes:
 
 ```bash
@@ -62,17 +60,21 @@ cargo install --git https://github.com/repotracer/repotracer --locked repotracer
 
 ## Updating
 
-Setup asks once whether Codex may mention future updates. It defaults to yes and
-continues after four seconds if you say nothing. To change it later, set
-`notifications.update_available` in `~/.repotracer/config.toml`, or set
-`REPOTRACER_NO_UPDATE_CHECK=1`.
+RepoTracer updates itself. Once a day it checks the release feed, verifies the
+new binary's SHA-256 against the published checksums, and replaces the copy in
+`~/.repotracer/bin`. The new version takes effect the next time you start Codex.
 
+It only ever replaces that one binary. A `cargo install` build or a source
+checkout is left alone.
 
-Run the install command again. `@latest` is what matters: without it npx serves
-whatever version it cached first.
+Setup asks once whether that is fine, defaults to yes, and continues after four
+seconds if you say nothing. To change it later, set `updates.automatic = false`
+in `~/.repotracer/config.toml` or set `REPOTRACER_NO_UPDATE=1`.
+
+To update on the spot rather than waiting for the daily check:
 
 ```bash
-npx repotracer@latest setup
+repotracer update
 ```
 
 ## How it works
@@ -136,6 +138,7 @@ repotracer "where is auth handled?"      # scout the current repository
 repotracer scout "trace refresh rotation"
 repotracer serve                         # MCP over stdio
 repotracer setup
+repotracer update                         # replace the binary with the newest release
 repotracer doctor
 repotracer status
 repotracer config --init

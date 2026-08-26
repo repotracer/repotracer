@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- RepoTracer replaces its own binary. Once a day the MCP server checks the release feed off the request path, verifies the new binary's SHA-256 against the published `SHA256SUMS`, and swaps `~/.repotracer/bin/repotracer` via `self-replace`. The new version takes effect at the next Codex start
+- `repotracer update` does the same thing on demand and reports what happened
+- `updates.automatic` in `~/.repotracer/config.toml` and `REPOTRACER_NO_UPDATE=1` turn it off. Setup asks once, defaults to yes, and continues after four seconds
+
+### Removed
+- The update notice in the `repo_scout` handoff, along with `notifications.update_available`. Asking Codex to relay a message so the user could go run a command was a workaround for a binary that could not update itself
+
 ## 0.1.5 — 2026-08-25
 
 ### Fixed
