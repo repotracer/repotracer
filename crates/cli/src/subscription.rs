@@ -583,7 +583,12 @@ fn write_provider_config(source: &Path, target: &Path) -> Result<()> {
         .context("Codex config root must be a TOML table")?;
     let mut child = toml::map::Map::new();
 
-    for key in ["model", "model_provider", "openai_base_url"] {
+    for key in [
+        "model",
+        "model_provider",
+        "openai_base_url",
+        "cli_auth_credentials_store",
+    ] {
         if let Some(value) = config.get(key) {
             child.insert(key.into(), value.clone());
         }
@@ -897,6 +902,7 @@ done
 model = "gpt-5.6-luna"
 model_provider = "codex-lb"
 openai_base_url = "https://ignored-for-custom-provider.example"
+cli_auth_credentials_store = "keyring"
 
 [model_providers.codex-lb]
 name = "Codex LB"
@@ -917,6 +923,10 @@ hooks = []
         let child: toml::Value = toml::from_str(&std::fs::read_to_string(target).unwrap()).unwrap();
         assert_eq!(child["model"].as_str(), Some("gpt-5.6-luna"));
         assert_eq!(child["model_provider"].as_str(), Some("codex-lb"));
+        assert_eq!(
+            child["cli_auth_credentials_store"].as_str(),
+            Some("keyring")
+        );
         assert_eq!(
             child["model_providers"]["codex-lb"]["base_url"].as_str(),
             Some("https://codex-lb.example/v1")
