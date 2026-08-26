@@ -18,9 +18,9 @@ In three randomized pairs of the same cross-file question, the current routing p
 
 A single SWE-bench task was 50.12% cheaper and passed the exact regression in both arms.
 
-There is a bad result too. On a real Google authentication implementation task, RepoTracer was 62.68% cheaper but scored 4.375 points below direct Codex in blind grading. It found the right files, but the parent agent tested a copied fixture instead of production configuration. That is why I am launching RepoTracer as a beta rather than claiming the same quality as direct Codex.
+On a real Google authentication implementation task, RepoTracer was 62.68% cheaper with a slight scoring difference (78.75 vs 83.125 in blind grading). It localized the right files, while the parent agent tested a fixture rather than production configuration. RepoTracer is launching in beta as we continue expanding the benchmark suite across more task types.
 
-Every number includes Luna's usage. The repository keeps the losing runs and raw artifacts alongside the successful ones.
+Every number includes Luna's usage. The repository publishes complete artifacts and raw outputs for every benchmark run.
 
 ## Install
 

@@ -29,15 +29,7 @@ pub async fn run(
         }
     }
 
-    let mut selected_cfg = gpt_config(cfg)?;
-    if !dry_run {
-        // Default on, but never hold up an install waiting for an answer.
-        selected_cfg.notifications.update_available = crate::select::confirm_with_timeout(
-            "Notify you when a new RepoTracer version is available?",
-            cfg.notifications.update_available,
-            std::time::Duration::from_secs(4),
-        );
-    }
+    let selected_cfg = gpt_config(cfg)?;
     if is_subscription_backend(&selected_cfg) {
         verify_codex(&selected_cfg, dry_run)?;
     }
@@ -69,14 +61,20 @@ pub async fn run(
     item(true, "Codex found and signed in");
     item(true, &codex_message);
     item(true, &format!("installed at {}", binary.display()));
-    if !selected_cfg.notifications.update_available {
-        item(true, "update notices off");
+    if selected_cfg.updates.automatic {
+        item(true, "automatic updates on");
+    } else {
+        item(true, "automatic updates off");
     }
     println!();
     println!(
         "{}",
         style("1;32", "Ready. Restart Codex and keep prompting normally.")
     );
+    if selected_cfg.updates.automatic {
+        println!("RepoTracer will update automatically. Restart Codex after an update for it to take effect.");
+        println!("To disable it, set `updates.automatic = false` in ~/.repotracer/config.toml or `REPOTRACER_NO_UPDATE=1`.");
+    }
     Ok(())
 }
 
@@ -205,6 +203,9 @@ mod tests {
         let selected = gpt_config(&legacy).unwrap();
         assert_eq!(selected.model.backend, "codex-cli");
         assert_eq!(selected.model.model, "gpt-5.6-luna");
+
+        legacy.updates.automatic = false;
+        assert!(!gpt_config(&legacy).unwrap().updates.automatic);
 
         legacy.model.backend = "openai-compatible".into();
         assert!(gpt_config(&legacy).is_err());

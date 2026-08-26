@@ -102,4 +102,8 @@ test('setup persists the npx binary but dry-run does not', (t) => {
 
   const destination = persistForSetup(source, ['setup'], home);
   assert.equal(fs.readFileSync(destination, 'utf8'), 'native-binary');
+
+  fs.writeFileSync(source, 'updated-binary', { mode: 0o755 });
+  assert.equal(persistForSetup(source, ['setup'], home), destination);
+  assert.equal(fs.readFileSync(destination, 'utf8'), 'updated-binary');
 });

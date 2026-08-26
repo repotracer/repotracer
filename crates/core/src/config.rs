@@ -7,22 +7,20 @@ pub struct RepoTracerConfig {
     pub model: ModelSettings,
     #[serde(default)]
     pub explorer: ExplorerBudget,
-    #[serde(default)]
-    pub notifications: NotificationSettings,
+    #[serde(default, alias = "notifications")]
+    pub updates: UpdateSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NotificationSettings {
-    /// Whether the scout handoff may tell the user a newer release exists.
-    #[serde(default = "default_true")]
-    pub update_available: bool,
+pub struct UpdateSettings {
+    /// Whether the binary may replace itself with a newer release.
+    #[serde(default = "default_true", alias = "update_available")]
+    pub automatic: bool,
 }
 
-impl Default for NotificationSettings {
+impl Default for UpdateSettings {
     fn default() -> Self {
-        Self {
-            update_available: true,
-        }
+        Self { automatic: true }
     }
 }
 
@@ -156,6 +154,22 @@ impl ExplorerBudget {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn updates_are_on_unless_the_user_turns_them_off() {
+        assert!(RepoTracerConfig::default().updates.automatic);
+        // A config written before this setting existed must not silently
+        // disable updates; a missing table has to read as the default.
+        let old: RepoTracerConfig = toml::from_str("[model]\nmodel = \"gpt-5.6-luna\"\n").unwrap();
+        assert!(old.updates.automatic);
+
+        let off: RepoTracerConfig = toml::from_str("[updates]\nautomatic = false\n").unwrap();
+        assert!(!off.updates.automatic);
+
+        let legacy: RepoTracerConfig =
+            toml::from_str("[notifications]\nupdate_available = false\n").unwrap();
+        assert!(!legacy.updates.automatic);
+    }
 
     #[test]
     fn whole_run_timeouts_are_opt_in() {

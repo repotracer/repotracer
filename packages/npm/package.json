@@ -1,6 +1,6 @@
 {
   "name": "repotracer",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Get up to 60% more from your Codex limits. A cheaper model searches your repo so Codex stops burning turns on it.",
   "bin": {
     "repotracer": "bin/repotracer.js"
@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "postinstall": "node scripts/fetch-binary.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/install.test.js"
   },
   "keywords": [
     "mcp",

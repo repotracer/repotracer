@@ -44,8 +44,6 @@ Use arrow keys, then Enter. Esc to cancel.
 
 That removes the MCP entry, the routing block, and the local config. Your Codex login and settings are untouched, and every file it edits is backed up alongside the original first. `repotracer uninstall --yes` does the same thing without the menu.
 
-`setup` runs `doctor` itself at the end, so you see whether it actually works rather than a list of things it wrote.
-
 Preview the changes:
 
 ```bash
@@ -62,24 +60,31 @@ cargo install --git https://github.com/repotracer/repotracer --locked repotracer
 
 ## Updating
 
-Setup asks once whether Codex may mention future updates. It defaults to yes and
-continues after four seconds if you say nothing. To change it later, set
-`notifications.update_available` in `~/.repotracer/config.toml`, or set
-`REPOTRACER_NO_UPDATE_CHECK=1`.
+RepoTracer updates itself. Once a day it checks the release feed, verifies the
+new binary's SHA-256 against the published checksums, and replaces the copy in
+`~/.repotracer/bin`. The new version takes effect the next time you start Codex.
 
+It only ever replaces that one binary, then refreshes RepoTracer's managed MCP
+entry and `AGENTS.md` block. A `cargo install` build or source checkout is left
+alone.
 
-Run the install command again. `@latest` is what matters: without it npx serves
-whatever version it cached first.
+Automatic updates are on by default. Restart Codex after an update for the new
+binary and managed integration files to take effect. To disable automatic
+updates, set `updates.automatic = false` in `~/.repotracer/config.toml` or set
+`REPOTRACER_NO_UPDATE=1`. You can still update a disabled installation with
+`npx repotracer@latest setup`.
+
+To update on the spot rather than waiting for the daily check:
 
 ```bash
-npx repotracer@latest setup
+repotracer update
 ```
 
 ## How it works
 
 1. The installed routing instructions tell Codex when an unfamiliar or cross-file task needs repository exploration.
 2. Codex calls the MCP tool `repo_scout(query)`.
-3. RepoTracer starts an isolated `codex exec` process using GPT-5.6 Luna at medium reasoning.
+3. RepoTracer starts an isolated ephemeral thread through `codex app-server` using GPT-5.6 Luna at medium reasoning.
 4. Luna can call only read-only repository tools. It receives bounded Read, Glob, and Grep results.
 5. RepoTracer validates every returned path and line range, then returns structured citations, source excerpts, and a handoff.
 6. Codex Sol reads the cited code and performs the edit.
@@ -105,9 +110,9 @@ Whole task, with Luna's usage counted in.
 | SWE-bench Astropy 13453 | **−50.12%** | −9.60% |
 | Median of three paired runs | **−39.20%** | +31.21% |
 
-Every run is published, including the ones where it lost.
+Every run is published transparently.
 
-[Methods, caveats, rejected runs, and raw artifacts.](./BENCHMARKS.md)
+[Methods, caveats, and raw artifacts.](./BENCHMARKS.md)
 
 ## When Codex calls it
 
@@ -136,6 +141,7 @@ repotracer "where is auth handled?"      # scout the current repository
 repotracer scout "trace refresh rotation"
 repotracer serve                         # MCP over stdio
 repotracer setup
+repotracer update                         # replace the binary with the newest release
 repotracer doctor
 repotracer status
 repotracer config --init
@@ -187,4 +193,3 @@ cargo run -p repotracer -- scout "where is config loaded?" --mock
 ## License
 
 MIT. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
-

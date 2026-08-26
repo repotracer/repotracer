@@ -2,6 +2,7 @@ mod agents;
 mod config;
 mod doctor;
 mod select;
+mod selfupdate;
 mod setup;
 mod subscription;
 
@@ -92,6 +93,11 @@ enum Commands {
         #[arg(long)]
         suite: Option<String>,
     },
+    /// Update the installed binary to the newest release now
+    Update,
+    /// Refresh files managed by the updater
+    #[command(name = "__refresh-integration", hide = true)]
+    RefreshIntegration,
     /// Remove repotracer agent integrations and local config
     Uninstall {
         #[arg(long)]
@@ -176,6 +182,11 @@ async fn run(cli: Cli) -> Result<()> {
             println!("Run: cargo run -p repotracer-bench -- --help");
             Ok(())
         }
+        Commands::Update => selfupdate::run_now().await,
+        Commands::RefreshIntegration => {
+            agents::install_codex(&agents::current_binary(), false)?;
+            Ok(())
+        }
         Commands::Uninstall { yes } => setup::uninstall(&root, yes),
         Commands::Version => {
             println!("repotracer {}", env!("CARGO_PKG_VERSION"));
@@ -234,8 +245,11 @@ async fn cmd_scout(
 async fn cmd_serve(root: &std::path::Path, cfg: &RepoTracerConfig, mock: bool) -> Result<()> {
     // Logs must not touch stdout.
     let engine = build_scout(root, cfg, mock)?;
-    let server = McpServer::new(engine, root.to_path_buf())
-        .with_update_notices(cfg.notifications.update_available);
+    // Off the request path and before the first message: a check that finds
+    // nothing costs one HTTP round trip a day, and the swap only ever affects
+    // the next launch.
+    selfupdate::spawn(cfg.updates.automatic);
+    let server = McpServer::new(engine, root.to_path_buf());
     server.serve_stdio().await
 }
 

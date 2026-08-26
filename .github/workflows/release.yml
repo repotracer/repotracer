@@ -89,9 +89,8 @@ jobs:
       - name: Release notes from the tag annotation
         id: notes
         run: |
-          # The first prose line of the tag message becomes the release body,
-          # which is what the update notice reads and relays to users. Write the
-          # tag message for a human: one plain sentence saying what changed.
+          # The tag message becomes the release body, so write it for a human:
+          # one plain sentence saying what changed.
           # checkout leaves a lightweight ref, so %(contents:body) would return
           # the commit message instead of the annotation. Fetch the tag object.
           git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
