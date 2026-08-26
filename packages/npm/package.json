@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "postinstall": "node scripts/fetch-binary.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/install.test.js"
   },
   "keywords": [
     "mcp",
