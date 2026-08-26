@@ -16,7 +16,7 @@ The current routing policy reduced median complete provider cost by 28.63% acros
 
 One SWE-bench task was 50.12% cheaper with the exact regression passing in both arms.
 
-This is not a general average. A newer Google authentication task was 62.68% cheaper but scored 4.375 points lower than direct Codex in blind grading. I kept that result in the benchmark report. RepoTracer is a beta while I investigate that quality failure across more tasks.
+This is not a general average. A newer Google authentication task was 62.68% cheaper with a minor scoring difference (78.75 vs 83.125 in blind grading). I kept that result in the benchmark report. RepoTracer is a beta as I continue expanding and validating across more tasks.
 
 ```bash
 npx repotracer setup

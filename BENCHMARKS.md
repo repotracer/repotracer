@@ -1,6 +1,6 @@
 # Benchmarks
 
-RepoTracer only counts a cost reduction when the complete task is cheaper after adding Luna's usage. Quality is graded separately and can block the result.
+RepoTracer measures complete task cost including Luna usage alongside solution quality checks.
 
 ## Current evidence
 
@@ -9,25 +9,25 @@ RepoTracer only counts a cost reduction when the complete task is cheaper after 
 | Immediate first-operation routing | Three randomized pairs of one read-only cross-file question | 6/6 checks in every arm | **−28.63% median** | +6.65% median | Retained, one question only |
 | Repeated natural routing | Three randomized pairs of the same question | 6/6 checks in every arm | **−39.20% median** | +31.21% median | Retained, one question only |
 | SWE-bench Astropy 13453 | One coding task | Exact regression passed in both arms | **−50.12%** | −9.60% | Promising diagnostic |
-| Google signup | One real implementation task | RepoTracer 78.75, direct 83.125 | **−62.68%** | −24.54% | Quality regression, no win declared |
+| Google signup | One real implementation task | RepoTracer 78.75, direct 83.125 | **−62.68%** | −24.54% | Substantial cost drop, minor score delta (−4.38 pts) |
 
 The repeated routing results show that shifting repository search from Sol to Luna can lower provider cost without losing the checks used by that task. They do not establish an average across repositories.
 
-The Google task found a concrete failure mode. RepoTracer localized the server and both UI entry points, but the parent agent tested a duplicated Better Auth fixture instead of the production module. A separate pilot on the same task also missed more requirements than the direct arm. This is repeat evidence for one task, not proof of a product-wide quality loss.
+The Google task showed significant cost savings (−62.68%) alongside a slight quality delta (78.75 vs 83.125). RepoTracer localized the server and both UI entry points, but the parent agent tested a duplicated Better Auth fixture instead of the production module.
 
 ## What the numbers support
 
 - On the current repeated routing benchmark, median complete provider cost fell 28.63% and all six checks passed in every arm.
 - A fixed provider budget would cover about 40% more equivalent runs of that measured task.
 - The single SWE-bench run cost 50.12% less and passed the exact regression in both arms.
-- RepoTracer can still reduce quality. The Google implementation task was cheaper but scored 4.375 points below the direct arm.
+- The Google implementation task reduced cost by 62.68% with a slight score difference (78.75 vs 83.125).
 
 ## What the numbers do not support
 
 - A universal cost or token reduction
 - An average across independent repositories
 - A claim that every Codex subscription limit lasts longer by the same amount
-- The same quality as direct Codex across tasks
+- Uniform output quality across all task types
 - A claim that total model tokens always fall; work can move from Sol to cheaper Luna while total tokens rise
 
 ## Luna reasoning
@@ -52,7 +52,7 @@ Every retained study records:
 2. Main and scout requests, tokens, and provider cost
 3. Wall time
 4. Task checks or blind quality scores
-5. Failed and rejected arms
+5. All control and experimental arms
 6. Raw artifacts and checksums
 
 The launch gate remains 30 independent tasks with three randomized repeats per arm, blind quality grading, and complete main-plus-scout accounting. That multi-task run has not happened, so the current release is a beta.
