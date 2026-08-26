@@ -173,6 +173,12 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="repotracer-app-server-") as temporary:
         temporary = Path(temporary)
+        user_codex_home = temporary / "user-codex-home"
+        user_codex_home.mkdir()
+        if os.name == "nt":
+            (user_codex_home / "config.toml").write_text(
+                '[windows]\nsandbox = "unelevated"\n', encoding="utf-8"
+            )
         wrapper = temporary / ("codex-wrapper.cmd" if os.name == "nt" else "codex-wrapper")
         write_wrapper(wrapper, codex, base_url)
         config = temporary / "repotracer.toml"
@@ -188,12 +194,15 @@ def main():
             encoding="utf-8",
         )
 
+        environment = os.environ.copy()
+        environment["CODEX_HOME"] = str(user_codex_home)
         process = subprocess.Popen(
             [str(binary), "--root", str(root), "--config", str(config), "serve"],
             cwd=root,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=environment,
             text=True,
             bufsize=1,
         )
