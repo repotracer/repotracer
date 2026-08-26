@@ -437,6 +437,16 @@ where
                 .cloned()
                 .context("Codex app-server response had no result");
         }
+        if message["method"] == "error"
+            && !message["params"]["willRetry"].as_bool().unwrap_or(false)
+        {
+            bail!(
+                "{}",
+                message["params"]["error"]["message"]
+                    .as_str()
+                    .unwrap_or("Codex app-server request failed")
+            );
+        }
         if message.get("id").is_some() && message.get("method").is_some() {
             reject_server_request(stdin, &message).await?;
         }
@@ -499,6 +509,11 @@ impl IsolatedCodexHome {
                 .join(format!("repotracer-codex-home-{}-{id}", std::process::id()));
             match std::fs::create_dir(&path) {
                 Ok(()) => {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))?;
+                    }
                     let source = std::env::var_os("CODEX_HOME")
                         .map(PathBuf::from)
                         .or_else(|| dirs::home_dir().map(|home| home.join(".codex")))
@@ -684,6 +699,28 @@ mod tests {
             .unwrap()
             .to_string()
             .contains("use low, medium, or high"));
+    }
+
+    #[tokio::test]
+    async fn startup_reports_fatal_app_server_notifications() {
+        let mut sink = tokio::io::sink();
+        let mut lines = BufReader::new(
+            &b"{\"method\":\"error\",\"params\":{\"willRetry\":false,\"error\":{\"message\":\"sandbox failed\"}}}\n"[..],
+        )
+        .lines();
+        let error = wait_for_response(&mut sink, &mut lines, 1)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("sandbox failed"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn isolated_codex_home_is_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let home = IsolatedCodexHome::create().unwrap();
+        let mode = std::fs::metadata(home.path()).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o700);
     }
 
     #[test]
