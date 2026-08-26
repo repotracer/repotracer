@@ -146,11 +146,6 @@ impl CliScout {
             )
             .into(),
         ]);
-        #[cfg(windows)]
-        args.extend([
-            OsString::from("--config"),
-            OsString::from("windows.sandbox=\"unelevated\""),
-        ]);
         args
     }
 
@@ -692,10 +687,6 @@ mod tests {
         assert!(codex_args
             .windows(2)
             .any(|pair| pair == ["--config", "service_tier=\"default\""]));
-        #[cfg(windows)]
-        assert!(codex_args
-            .windows(2)
-            .any(|pair| pair == ["--config", "windows.sandbox=\"unelevated\""]));
         assert!(CliScout::from_config(&config("claude-cli", Path::new("claude"))).is_err());
     }
 
