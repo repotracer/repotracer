@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.7 — 2026-08-26
+
+### Fixed
+- Codex subscription scouts restore the user's Windows `unelevated` sandbox setting when they start an isolated app-server session
+- CI now runs the real RepoTracer to Codex app-server to sandbox repository-read path on Linux, macOS, and Windows, including a regression fixture for the Windows configuration loss
+
 ## 0.1.6 — 2026-08-26
 
 ### Added
