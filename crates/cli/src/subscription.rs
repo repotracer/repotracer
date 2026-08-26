@@ -146,6 +146,11 @@ impl CliScout {
             )
             .into(),
         ]);
+        #[cfg(windows)]
+        args.extend([
+            OsString::from("--config"),
+            OsString::from("windows.sandbox=\"unelevated\""),
+        ]);
         args
     }
 
