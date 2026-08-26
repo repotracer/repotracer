@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-COMMAND = 'rg -n "^\\[workspace\\]$" Cargo.toml'
+COMMAND = 'rg -n "workspace" Cargo.toml'
 USAGE = {
     "input_tokens": 0,
     "input_tokens_details": None,

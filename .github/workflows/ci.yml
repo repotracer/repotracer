@@ -40,7 +40,10 @@ jobs:
           node-version: '20'
       - name: Install ripgrep
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap ripgrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap ripgrep
+          sudo chmod u+s "$(command -v bwrap)"
       - name: Install ripgrep
         if: runner.os == 'macOS'
         run: brew install ripgrep
