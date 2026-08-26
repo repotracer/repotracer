@@ -85,7 +85,7 @@ repotracer update
 
 1. The installed routing instructions tell Codex when an unfamiliar or cross-file task needs repository exploration.
 2. Codex calls the MCP tool `repo_scout(query)`.
-3. RepoTracer starts an isolated ephemeral thread through `codex app-server` using GPT-5.6 Luna at medium reasoning.
+3. RepoTracer starts an isolated ephemeral thread through `codex app-server` using GPT-5.6 Luna at medium reasoning. It carries over the active Codex model-provider settings, including compatible custom providers, without inheriting the rest of the Codex home.
 4. Luna can call only read-only repository tools. It receives bounded Read, Glob, and Grep results.
 5. RepoTracer validates every returned path and line range, then returns structured citations, source excerpts, and a handoff.
 6. Codex Sol reads the cited code and performs the edit.

@@ -519,12 +519,18 @@ impl IsolatedCodexHome {
                         use std::os::unix::fs::PermissionsExt;
                         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))?;
                     }
-                    let source = std::env::var_os("CODEX_HOME")
+                    let source_home = std::env::var_os("CODEX_HOME")
                         .map(PathBuf::from)
-                        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")))
-                        .map(|home| home.join("auth.json"));
-                    if let Some(source) = source.filter(|source| source.is_file()) {
-                        link_auth(&source, &path.join("auth.json"))?;
+                        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")));
+                    if let Some(source_home) = source_home {
+                        let auth = source_home.join("auth.json");
+                        if auth.is_file() {
+                            link_auth(&auth, &path.join("auth.json"))?;
+                        }
+                        write_provider_config(
+                            &source_home.join("config.toml"),
+                            &path.join("config.toml"),
+                        )?;
                     }
                     return Ok(Self { path });
                 }
@@ -557,6 +563,54 @@ fn link_auth(source: &Path, target: &Path) -> Result<()> {
     std::fs::copy(source, target)
         .map(|_| ())
         .with_context(|| "could not make Codex authentication available to isolated scout")
+}
+
+/// Keep the active Codex provider while excluding user MCPs, hooks, plugins,
+/// and other session settings from the isolated scout home.
+fn write_provider_config(source: &Path, target: &Path) -> Result<()> {
+    let text = match std::fs::read_to_string(source) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("could not read Codex config {}", source.display()))
+        }
+    };
+    let config: toml::Value = toml::from_str(&text)
+        .with_context(|| format!("could not parse Codex config {}", source.display()))?;
+    let config = config
+        .as_table()
+        .context("Codex config root must be a TOML table")?;
+    let mut child = toml::map::Map::new();
+
+    for key in ["model", "model_provider", "openai_base_url"] {
+        if let Some(value) = config.get(key) {
+            child.insert(key.into(), value.clone());
+        }
+    }
+
+    if let Some(provider_id) = config.get("model_provider").and_then(toml::Value::as_str) {
+        if let Some(provider) = config
+            .get("model_providers")
+            .and_then(toml::Value::as_table)
+            .and_then(|providers| providers.get(provider_id))
+        {
+            let mut providers = toml::map::Map::new();
+            providers.insert(provider_id.into(), provider.clone());
+            child.insert("model_providers".into(), toml::Value::Table(providers));
+        }
+    }
+
+    if child.is_empty() {
+        return Ok(());
+    }
+    std::fs::write(target, toml::to_string(&toml::Value::Table(child))?)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(target, std::fs::Permissions::from_mode(0o600))?;
+    }
+    Ok(())
 }
 
 fn truncate_utf8(text: &str, max_bytes: usize) -> String {
@@ -830,5 +884,60 @@ done
             .unwrap_err();
         assert!(error.to_string().contains("timed out"));
         assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn child_config_keeps_the_selected_provider_and_drops_user_tools() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("config.toml");
+        let target = dir.path().join("child-config.toml");
+        std::fs::write(
+            &source,
+            r#"
+model = "gpt-5.6-luna"
+model_provider = "codex-lb"
+openai_base_url = "https://ignored-for-custom-provider.example"
+
+[model_providers.codex-lb]
+name = "Codex LB"
+base_url = "https://codex-lb.example/v1"
+wire_api = "responses"
+requires_openai_auth = true
+
+[mcp_servers.secret]
+command = "do-not-copy"
+
+[hooks.SessionStart]
+hooks = []
+"#,
+        )
+        .unwrap();
+
+        write_provider_config(&source, &target).unwrap();
+        let child: toml::Value = toml::from_str(&std::fs::read_to_string(target).unwrap()).unwrap();
+        assert_eq!(child["model"].as_str(), Some("gpt-5.6-luna"));
+        assert_eq!(child["model_provider"].as_str(), Some("codex-lb"));
+        assert_eq!(
+            child["model_providers"]["codex-lb"]["base_url"].as_str(),
+            Some("https://codex-lb.example/v1")
+        );
+        assert!(child.get("mcp_servers").is_none());
+        assert!(child.get("hooks").is_none());
+    }
+
+    #[test]
+    fn child_config_preserves_the_builtin_openai_base_url() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("config.toml");
+        let target = dir.path().join("child-config.toml");
+        std::fs::write(&source, "openai_base_url = \"https://proxy.example/v1\"\n").unwrap();
+
+        write_provider_config(&source, &target).unwrap();
+        let child: toml::Value = toml::from_str(&std::fs::read_to_string(target).unwrap()).unwrap();
+        assert_eq!(
+            child["openai_base_url"].as_str(),
+            Some("https://proxy.example/v1")
+        );
+        assert!(child.get("model_providers").is_none());
     }
 }
