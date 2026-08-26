@@ -10,12 +10,14 @@ npx repotracer@latest setup
 
 The installer downloads the native binary, verifies its SHA-256 checksum, copies it to `~/.repotracer/bin/repotracer`, registers the stdio MCP server, and adds a managed routing block to `~/.codex/AGENTS.md`.
 
-Codex must already be installed and signed in. RepoTracer reuses that login and does not require another API key.
+Codex must already be installed, but you can set up RepoTracer before signing in.
+When a scout runs, RepoTracer reuses the current Codex login and provider instead
+of requiring another API key.
 
 ```bash
 npm install -g @openai/codex
-codex login
 npx repotracer@latest setup
+codex login
 repotracer doctor
 ```
 

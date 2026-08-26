@@ -1,11 +1,10 @@
 use crate::agents;
 use crate::config;
 use crate::subscription::{is_subscription_backend, CliScout};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use repotracer_core::RepoTracerConfig;
 use std::io::{self, IsTerminal};
 use std::path::Path;
-use std::process::Command;
 
 pub async fn run(
     root: &Path,
@@ -31,7 +30,7 @@ pub async fn run(
 
     let selected_cfg = gpt_config(cfg)?;
     if is_subscription_backend(&selected_cfg) {
-        verify_codex(&selected_cfg, dry_run)?;
+        verify_codex_available(&selected_cfg, dry_run)?;
     }
 
     let binary = agents::current_binary();
@@ -58,7 +57,7 @@ pub async fn run(
     }
     selected_cfg.save_to(cfg_path)?;
 
-    item(true, "Codex found and signed in");
+    item(true, "Codex found");
     item(true, &codex_message);
     item(true, &format!("installed at {}", binary.display()));
     if selected_cfg.updates.automatic {
@@ -127,11 +126,11 @@ fn gpt_config(cfg: &RepoTracerConfig) -> Result<RepoTracerConfig> {
     Ok(selected)
 }
 
-fn verify_codex(cfg: &RepoTracerConfig, dry_run: bool) -> Result<()> {
+fn verify_codex_available(cfg: &RepoTracerConfig, dry_run: bool) -> Result<()> {
     let scout = CliScout::from_config(cfg)?;
     if dry_run {
         plan(&format!(
-            "would use {} with `{}` and its existing login/provider",
+            "would use {} with `{}` and its login/provider at scout time",
             cfg.model.model,
             scout.executable().display()
         ));
@@ -139,15 +138,8 @@ fn verify_codex(cfg: &RepoTracerConfig, dry_run: bool) -> Result<()> {
     }
     if !scout.executable().is_file() && which::which(scout.executable()).is_err() {
         bail!(
-            "Codex CLI is required for zero-config GPT scouting; install Codex, sign in, then rerun `repotracer setup`"
+            "Codex CLI is required for zero-config GPT scouting; install Codex, then rerun `repotracer setup`"
         );
-    }
-    let output = Command::new(scout.executable())
-        .args(["login", "status"])
-        .output()
-        .context("could not check Codex login")?;
-    if !output.status.success() {
-        bail!("Codex is not signed in; run `codex login`, then rerun `repotracer setup`");
     }
     Ok(())
 }

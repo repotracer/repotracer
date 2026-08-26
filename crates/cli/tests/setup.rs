@@ -66,28 +66,34 @@ fn custom_setup_accepts_only_gpt_models() {
         .stderr(predicate::str::contains("currently supports GPT models"));
 }
 
-#[cfg(unix)]
 #[test]
-fn setup_uses_existing_codex_login_without_prompts() {
-    use std::os::unix::fs::PermissionsExt;
-
+fn setup_does_not_require_an_existing_codex_login() {
     let home = tempfile::tempdir().unwrap();
     let root = tempfile::tempdir().unwrap();
     let bin = home.path().join("bin");
     std::fs::create_dir(&bin).unwrap();
-    let codex = bin.join("codex");
-    std::fs::write(&codex, "#!/bin/sh\nexit 0\n").unwrap();
-    let mut permissions = std::fs::metadata(&codex).unwrap().permissions();
-    permissions.set_mode(0o755);
-    std::fs::set_permissions(&codex, permissions).unwrap();
+    let codex = if cfg!(windows) {
+        bin.join("codex.cmd")
+    } else {
+        bin.join("codex")
+    };
+    #[cfg(windows)]
+    std::fs::write(&codex, "@exit /b 1\r\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(&codex, "#!/bin/sh\nexit 1\n").unwrap();
+        let mut permissions = std::fs::metadata(&codex).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&codex, permissions).unwrap();
+    }
 
     let config = home.path().join(".repotracer/config.toml");
     let codex_home = home.path().join(".codex");
-    let path = format!(
-        "{}:{}",
-        bin.display(),
-        std::env::var("PATH").unwrap_or_default()
-    );
+    let inherited_path = std::env::var_os("PATH").unwrap_or_default();
+    let mut paths = vec![bin];
+    paths.extend(std::env::split_paths(&inherited_path));
+    let path = std::env::join_paths(paths).unwrap();
     let mut command = Command::cargo_bin("repotracer").unwrap();
     command
         .env("HOME", home.path())
@@ -98,7 +104,7 @@ fn setup_uses_existing_codex_login_without_prompts() {
         .args(["--root", root.path().to_str().unwrap(), "setup"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Codex found and signed in"))
+        .stdout(predicate::str::contains("Codex found"))
         .stdout(predicate::str::contains("Ready. Restart Codex"))
         .stdout(predicate::str::contains("will update automatically"))
         .stdout(predicate::str::contains("updates.automatic = false"))
