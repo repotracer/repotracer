@@ -233,7 +233,7 @@ def main():
             )
             response = read_response(lines, 2)
             if "error" in response:
-                raise AssertionError(response)
+                raise AssertionError(FakeResponses.failure or response)
             structured = response["result"]["structuredContent"]
             if structured["citations"][0]["path"] != "Cargo.toml":
                 raise AssertionError(response)
