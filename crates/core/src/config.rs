@@ -7,14 +7,14 @@ pub struct RepoTracerConfig {
     pub model: ModelSettings,
     #[serde(default)]
     pub explorer: ExplorerBudget,
-    #[serde(default)]
+    #[serde(default, alias = "notifications")]
     pub updates: UpdateSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateSettings {
     /// Whether the binary may replace itself with a newer release.
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "update_available")]
     pub automatic: bool,
 }
 
@@ -165,6 +165,10 @@ mod tests {
 
         let off: RepoTracerConfig = toml::from_str("[updates]\nautomatic = false\n").unwrap();
         assert!(!off.updates.automatic);
+
+        let legacy: RepoTracerConfig =
+            toml::from_str("[notifications]\nupdate_available = false\n").unwrap();
+        assert!(!legacy.updates.automatic);
     }
 
     #[test]

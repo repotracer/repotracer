@@ -268,7 +268,12 @@ pub fn is_newer(candidate: &str, current: &str) -> bool {
 fn managed_binary() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let expected = managed_path(&home()?);
-    same_file(&exe, &expected).then_some(expected)
+    managed_executable(&exe, &expected).then_some(expected)
+}
+
+fn managed_executable(exe: &Path, expected: &Path) -> bool {
+    std::fs::symlink_metadata(expected).is_ok_and(|metadata| !metadata.file_type().is_symlink())
+        && same_file(exe, expected)
 }
 
 pub fn managed_path(home: &Path) -> PathBuf {
@@ -310,10 +315,9 @@ fn current_version() -> &'static str {
 /// Named after the convention every tool in this space follows: Deno has
 /// `DENO_NO_UPDATE_CHECK`, rustup has `RUSTUP_UPDATE_ROOT`.
 fn disabled_by_env() -> bool {
-    matches!(
-        std::env::var("REPOTRACER_NO_UPDATE").as_deref(),
-        Ok("1") | Ok("true")
-    )
+    ["REPOTRACER_NO_UPDATE", "REPOTRACER_NO_UPDATE_CHECK"]
+        .into_iter()
+        .any(|name| matches!(std::env::var(name).as_deref(), Ok("1") | Ok("true")))
 }
 
 // ---------------------------------------------------------------------------
@@ -534,6 +538,19 @@ mod tests {
             }
         );
         assert!(path.starts_with(home.join(".repotracer").join("bin")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_managed_path_symlink_cannot_replace_an_external_binary() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let external = dir.path().join("external");
+        let managed = dir.path().join("managed");
+        std::fs::write(&external, b"binary").unwrap();
+        symlink(&external, &managed).unwrap();
+
+        assert!(!managed_executable(&external, &managed));
     }
 
     #[test]
