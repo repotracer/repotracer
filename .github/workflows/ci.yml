@@ -35,14 +35,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Install ripgrep
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Install ripgrep
         if: runner.os == 'macOS'
         run: brew install ripgrep
+      - name: Install Codex CLI
+        run: npm install --global @openai/codex@0.149.1
       - name: Test
         run: cargo test --workspace
+      - name: Real Codex app-server repository read
+        run: |
+          cargo build -p repotracer
+          python3 scripts/codex-app-server-smoke.py
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Fmt
@@ -77,14 +86,12 @@ jobs:
         run: choco install ripgrep -y
       - name: Install Codex CLI
         run: npm install --global @openai/codex@0.149.1
-      - name: Codex read-only sandbox smoke test
-        shell: pwsh
-        run: |
-          codex --version
-          codex sandbox -P :read-only -C "$PWD" git rev-parse HEAD
-          codex sandbox -P :read-only -C "$PWD" git status --short --branch
       - name: Test
         run: cargo test --workspace
+      - name: Real Codex app-server repository read
+        run: |
+          cargo build -p repotracer
+          python scripts/codex-app-server-smoke.py
       - name: Test npx updates
         working-directory: packages/npm
         run: npm test
