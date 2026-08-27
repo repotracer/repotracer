@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f8fbff" />
+    <meta name="description" content="Decision report for RepoTracer's formal and MAH-SWE benchmark architecture." />
+    <title>MAH-SWE benchmark architecture — decision report</title>
+    <style>
+      @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Regular.otf?v=1776492806") format("opentype"); }
+      @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 600; font-display: swap; src: url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Semibold.otf?v=1776492806") format("opentype"); }
+      @font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ss3/SourceSans3-BASIC-Regular.otf?v=1747251196") format("opentype"); }
+      @font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 600; font-display: swap; src: url("https://gwern.net/static/font/ss3/SourceSans3-BASIC-Semibold.otf?v=1747251196") format("opentype"); }
+      @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ibm-plex-mono/IBMPlexMono-Regular.otf?v=1606177027") format("opentype"); }
+
+      :root {
+        --paper: #f8fbff;
+        --ink: #17213d;
+        --body: #39415b;
+        --muted: #66708b;
+        --faint: #8f98af;
+        --rule: #d5dceb;
+        --rule-dark: #a3aec6;
+        --accent: #5544c4;
+        --soft: #eee9ff;
+        --blue: #d8efff;
+        --good: #21624d;
+        --warn: #8a4d17;
+        --sans: "Source Sans 3", Arial, sans-serif;
+        --serif: "Source Serif 4", Georgia, serif;
+        --mono: "IBM Plex Mono", monospace;
+        --max: 1400px;
+        --measure: 900px;
+        --gutter: clamp(18px, 3vw, 38px);
+        color-scheme: light;
+      }
+      body.dark-mode {
+        --paper: #111827;
+        --ink: #f7f5ff;
+        --body: #d8dbea;
+        --muted: #a6acc2;
+        --faint: #7f87a1;
+        --rule: #303950;
+        --rule-dark: #55617d;
+        --accent: #aab7ff;
+        --soft: #2c3152;
+        --blue: #25466c;
+        --good: #82d7b0;
+        --warn: #f3b77d;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: var(--paper); color: var(--body); font: 18px/1.7 var(--serif); -webkit-font-smoothing: antialiased; }
+      a { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); text-underline-offset: 2px; }
+      button { border: 0; background: none; color: inherit; cursor: pointer; font: inherit; }
+      code { font: .82em/1.4 var(--mono); overflow-wrap: anywhere; }
+      ::selection { background: var(--soft); color: var(--ink); }
+      .skip-link { position: absolute; left: -999px; top: 8px; padding: 8px 12px; background: var(--soft); color: var(--ink); font: 13px var(--sans); }
+      .skip-link:focus { left: 12px; z-index: 50; }
+      .progress { position: fixed; inset: 0 auto auto 0; z-index: 40; width: 100%; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: left; }
+      .utility { width: min(100% - var(--gutter) * 2, var(--max)); min-height: 54px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--rule); color: var(--muted); font: 11px/1.2 var(--mono); }
+      .utility strong { color: var(--ink); font-weight: 400; }
+      .utility-actions { display: flex; gap: 18px; }
+      .utility-actions button:hover { color: var(--ink); }
+      .layout { width: min(100% - var(--gutter) * 2, var(--max)); margin: auto; display: grid; grid-template-columns: 170px minmax(0, var(--measure)) 210px; gap: clamp(28px, 4vw, 64px); }
+      .side, .margin { padding-top: 92px; }
+      .sticky { position: sticky; top: 28px; }
+      .nav-title { margin-bottom: 16px; color: var(--faint); font: 11px/1.2 var(--mono); text-transform: uppercase; }
+      .nav { display: grid; gap: 9px; }
+      .nav a { padding-left: 11px; border-left: 1px solid transparent; color: var(--muted); font: 14px/1.4 var(--sans); text-decoration: none; }
+      .nav a:hover, .nav a.active { border-color: var(--accent); color: var(--ink); }
+      .stamp { margin-top: 46px; color: var(--faint); font: 11px/1.55 var(--mono); }
+      .stamp span { color: var(--accent); }
+      main { min-width: 0; }
+      article { padding: 82px 0 110px; }
+      .kicker { margin-bottom: 14px; color: var(--accent); font: 600 13px/1.2 var(--sans); text-transform: uppercase; letter-spacing: .03em; }
+      h1, h2, h3, p { margin-top: 0; }
+      h1 { max-width: 850px; margin-bottom: 18px; color: var(--ink); font: 600 clamp(45px, 5vw, 72px)/1.04 var(--serif); letter-spacing: -.038em; }
+      .dek { max-width: 800px; margin-bottom: 24px; color: var(--body); font-size: 22px; line-height: 1.55; }
+      .metadata { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 12px 0; border-top: 1px solid var(--rule-dark); border-bottom: 1px solid var(--rule); color: var(--muted); font: 11px/1.45 var(--mono); }
+      .metadata strong { color: var(--ink); font-weight: 400; }
+      .abstract { margin: 38px 0 54px; padding: 18px 0 18px 22px; border-left: 3px solid var(--accent); }
+      .abstract-label { margin-bottom: 8px; color: var(--accent); font: 600 11px/1.2 var(--sans); text-transform: uppercase; }
+      .abstract p { margin: 0; color: var(--ink); font-size: 20px; }
+      section { scroll-margin-top: 26px; margin-top: 68px; }
+      h2 { padding-bottom: 13px; border-bottom: 1px solid var(--rule-dark); color: var(--ink); font: 600 31px/1.2 var(--sans); letter-spacing: -.012em; }
+      h2 span { margin-right: 9px; color: var(--accent); font: 11px/1 var(--mono); vertical-align: 5px; }
+      h3 { margin: 27px 0 8px; color: var(--ink); font: 600 18px/1.3 var(--sans); }
+      .decision { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 20px 0 24px; border: 1px solid var(--rule); background: var(--rule); }
+      .decision div { padding: 20px; background: var(--paper); }
+      .decision b { display: block; margin-bottom: 8px; color: var(--accent); font: 600 12px/1.2 var(--mono); text-transform: uppercase; }
+      .decision strong { display: block; margin-bottom: 7px; color: var(--ink); font: 600 18px/1.3 var(--sans); }
+      .decision p { margin: 0; font-size: 16px; line-height: 1.55; }
+      .table-wrap { overflow-x: auto; margin: 18px 0 12px; }
+      table { width: 100%; min-width: 720px; border-collapse: collapse; font: 16px/1.5 var(--sans); }
+      th { padding: 11px 10px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule-dark); color: var(--muted); font: 10px/1.2 var(--mono); text-align: left; text-transform: uppercase; }
+      td { padding: 14px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+      td:first-child { color: var(--ink); font-weight: 600; }
+      tr:hover td { background: var(--soft); }
+      .status-good { color: var(--good); font-weight: 600; }
+      .status-warn { color: var(--warn); font-weight: 600; }
+      .stages { margin-top: 18px; border-top: 1px solid var(--ink); }
+      .stage { display: grid; grid-template-columns: 55px 160px 1fr; gap: 18px; padding: 18px 0; border-bottom: 1px solid var(--rule); }
+      .stage .num { color: var(--accent); font: 11px/1.5 var(--mono); }
+      .stage strong { color: var(--ink); font: 600 17px/1.35 var(--sans); }
+      .stage p { margin: 0; font-size: 17px; line-height: 1.62; }
+      .callout { margin: 24px 0; padding: 18px 20px; background: var(--soft); border-left: 3px solid var(--accent); color: var(--ink); font-size: 17px; }
+      .plain-list { margin: 14px 0; padding: 0; list-style: none; }
+      .plain-list li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 12px 0; border-top: 1px solid var(--rule); }
+      .plain-list li::before { content: "—"; color: var(--accent); font-family: var(--mono); }
+      .small { color: var(--muted); font: 14px/1.55 var(--sans); }
+      .refs { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: ref; }
+      .refs li { display: grid; grid-template-columns: 30px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--rule); counter-increment: ref; font: 15px/1.5 var(--sans); }
+      .refs li::before { content: counter(ref, decimal-leading-zero); color: var(--faint); font: 11px/1.5 var(--mono); }
+      .refs small { display: block; color: var(--muted); }
+      .margin-note { margin-bottom: 30px; padding-top: 13px; border-top: 1px solid var(--rule-dark); color: var(--muted); font: 14px/1.6 var(--sans); }
+      .margin-note strong { display: block; margin-bottom: 8px; color: var(--ink); font: 11px/1.2 var(--mono); text-transform: uppercase; }
+      .footer { margin-top: 52px; padding-top: 13px; border-top: 1px solid var(--rule-dark); color: var(--muted); font: 11px/1.5 var(--mono); }
+      @media (max-width: 1050px) { .layout { grid-template-columns: 145px minmax(0, 1fr); } .margin { display: none; } }
+      @media (max-width: 760px) { body { font-size: 17px; } .utility-actions button:first-child { display: none; } .layout { display: block; } .side { padding-top: 18px; } .sticky { position: static; } .nav-title, .stamp { display: none; } .nav { display: flex; flex-wrap: wrap; gap: 10px 14px; } .nav a { padding: 0; border: 0; } article { padding-top: 42px; } .decision { grid-template-columns: 1fr; } .stage { grid-template-columns: 42px 1fr; } .stage p { grid-column: 2; } }
+      @media print { .progress, .side, .margin, .utility-actions { display: none; } .utility, .layout { width: 100%; } .layout { display: block; } article { padding: 28px 0; } a { color: inherit; } }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#report">skip to report</a>
+    <div class="progress" aria-hidden="true"></div>
+    <header class="utility">
+      <strong>RepoTracer / decision report 001</strong>
+      <div class="utility-actions">
+        <button id="theme" type="button">dark mode</button>
+        <button id="copy" type="button">copy link</button>
+        <button id="print" type="button">print</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="side" aria-label="Report contents">
+        <div class="sticky">
+          <div class="nav-title">contents</div>
+          <nav class="nav">
+            <a class="active" href="#decision">decision</a>
+            <a href="#evidence">evidence</a>
+            <a href="#runtime">runtime</a>
+            <a href="#gate">release gate</a>
+            <a href="#built">built now</a>
+            <a href="#risks">risks</a>
+            <a href="#references">sources</a>
+          </nav>
+          <div class="stamp"><span>architecture gate</span><br />27 aug 2026<br />status: review</div>
+        </div>
+      </aside>
+
+      <main id="report">
+        <article>
+          <div class="kicker">Benchmark architecture / decision required</div>
+          <h1>Build MAH-SWE, then change Scout.</h1>
+          <p class="dek">Use two separate evidence lanes: a public repository benchmark for external capability, and MAH-SWE for our real multi-round work. Do not tune tools, prompts, or routing against today’s small routing set.</p>
+          <div class="metadata">
+            <span>owner <strong>RepoTracer</strong></span>
+            <span>priority <strong>quality → cost → time</strong></span>
+            <span>release floor <strong>30 tasks × 3 repeats × 2 arms</strong></span>
+            <span>status <strong>architecture implemented / corpus incomplete</strong></span>
+          </div>
+
+          <div class="abstract" id="decision">
+            <div class="abstract-label">decision</div>
+            <p>Adopt the version 3 protocol now. Use DeepSWE as the primary public lane, SWE-Interact only for continuity questions, and MAH-SWE as the private real-work lane. Approve the proposed release gate before researching Scout search tools.</p>
+          </div>
+
+          <div class="decision" aria-label="Decision summary">
+            <div><b>01 / formal</b><strong>DeepSWE first</strong><p>Original tasks, functional verifiers, repeated rollouts, and public artifacts. Keep SWE-bench Verified as a legacy diagnostic, not a headline.</p></div>
+            <div><b>02 / real work</b><strong>MAH-SWE</strong><p>Original or private tasks with ordered follow-up turns, one persistent session, hidden verification, and blind weighted review.</p></div>
+            <div><b>03 / promotion</b><strong>No one-run wins</strong><p>Require paired repeated evidence and uncertainty bounds. A cheap result that loses required behavior fails.</p></div>
+          </div>
+
+          <section id="evidence">
+            <h2><span>01</span>Why this split</h2>
+            <p>No single benchmark answers all three questions. Public tasks give comparability. Private real work gives relevance. Multi-round tasks expose continuity and recovery failures that a one-shot patch benchmark cannot.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>lane</th><th>what it measures</th><th>strength</th><th>limitation</th><th>decision</th></tr></thead>
+                <tbody>
+                  <tr><td>DeepSWE</td><td>113 original long-horizon repository tasks; about four rollouts per task</td><td>Functional verifiers, original tasks, released trajectories, pass@1 and pass@4</td><td>Expensive; single-turn task contract</td><td class="status-good">Primary formal lane</td></tr>
+                  <tr><td>SWE-Interact</td><td>75 tasks across plan, implementation, handoff, test, and test-handoff rounds</td><td>Directly measures session continuity and user feedback handling</td><td>User simulator adds cost and a second model-dependent variable</td><td>Focused continuity study</td></tr>
+                  <tr><td>SWE-bench Verified</td><td>Historical public issue resolution</td><td>Large ecosystem and prior comparability</td><td>Public fixes create contamination risk; inherited tests can misgrade behavior</td><td class="status-warn">Legacy diagnostic only</td></tr>
+                  <tr><td>MAH-SWE</td><td>Our recurring bugs, feature work, reviews, and follow-up corrections</td><td>Exact product relevance; can grade routing, continuity, and complete economics</td><td>Private tasks are not externally reproducible; manual review costs time</td><td class="status-good">Primary product lane</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small">Do not combine lane scores. Report each lane separately, then make one product decision from the joint evidence.</p>
+          </section>
+
+          <section id="runtime">
+            <h2><span>02</span>One benchmark run, end to end</h2>
+            <div class="stages">
+              <div class="stage"><div class="num">01</div><strong>Author the task</strong><p>The task owner records the source repository and base commit, writes natural user turns, preregisters a 100-point rubric, and supplies behavioral verification. Solver prompts never contain expected paths, rubric text, or verifier details.</p></div>
+              <div class="stage"><div class="num">02</div><strong>Freeze the plan</strong><p><code>repotracer-bench</code> validates every task, hashes the ordered prompts, creates baseline and RepoTracer pairs, randomizes pair order from the study ID, and alternates which arm runs first. Release mode refuses fewer than 30 tasks, fewer than three repeats, or any unapproved task.</p></div>
+              <div class="stage"><div class="num">03</div><strong>Run each arm</strong><p>Both arms start from the same commit, model, reasoning level, environment, and byte-identical turns. One solver thread and one worktree persist through every round. The treatment adds only RepoTracer and its routing instructions.</p></div>
+              <div class="stage"><div class="num">04</div><strong>Capture real economics</strong><p>The coordinator stores patch, repository state, verifier output, final replies, and trajectories. Cost comes from provider billing for the main solver, every child agent, and every Scout request. Wall time is measured around the complete trial, not a single model call.</p></div>
+              <div class="stage"><div class="num">05</div><strong>Grade blind</strong><p>Behavioral verification runs first. The planner emits opaque review IDs and forms that omit arm, routing, cost, latency, and repeat. A reviewer scores each criterion from the sanitized artifact bundle, records evidence, marks required items, and locks the review before unblinding.</p></div>
+              <div class="stage"><div class="num">06</div><strong>Compare pairs</strong><p>Analysis reports task-level paired quality, complete cost, and wall-time deltas. A 95% task-cluster bootstrap resamples tasks while keeping every repeat from a task together. Losing trials remain in the record.</p></div>
+            </div>
+            <div class="callout"><strong>Failure rule:</strong> provider, harness, or verifier infrastructure failures invalidate and resample both arms. Agent timeout, context exhaustion, bad patch, missed requirement, or failed verification counts as model failure. This keeps infrastructure noise out without forgiving agent behavior.</div>
+          </section>
+
+          <section id="gate">
+            <h2><span>03</span>Proposed release gate</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>priority</th><th>metric</th><th>gate</th><th>why</th></tr></thead>
+                <tbody>
+                  <tr><td>1 / Quality</td><td>Weighted task score plus required items</td><td>No new security, data-loss, or required-behavior failure. The 95% lower bound of the paired quality delta must be at least −5 points.</td><td>A 60% saving is not useful if Scout makes Sol ship the wrong change.</td></tr>
+                  <tr><td>2 / Cost</td><td>Complete provider USD: solver + children + Scout</td><td>Target at least 60% median reduction; the 95% lower bound must remain above 0%.</td><td>Provider billing handles cache and model-price differences that raw token totals hide.</td></tr>
+                  <tr><td>3 / Time</td><td>Complete trial wall time</td><td>The 95% upper bound of the paired regression must not exceed +20%.</td><td>Scout may add a short handoff, but must not turn search savings into a slower product.</td></tr>
+                  <tr><td>Evidence floor</td><td>Independent tasks and repeats</td><td>At least 30 tasks and three randomized repeats per arm.</td><td>One task can diagnose a mechanism. It cannot justify a release claim.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="small">These are promotion thresholds, not claims about current performance. Existing RepoTracer studies remain diagnostics because they use too few independent tasks.</p>
+          </section>
+
+          <section id="built">
+            <h2><span>04</span>What is built now</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>artifact</th><th>change</th><th>observed check</th></tr></thead>
+                <tbody>
+                  <tr><td><code>crates/bench/src/main.rs</code></td><td>Version 3 multi-round tasks, deterministic paired order, release gates, prompt hashes, and blind review forms</td><td>4 focused Rust tests pass</td></tr>
+                  <tr><td><code>benchmarks/tasks/mah-swe-subscription-idle-timeout.json</code></td><td>First real-work MAH-SWE task: implementation round plus adversarial review round, hidden rubric, and behavior checks</td><td>Loads as a two-round task</td></tr>
+                  <tr><td><code>plan-v3.schema.json</code> and <code>review-v1.schema.json</code></td><td>Machine-readable plan and blind review contracts</td><td>JSON syntax checked</td></tr>
+                  <tr><td>Representative pilot plan</td><td>One task × three repeats × two arms; two rounds per trial</td><td>6 trials, 12 planned rounds, 6 opaque review forms generated</td></tr>
+                  <tr><td>Release mode</td><td>Refuses undersized or unapproved plans</td><td>One-task release plan rejected: “requires at least 30 independent tasks”</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>The implementation deliberately stops at protocol generation and review scaffolding. Existing runners continue to own model execution and provider accounting; replacing them before the protocol is approved would create a second benchmark system without evidence that it helps.</p>
+          </section>
+
+          <section id="risks">
+            <h2><span>05</span>Open risks and next decision</h2>
+            <ul class="plain-list">
+              <li><div><strong>Corpus gap.</strong> MAH-SWE has one task. Twenty-nine more independent, verifier-backed tasks are required before release-grade conclusions.</div></li>
+              <li><div><strong>Reviewer leakage.</strong> The forms are blind, but the coordinator must copy sanitized bundles by review ID and keep the manifest mapping private until scores lock.</div></li>
+              <li><div><strong>Private-task bias.</strong> MAH-SWE can overfit to our repositories. DeepSWE remains separate so a local gain cannot masquerade as general repository capability.</div></li>
+              <li><div><strong>Cost of evidence.</strong> The minimum release matrix is 180 complete trials before external formal runs. Use pilots for harness debugging, never for promotion claims.</div></li>
+              <li><div><strong>Research limit.</strong> The Deep Research bridge daemon was unavailable. This decision uses direct reads of primary papers, repositories, and local benchmark artifacts instead.</div></li>
+            </ul>
+            <div class="callout"><strong>Decision requested:</strong> approve this architecture and the proposed gates, or change them now. If approved, the next iteration compares large-repository search tools against Scout’s read-only, citation-bearing, low-cost boundary. No tool integration happens before that report.</div>
+          </section>
+
+          <section id="references">
+            <h2><span>06</span>Sources</h2>
+            <ol class="refs">
+              <li><div><a href="https://arxiv.org/html/2607.07946v1">DeepSWE paper</a><small>113 original tasks, repeated sampling, uncertainty, verifier analysis, and cost/latency reporting.</small></div></li>
+              <li><div><a href="https://github.com/datacurve-ai/deep-swe">DeepSWE repository</a><small>Public task definitions, verifier containers, provenance, and trajectories.</small></div></li>
+              <li><div><a href="https://arxiv.org/html/2606.30573">SWE-Interact paper</a><small>Multi-turn resolve rates, two 75-task runs, and interactive evaluation design.</small></div></li>
+              <li><div><a href="https://github.com/scaleapi/SWE-Interact">SWE-Interact repository</a><small>Five-stage task flow, per-stage timeouts, user-server boundary, and example run configs.</small></div></li>
+              <li><div><a href="https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents">Anthropic: Demystifying evals for AI agents</a><small>Outcome-based grading, partial credit, task diversity, and transcript review guidance.</small></div></li>
+              <li><div><a href="../BENCHMARKS.md">RepoTracer current evidence</a><small>Existing one-task and repeated-routing diagnostics, complete cost accounting, and explicit claim limits.</small></div></li>
+            </ol>
+          </section>
+
+          <div class="footer">RepoTracer benchmark architecture · report 001 · architecture checkpoint · 27 aug 2026</div>
+        </article>
+      </main>
+
+      <aside class="margin" aria-label="Decision notes">
+        <div class="sticky">
+          <div class="margin-note"><strong>read first</strong>The decision and release gate are the only approval points. The runtime section records how evidence moves.</div>
+          <div class="margin-note"><strong>current proof</strong><span class="status-good">Planner works.</span><br />The corpus and release matrix do not exist yet.</div>
+          <div class="margin-note"><strong>do not claim</strong>Do not publish average quality, savings, or speed from the current pilots.</div>
+          <div class="margin-note"><strong>next owner</strong>After approval: Scout search-tool research and a second decision report.</div>
+        </div>
+      </aside>
+    </div>
+
+    <script>
+      (() => {
+        const body = document.body;
+        const theme = document.getElementById('theme');
+        const meta = document.querySelector('meta[name="theme-color"]');
+        const setTheme = (dark) => {
+          body.classList.toggle('dark-mode', dark);
+          theme.textContent = dark ? 'light mode' : 'dark mode';
+          meta.setAttribute('content', dark ? '#111827' : '#f8fbff');
+          try { localStorage.setItem('repotracer-report-theme', dark ? 'dark' : 'light'); } catch {}
+        };
+        let saved = 'light';
+        try { saved = localStorage.getItem('repotracer-report-theme') || 'light'; } catch {}
+        setTheme(saved === 'dark');
+        theme.addEventListener('click', () => setTheme(!body.classList.contains('dark-mode')));
+        document.getElementById('print').addEventListener('click', () => window.print());
+        document.getElementById('copy').addEventListener('click', async (event) => {
+          try { await navigator.clipboard.writeText(window.location.href); event.currentTarget.textContent = 'copied'; }
+          catch { event.currentTarget.textContent = 'link ready'; }
+          setTimeout(() => { event.currentTarget.textContent = 'copy link'; }, 1400);
+        });
+        const progress = document.querySelector('.progress');
+        const links = [...document.querySelectorAll('.nav a')];
+        const targets = links.map((link) => document.querySelector(link.getAttribute('href')));
+        const update = () => {
+          const max = document.documentElement.scrollHeight - innerHeight;
+          progress.style.transform = `scaleX(${max > 0 ? scrollY / max : 0})`;
+          const probe = scrollY + 140;
+          let active = 0;
+          targets.forEach((target, index) => { if (target && target.offsetTop <= probe) active = index; });
+          links.forEach((link, index) => link.classList.toggle('active', index === active));
+        };
+        addEventListener('scroll', update, { passive: true });
+        update();
+      })();
+    </script>
+  </body>
+</html>

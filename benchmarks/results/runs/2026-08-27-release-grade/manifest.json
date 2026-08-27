@@ -1,0 +1,68 @@
+{
+  "schema_version": 2,
+  "study_id": "2026-08-27-release-grade",
+  "generated_at": "2026-08-27T18:28:19Z",
+  "status": "failed",
+  "suite_root": "benchmarks/tasks",
+  "arms": [
+    "baseline",
+    "repotracer"
+  ],
+  "repeats_per_arm": 2,
+  "trial_count": 12,
+  "tasks": [
+    {
+      "schema_version": 1,
+      "suite": "repository-scout",
+      "id": "subscription-process",
+      "prompt": "Trace subscription-backed Scout process execution from configuration through JSON stream handling and process-tree cleanup. Cite the direct implementation and checks.",
+      "expected_scout": true,
+      "expected_paths": [
+        "crates/core/src/config.rs",
+        "crates/cli/src/subscription.rs"
+      ],
+      "headline_eligible": false
+    },
+    {
+      "schema_version": 1,
+      "suite": "repository-scout",
+      "id": "repository-tool-dispatch",
+      "prompt": "Trace how repository tool definitions reach a model request and how returned calls are sandboxed, executed, and turned into validated citations. Cite budget and timeout paths.",
+      "expected_scout": true,
+      "expected_paths": [
+        "crates/repo-tools/src/lib.rs",
+        "crates/cli/src/subscription.rs"
+      ],
+      "headline_eligible": false
+    },
+    {
+      "schema_version": 1,
+      "suite": "repository-scout",
+      "id": "gigo-request-fallback",
+      "prompt": "Trace one chat completion request through route selection, provider fallback, and final HTTP error mapping. Cite the direct implementation paths.",
+      "expected_scout": true,
+      "expected_paths": [
+        "internal/server/request_fallback.go",
+        "internal/routing/routing.go"
+      ],
+      "headline_eligible": false
+    }
+  ],
+  "result_layout": "Sanitized aggregates are in summary.json. Raw commands, streams, retries, and provider metadata remain under private/.",
+  "methodology": "Two repeats per arm in deterministic randomized order. Three concurrent Go workers invoked the production Gigo gateway through a local credential-hiding model-name adapter. Both arms used identical prompts and bounded Scout settings; the treatment enabled the candidate Scout binary and CodeGraph configuration. Separate five-repeat process fixtures measured timeout behavior, and the existing 111-run routing matrix measured route quality.",
+  "protocol": {
+    "main_model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+    "reasoning_effort": "low",
+    "setup_command": "go run benchmarks/results/runs/2026-08-27-release-grade/private/run_gigo_scouts.go",
+    "order_policy": "Deterministic shuffle with PCG seed (20260827, 1); three concurrent workers.",
+    "timeout_seconds": 120,
+    "network_policy": "Production Gigo endpoint; no credentials written to artifacts.",
+    "cache_policy": "Shared compiled binaries; immutable per-attempt result directories; no model response cache."
+  },
+  "limitations": [
+    "Neither benchmark repository had a .codegraph index at execution time, so the treatment could not exercise CodeGraph and this run cannot support a tool-impact claim.",
+    "The free OpenRouter model produced no useful final answers and hit three rate-limit or upstream failures in the first complete matrix.",
+    "The authenticated model catalog advertised Gemini tool support incorrectly for the adapter, and the preferred paid OpenRouter route had no credits; those failed retries are retained under private/.",
+    "Repository-task quality and citation recall are too low for headline use. The process-timeout result is independent and conclusive."
+  ]
+}

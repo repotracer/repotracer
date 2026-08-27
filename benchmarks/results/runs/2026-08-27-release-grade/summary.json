@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-27-release-grade",
+  "decision": "retain_inactivity_timeout_benchmark_inconclusive_for_scout_tool_impact",
+  "timeout_behavior": {
+    "repeats_per_case": 5,
+    "idle_interval_ms": 200,
+    "baseline": {
+      "active_long_run_survived": 0,
+      "silent_child_killed": 5,
+      "parent_exit_descendants_killed": 5,
+      "active_median_ms": 215,
+      "silent_median_ms": 214
+    },
+    "candidate": {
+      "active_long_run_survived": 5,
+      "silent_child_killed": 5,
+      "parent_exit_descendants_killed": 5,
+      "active_median_ms": 444,
+      "silent_median_ms": 215
+    },
+    "interpretation": "The candidate survives beyond the idle interval while valid stream frames continue, then kills silent process groups. The baseline applies a wall-clock cap and kills every active run."
+  },
+  "routing_quality": {
+    "runs": 111,
+    "tasks": 37,
+    "repeats": 3,
+    "route_accuracy": 0.9459459459459459,
+    "scout_recall": 0.9565217391304348,
+    "skip_precision": 0.9285714285714286,
+    "median_duration_ms": 2944,
+    "cost_usd": 0.0234636,
+    "http_failures": 0,
+    "false_negatives": [
+      "route-runtime-03",
+      "subbridge-google-signup"
+    ],
+    "false_positives": [
+      "mcp-cancellation",
+      "route-cli-08"
+    ]
+  },
+  "production_gigo_scouts": {
+    "model": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+    "runs": 12,
+    "provider_cost_usd": 0,
+    "baseline": {
+      "runs": 6,
+      "successful_processes": 5,
+      "useful_results": 0,
+      "mean_expected_path_recall": 0.25,
+      "median_duration_ms": 21832,
+      "prompt_tokens": 61047,
+      "completion_tokens": 8734
+    },
+    "candidate": {
+      "runs": 6,
+      "successful_processes": 4,
+      "useful_results": 0,
+      "mean_expected_path_recall": 0.08333333333333333,
+      "median_duration_ms": 15352,
+      "prompt_tokens": 32268,
+      "completion_tokens": 3889
+    },
+    "gateway_requests": {
+      "count": 35,
+      "http_200": 32,
+      "http_429": 1,
+      "http_502": 2,
+      "median_duration_ms": 3061,
+      "provider_cost_usd": 0
+    },
+    "interpretation": "The candidate used fewer tokens and was faster, but citation recall regressed and no result passed the Scout useful-result contract. No .codegraph index existed, so both arms had the same repository tools. Do not treat the latency or token difference as a tool benefit."
+  },
+  "retry_failures": {
+    "gemini_3_flash_preview": "12/12 rejected with HTTP 400 because the Gemini adapter does not support tools.",
+    "openrouter_openai_gpt_5_6_sol": "The first three requests returned HTTP 402 for insufficient provider credits; the remaining nine hit the opened upstream circuit with HTTP 502.",
+    "post_credit_openrouter_retry": "A second direct OpenRouter route hit the same exhausted-credit state: three HTTP 402 responses followed by nine HTTP 502 circuit rejections."
+  },
+  "verification": {
+    "subscription_tests": "8 passed across 2 suites",
+    "workspace_tests": "89 passed across 12 suites",
+    "npm_tests": "5 passed",
+    "git_refs": "HEAD, main, and origin/main remained 603b196d444969dbdaabbbe2852cebe0cc8136de",
+    "package_versions": "Workspace and npm package versions remained 0.1.5"
+  }
+}
