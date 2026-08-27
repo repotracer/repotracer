@@ -1,0 +1,87 @@
+{
+  "schema_version": 3,
+  "suite": "mah-swe",
+  "id": "mah-swe-subscription-idle-timeout",
+  "rounds": [
+    {
+      "id": "implement",
+      "prompt": "Subscription-backed scouts can hang forever after their child provider stops producing output. Fix the root cause with a configurable inactivity timeout, not a total runtime cap. A healthy scout must be allowed to run indefinitely while meaningful stdout, stderr, or JSON/MCP stream activity continues. Kill the complete child process tree only after the silent interval. Preserve existing CLI and provider behavior, inspect every caller before changing exported APIs, and keep the change minimal.",
+      "expected_scout": true,
+      "expected_paths": [
+        "crates/cli/src/subscription.rs",
+        "crates/core/src/config.rs"
+      ]
+    },
+    {
+      "id": "adversarial-review",
+      "prompt": "Review the implementation against two failures users have seen: a run can last longer than the configured idle interval while output keeps arriving, and a silent provider may leave descendants alive after the direct child exits. Exercise both behaviors. Treat valid stdout, stderr, and MCP/JSON frames as activity, but not process existence. Fix any gap you find and leave the smallest behavioral checks that prove both invariants.",
+      "expected_scout": true,
+      "expected_paths": [
+        "crates/cli/src/subscription.rs"
+      ]
+    }
+  ],
+  "rubric": [
+    {
+      "id": "idle-semantics",
+      "criterion": "Uses one resettable inactivity deadline and never imposes a fixed total runtime cap.",
+      "weight": 25,
+      "required": true,
+      "evidence": ["patch", "trajectory"]
+    },
+    {
+      "id": "activity-coverage",
+      "criterion": "Valid stdout, stderr, and JSON/MCP stream frames refresh the deadline; mere process existence does not.",
+      "weight": 20,
+      "required": true,
+      "evidence": ["patch", "verifier"]
+    },
+    {
+      "id": "healthy-survival",
+      "criterion": "A child that remains active for longer than the idle interval completes without timeout.",
+      "weight": 15,
+      "required": true,
+      "evidence": ["verifier"]
+    },
+    {
+      "id": "tree-termination",
+      "criterion": "A silent child times out near the configured interval and its complete process tree is terminated.",
+      "weight": 20,
+      "required": true,
+      "evidence": ["verifier", "repository_state"]
+    },
+    {
+      "id": "compatibility",
+      "criterion": "Configuration remains backward compatible and current CLI/provider behavior is unchanged outside idle hang handling.",
+      "weight": 10,
+      "required": true,
+      "evidence": ["patch", "verifier"]
+    },
+    {
+      "id": "engineering-quality",
+      "criterion": "The patch fixes the shared process boundary with minimal code and focused behavioral checks.",
+      "weight": 10,
+      "required": false,
+      "evidence": ["patch", "trajectory", "final_response"]
+    }
+  ],
+  "verification": {
+    "commands": [
+      "cargo test -p repotracer activity_extends_idle_deadline_and_silence_kills_tree -- --nocapture",
+      "cargo test -p repotracer subscription"
+    ],
+    "manual_checks": [
+      "Inspect the process API call graph for every configuration and session caller.",
+      "Confirm the implementation contains no replacement wall-clock cap.",
+      "Confirm timeout cleanup reaches a descendant created by the fake provider."
+    ]
+  },
+  "source": {
+    "kind": "real-worktree-task",
+    "repository": "repotracer/repotracer",
+    "base_commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+    "observed_failure": "A subscription scout remained alive after its provider stopped emitting stream activity.",
+    "authored_at": "2026-08-27"
+  },
+  "headline_eligible": false
+}
