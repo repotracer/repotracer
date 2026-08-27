@@ -1,0 +1,62 @@
+#!/bin/sh
+set -eu
+
+for path do
+  printf '\n%s\n' "$path"
+  jq -rs '
+    def median:
+      sort as $values | ($values | length) as $n |
+      if $n == 0 then null
+      elif $n % 2 == 1 then $values[($n / 2 | floor)]
+      else (($values[$n / 2 - 1] + $values[$n / 2]) / 2)
+      end;
+    def rows:
+      if type == "array" then map(select(type == "object"))
+      elif type == "object" and length > 0 and all(.[]; type == "object") then [.[]]
+      else [] end;
+    def counts($key):
+      [ .[] | getpath($key | split("."))? | select(. != null) | tostring ] |
+      group_by(.) | map("\(.[0])=\(length)") | join(", ");
+    def numbers($key):
+      [ .[] | getpath($key | split("."))? | select(type == "number") ];
+    def metric($key; $total):
+      numbers($key) as $values |
+      if ($values | length) == 0 then empty
+      else "\($key): median=\($values | median), min=\($values | min), max=\($values | max)" +
+        (if $total then ", total=\($values | add)" else "" end)
+      end;
+    def failed:
+      (.correct == false) or (.timed_out == true) or
+      ((.exit_code | type) == "number" and .exit_code != 0) or
+      ((.status | type) == "number" and .status >= 400);
+    def row_label:
+      (.id // .task_id // .instance_id //
+        ([.arm, .mode] | map(select(. != null) | tostring) | join("/") | select(length > 0)) // "unknown") as $name |
+      $name + (if .repeat == null then "" else "/r\(.repeat)" end);
+
+    (if length == 1 then .[0] else . end) as $data |
+    if ($data | type) == "object" and ($data.summary | type) == "object" then
+      $data.summary | to_entries[] | "\(.key): \(.value | tojson)"
+    elif ($data | rows | length) > 0 then
+      ($data | rows) as $rows |
+      "records: \($rows | length)",
+      ($rows | ["arm", "status", "exit_code", "timed_out", "correct", "expected_scout", "actual_scout"][] as $key |
+        counts($key) as $counts | select($counts != "") | "\($key): \($counts)"),
+      ($rows | metric("duration_ms"; false), metric("wall_seconds"; false),
+        metric("expected_path_recall"; false), metric("usage.cost"; true)),
+      ($rows | map(select(failed) | row_label) | unique) as $failures |
+        if ($failures | length) > 0 then
+          "failures: \($failures[:12] | join(", "))" +
+          (if ($failures | length) > 12 then " (+\(($failures | length) - 12) more)" else "" end)
+        else empty end
+    elif ($data | type) == "array" then
+      "items: \($data | length)", "sample: \($data[:12] | tojson)"
+    elif ($data | type) == "object" then
+      $data | to_entries[] |
+      select((.value | type) != "object" and ((.value | type) != "array" or (.value | length) <= 12)) |
+      "\(.key): \(.value | tojson)"
+    else
+      $data | tojson
+    end
+  ' "$path"
+done

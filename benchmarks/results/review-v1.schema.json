@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://repotracer.dev/schemas/benchmark-review-v1.json",
+  "title": "RepoTracer blinded quality review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "review_id",
+    "task_id",
+    "artifact_bundle",
+    "blinded_fields",
+    "scores",
+    "overall_score_100",
+    "required_items_passed",
+    "quality_defects",
+    "reviewer_confidence",
+    "locked_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "review_id": { "type": "string", "pattern": "^review-[0-9a-f]{16}$" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "artifact_bundle": { "type": "string", "minLength": 1 },
+    "blinded_fields": { "const": ["arm", "routing", "cost", "latency", "repeat"] },
+    "scores": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rubric_id",
+          "criterion",
+          "points_available",
+          "required",
+          "points_awarded",
+          "passed",
+          "evidence",
+          "note"
+        ],
+        "properties": {
+          "rubric_id": { "type": "string", "minLength": 1 },
+          "criterion": { "type": "string", "minLength": 1 },
+          "points_available": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "required": { "type": "boolean" },
+          "points_awarded": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+          "passed": { "type": ["boolean", "null"] },
+          "evidence": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "note": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "overall_score_100": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+    "required_items_passed": { "type": ["boolean", "null"] },
+    "quality_defects": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "reviewer_confidence": { "enum": ["low", "medium", "high", null] },
+    "locked_at": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

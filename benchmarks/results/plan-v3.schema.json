@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://repotracer.dev/schemas/benchmark-plan-v3.json",
+  "title": "RepoTracer paired benchmark plan v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_schema",
+    "review_schema",
+    "study_id",
+    "generated_at",
+    "status",
+    "profile",
+    "suite_root",
+    "task_suite",
+    "arms",
+    "repeats_per_arm",
+    "task_count",
+    "trial_count",
+    "planned_round_count",
+    "tasks",
+    "trials",
+    "result_layout",
+    "methodology",
+    "review_policy",
+    "decision_gate"
+  ],
+  "properties": {
+    "schema_version": { "const": 3 },
+    "plan_schema": { "const": "benchmarks/results/plan-v3.schema.json" },
+    "review_schema": { "const": "benchmarks/results/review-v1.schema.json" },
+    "study_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "status": { "const": "planned" },
+    "profile": { "enum": ["pilot", "release"] },
+    "suite_root": { "type": "string", "minLength": 1 },
+    "task_suite": { "type": ["string", "null"] },
+    "arms": { "const": ["baseline", "repotracer"] },
+    "repeats_per_arm": { "type": "integer", "minimum": 1 },
+    "task_count": { "type": "integer", "minimum": 1 },
+    "trial_count": { "type": "integer", "minimum": 2 },
+    "planned_round_count": { "type": "integer", "minimum": 2 },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/task" }
+    },
+    "trials": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/trial" }
+    },
+    "result_layout": { "type": "string", "minLength": 1 },
+    "methodology": { "type": "string", "minLength": 1 },
+    "review_policy": { "$ref": "#/$defs/review_policy" },
+    "decision_gate": { "$ref": "#/$defs/decision_gate" }
+  },
+  "$defs": {
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "suite", "id", "headline_eligible"],
+      "properties": {
+        "schema_version": { "enum": [1, 2, 3] },
+        "suite": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "prompt": { "type": "string", "minLength": 1 },
+        "rounds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/round" }
+        },
+        "expected_scout": { "type": "boolean" },
+        "expected_paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rubric": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/rubric_item" }
+        },
+        "verification": { "$ref": "#/$defs/verification" },
+        "source": { "type": "object" },
+        "headline_eligible": { "type": "boolean" }
+      },
+      "oneOf": [
+        {
+          "properties": { "schema_version": { "enum": [1, 2] } },
+          "required": ["prompt"]
+        },
+        {
+          "properties": { "schema_version": { "const": 3 } },
+          "required": ["rounds", "rubric", "verification", "source"]
+        }
+      ]
+    },
+    "round": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "prompt", "expected_scout", "expected_paths"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "prompt": { "type": "string", "minLength": 1 },
+        "expected_scout": { "type": "boolean" },
+        "expected_paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "rubric_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "criterion", "weight", "required", "evidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "criterion": { "type": "string", "minLength": 1 },
+        "weight": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "required": { "type": "boolean" },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["verifier", "patch", "trajectory", "final_response", "repository_state"]
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commands", "manual_checks"],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "manual_checks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "anyOf": [
+        { "properties": { "commands": { "minItems": 1 } } },
+        { "properties": { "manual_checks": { "minItems": 1 } } }
+      ]
+    },
+    "trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pair_id", "task_id", "repeat", "arm", "order", "prompt_sha256", "review_id"],
+      "properties": {
+        "pair_id": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 },
+        "repeat": { "type": "integer", "minimum": 1 },
+        "arm": { "enum": ["baseline", "repotracer"] },
+        "order": { "type": "integer", "minimum": 1 },
+        "prompt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "review_id": { "type": "string", "pattern": "^review-[0-9a-f]{16}$" }
+      }
+    },
+    "review_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blinding", "quality", "invalid_pair", "uncertainty"],
+      "properties": {
+        "blinding": { "type": "string", "minLength": 1 },
+        "quality": { "type": "string", "minLength": 1 },
+        "invalid_pair": { "type": "string", "minLength": 1 },
+        "uncertainty": { "type": "string", "minLength": 1 }
+      }
+    },
+    "decision_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "priority",
+        "minimum_independent_tasks",
+        "minimum_repeats_per_arm",
+        "maximum_quality_regression_points",
+        "target_median_cost_reduction_percent",
+        "maximum_median_wall_time_regression_percent",
+        "hard_failure_policy",
+        "confidence_rule"
+      ],
+      "properties": {
+        "priority": { "const": ["quality", "complete_provider_cost_usd", "wall_seconds"] },
+        "minimum_independent_tasks": { "type": "integer", "minimum": 1 },
+        "minimum_repeats_per_arm": { "type": "integer", "minimum": 1 },
+        "maximum_quality_regression_points": { "type": "number", "minimum": 0, "maximum": 100 },
+        "target_median_cost_reduction_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "maximum_median_wall_time_regression_percent": { "type": "number", "minimum": 0 },
+        "hard_failure_policy": { "type": "string", "minLength": 1 },
+        "confidence_rule": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
