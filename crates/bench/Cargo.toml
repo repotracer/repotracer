@@ -15,5 +15,6 @@ repotracer-core.workspace = true
 repotracer-model.workspace = true
 repotracer-repo-tools.workspace = true
 serde.workspace = true
+sha2.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
