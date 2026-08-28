@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-28-scout-reasoning",
+  "status": "completed",
+  "decision": {
+    "selected_arm": "medium",
+    "confidence": "moderate",
+    "reason": "Medium was perfect in 24/24 blind grades. High added no quality, took 2.384x the arm-level median wall time, and used 6.332x the reasoning-output tokens. Low was fastest but produced six citation/completeness defects across four cross-file task types.",
+    "hybrid_policy": "Not selected. Exact lookups tolerated low in this set, but the same eight tasks cannot justify a production classifier; require a separately preregistered held-out test."
+  },
+  "execution": {
+    "model": "gpt-5.6-luna",
+    "provider_path": "Codex subscription app-server",
+    "tasks": 8,
+    "repeats_per_arm": 3,
+    "arms": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "completed_trials": 72,
+    "failed_trials": 0,
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep"
+    ],
+    "prompt_policy": "byte-identical across arms"
+  },
+  "quality": {
+    "method": "blind manual 0-4 rubric; scores locked before arm reveal",
+    "arm_summary": {
+      "low": {
+        "mean_score": 3.75,
+        "score_counts": {
+          "0": 0,
+          "1": 0,
+          "2": 0,
+          "3": 6,
+          "4": 18
+        },
+        "valid_citation_rate": 1.0,
+        "expected_path_recall": 0.8958
+      },
+      "medium": {
+        "mean_score": 4.0,
+        "score_counts": {
+          "0": 0,
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 24
+        },
+        "valid_citation_rate": 1.0,
+        "expected_path_recall": 0.8229
+      },
+      "high": {
+        "mean_score": 4.0,
+        "score_counts": {
+          "0": 0,
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 24
+        },
+        "valid_citation_rate": 1.0,
+        "expected_path_recall": 0.8021
+      }
+    },
+    "task_cluster_bootstrap_95_ci": {
+      "medium_minus_low_mean_score": [
+        0.083,
+        0.458
+      ],
+      "high_minus_medium_mean_score": [
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "latency": {
+    "low": {
+      "mean_seconds": 31.921,
+      "median_seconds": 34.59,
+      "p95_seconds": 49.123
+    },
+    "medium": {
+      "mean_seconds": 51.454,
+      "median_seconds": 58.148,
+      "p95_seconds": 72.749
+    },
+    "high": {
+      "mean_seconds": 116.903,
+      "median_seconds": 138.646,
+      "p95_seconds": 185.778
+    }
+  },
+  "usage_and_equivalent_cost": {
+    "pricing_usd_per_million": {
+      "uncached_input": 0.2,
+      "cached_input_read": 0.02,
+      "output_including_reasoning": 1.2
+    },
+    "note": "Equivalent usage cost, not an invoice. output_tokens already includes reasoning tokens; reasoning_output_tokens is the reported subset.",
+    "arms": {
+      "low": {
+        "prompt_tokens": 608051,
+        "cached_prompt_tokens": 523264,
+        "completion_tokens": 12683,
+        "reasoning_output_tokens": 1149,
+        "tool_calls": 127,
+        "equivalent_cost_usd": 0.042642
+      },
+      "medium": {
+        "prompt_tokens": 785181,
+        "cached_prompt_tokens": 667904,
+        "completion_tokens": 23378,
+        "reasoning_output_tokens": 11812,
+        "tool_calls": 167,
+        "equivalent_cost_usd": 0.064867
+      },
+      "high": {
+        "prompt_tokens": 785538,
+        "cached_prompt_tokens": 724992,
+        "completion_tokens": 84772,
+        "reasoning_output_tokens": 74793,
+        "tool_calls": 193,
+        "equivalent_cost_usd": 0.128335
+      }
+    }
+  },
+  "pairwise": {
+    "medium_vs_low": {
+      "quality_wins": 6,
+      "quality_ties": 18,
+      "quality_losses": 0,
+      "faster_trials": 0,
+      "slower_trials": 24,
+      "median_paired_wall_delta_seconds": 20.012,
+      "median_paired_wall_ratio": 1.616
+    },
+    "high_vs_medium": {
+      "quality_wins": 0,
+      "quality_ties": 24,
+      "quality_losses": 0,
+      "faster_trials": 3,
+      "slower_trials": 21,
+      "median_paired_wall_delta_seconds": 76.219,
+      "median_paired_wall_ratio": 2.124
+    }
+  },
+  "task_interaction": {
+    "exact_lookup": "All 18 exact lookup trials scored 4/4. Low was adequate and fastest in this dataset.",
+    "cross_file": "Low produced six 3/4 answers across direct tool dispatch, setup, self-update, and subscription process-flow tasks; medium and high scored 4/4 on every cross-file trial.",
+    "production_policy": "Keep medium globally. A low-for-exact hybrid is exploratory only until a separately preregistered held-out classifier test passes."
+  },
+  "limitations": [
+    "Eight tasks from one repository snapshot; no claim of cross-repository generality.",
+    "One blind reviewer; no inter-rater calibration.",
+    "Equivalent cost uses documented benchmark rates rather than a provider invoice.",
+    "Task-specific policy findings are exploratory because the same dataset both suggested and measured the split."
+  ],
+  "artifacts": {
+    "protocol": "protocol.json",
+    "raw_trials": "private/main/trials/",
+    "blind_review": "private/main/blind-review.json",
+    "blind_grades": "private/main/blind-grades.json",
+    "unblinded_analysis": "private/main/scored-analysis.json"
+  }
+}
