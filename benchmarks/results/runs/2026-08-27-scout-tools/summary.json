@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-27-scout-tools",
+  "status": "completed",
+  "decision": "Reject and remove the CodeGraph adapter. Exact selection became correct, and prompt usage fell, but answer quality did not reliably match native tools across low, medium, and high reasoning. A user-facing opt-in would preserve an experiment that failed its release criterion.",
+  "primary_evidence": {
+    "phase": "main",
+    "trials": 72,
+    "matched_task_repeat_blocks": 24,
+    "successful_trials": 72,
+    "scout_model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "subscription_only": true,
+    "manual_review": "72 outputs scored 0-4 before unblinding; arm-specific absolute paths were removed from the main review bundle",
+    "execution_identity": {
+      "repository_base_commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "source_snapshot": "Tracked and non-ignored uncommitted worktree files copied independently per repeat and arm",
+      "candidate_binary_sha256": "35aff197993dcf8cfaa28f811af844b57f5a06e0bedcf8df33f2abc12a2e5ffb",
+      "pilot_randomization_seed": 20260827,
+      "main_randomization_seed": 20260828,
+      "concurrent_workers": 4,
+      "scout_idle_timeout_ms": 180000,
+      "repository_tool_timeout_seconds": 30
+    },
+    "arms": {
+      "control": {
+        "mean_quality": 3.9167,
+        "mean_wall_seconds": 37.8652,
+        "median_wall_seconds": 38.549,
+        "mean_prompt_tokens": 23037.3333,
+        "mean_uncached_prompt_tokens": 5202.6667,
+        "mean_completion_tokens": 863.2083,
+        "mean_reasoning_output_tokens": 411.75,
+        "mean_expected_path_recall": 0.8056,
+        "valid_citation_rate": 1.0
+      },
+      "placebo": {
+        "mean_quality": 3.3333,
+        "mean_wall_seconds": 39.5895,
+        "median_wall_seconds": 42.827,
+        "mean_prompt_tokens": 20619.4583,
+        "mean_uncached_prompt_tokens": 4406.125,
+        "mean_completion_tokens": 960.3333,
+        "mean_reasoning_output_tokens": 524.5,
+        "mean_expected_path_recall": 0.7292,
+        "valid_citation_rate": 1.0
+      },
+      "codegraph": {
+        "mean_quality": 3.7083,
+        "mean_wall_seconds": 34.0201,
+        "median_wall_seconds": 34.98,
+        "mean_prompt_tokens": 20052.0833,
+        "mean_uncached_prompt_tokens": 4308.0833,
+        "mean_completion_tokens": 870.875,
+        "mean_reasoning_output_tokens": 411.8333,
+        "mean_expected_path_recall": 0.7465,
+        "valid_citation_rate": 1.0
+      }
+    },
+    "matched_codegraph_minus_control": {
+      "mean_quality": -0.2083,
+      "mean_quality_bootstrap_95_percent_ci": [-0.4167, -0.0417],
+      "mean_wall_seconds": -3.845,
+      "mean_wall_bootstrap_95_percent_ci": [-10.0624, 1.0521],
+      "mean_prompt_tokens": -2985.25,
+      "mean_prompt_bootstrap_95_percent_ci": [-5117.5, -835.7083],
+      "mean_uncached_prompt_tokens": -894.5833,
+      "mean_uncached_prompt_bootstrap_95_percent_ci": [-2271.875, 908.4583],
+      "mean_expected_path_recall": -0.059
+    },
+    "matched_codegraph_minus_placebo": {
+      "mean_quality": 0.375,
+      "mean_quality_bootstrap_95_percent_ci": [-0.0417, 0.8333],
+      "mean_wall_seconds": -5.5694,
+      "mean_wall_bootstrap_95_percent_ci": [-8.777, -2.3784],
+      "mean_prompt_tokens": -567.375,
+      "mean_prompt_bootstrap_95_percent_ci": [-2499.375, 1184.5417]
+    },
+    "graph_suitable_tasks": {
+      "control_mean_quality": 3.8889,
+      "codegraph_mean_quality": 3.6111,
+      "control_mean_wall_seconds": 43.6138,
+      "codegraph_mean_wall_seconds": 38.2092,
+      "control_mean_prompt_tokens": 26850.3889,
+      "codegraph_mean_prompt_tokens": 21463.2778
+    },
+    "negative_controls": {
+      "control_mean_quality": 4.0,
+      "codegraph_mean_quality": 4.0,
+      "control_mean_wall_seconds": 20.6192,
+      "codegraph_mean_wall_seconds": 21.4528,
+      "control_mean_prompt_tokens": 11598.1667,
+      "codegraph_mean_prompt_tokens": 15818.5,
+      "codegraph_selected_trials": 5,
+      "trials": 6
+    },
+    "retrieval_activity": {
+      "placebo_sessions_selecting_tool": 24,
+      "placebo_explore_calls": 24,
+      "codegraph_sessions_selecting_tool": 23,
+      "codegraph_explore_calls": 47,
+      "codegraph_mean_explore_calls_per_selecting_session": 2.0435
+    }
+  },
+  "operational_evidence": {
+    "codegraph_version": "1.5.0",
+    "repository_files": 190,
+    "index_bytes": 3104997,
+    "cold_init_wall_seconds": 0.486,
+    "unchanged_sync_wall_seconds": 0.138,
+    "changed_sync_wall_seconds": 0.249,
+    "first_explore_wall_seconds": 0.143,
+    "warm_explore_wall_seconds": 0.145,
+    "max_rss_bytes": 347291648
+  },
+  "follow_up_evidence": {
+    "trials": 144,
+    "trials_per_reasoning_level": 48,
+    "successful_trials": 144,
+    "valid_citation_rate": 1.0,
+    "selection_medium": {
+      "graph_suitable_trials": 18,
+      "graph_suitable_trials_selecting_codegraph": 18,
+      "negative_control_trials": 6,
+      "negative_control_trials_selecting_codegraph": 0,
+      "codegraph_explore_calls": 27,
+      "candidate_minus_control_mean_quality": 0.125,
+      "quality_bootstrap_95_percent_ci": [-0.25, 0.5],
+      "candidate_minus_control_mean_prompt_tokens": -3756.5833,
+      "prompt_token_bootstrap_95_percent_ci": [-6699.0833, -832.625],
+      "candidate_minus_control_mean_wall_seconds": -3.4005,
+      "wall_bootstrap_95_percent_ci": [-7.8199, 1.174]
+    },
+    "reasoning_comparison": {
+      "low": {
+        "control_mean_quality": 3.9167,
+        "codegraph_mean_quality": 3.7083,
+        "candidate_minus_control_mean_prompt_tokens": -2559.7917,
+        "candidate_minus_control_mean_wall_seconds": -0.7552
+      },
+      "medium": {
+        "control_mean_quality": 3.5417,
+        "codegraph_mean_quality": 3.6667,
+        "candidate_minus_control_mean_prompt_tokens": -3756.5833,
+        "candidate_minus_control_mean_wall_seconds": -3.4005
+      },
+      "high": {
+        "control_mean_quality": 3.9167,
+        "codegraph_mean_quality": 3.7917,
+        "candidate_minus_control_mean_prompt_tokens": -2879.75,
+        "candidate_minus_control_mean_wall_seconds": -15.4654
+      }
+    }
+  },
+  "methodology": {
+    "hypothesis": "Real graph evidence should tie or improve quality on cross-file tasks while reducing Scout usage or time, and should be skipped on exact local tasks.",
+    "counter_hypothesis": "A fourth tool can attract unnecessary calls, return dense but incomplete evidence, or improve apparent retrieval metrics while lowering final answer quality.",
+    "task_selection": "Six repository-local multi-file flow or change-impact questions plus two exact one-or-two-file negative controls. Evaluator-only expected paths were current source owners and were never sent to the model.",
+    "arm_isolation": "Every arm received the same Scout configuration and query. Control removed the CodeGraph schema. Placebo exposed the treatment schema but returned bounded unavailability. Treatment used real CodeGraph. Each arm used an independent repository snapshot and CODEX_HOME while sharing subscription authentication only.",
+    "randomization": "Each repeat shuffled task order and randomized the three arm positions inside every matched task block. Main used seed 20260828.",
+    "blinding": "Main summaries and citation paths were normalized before assigning opaque labels. Scores were written before the label-to-trial key was opened. Pilot arm-path leakage is recorded and excluded from primary evidence.",
+    "cold_warm_policy": "Treatment indices were initialized before efficacy trials. Production sync still ran at first actual use. Cold init, unchanged sync, changed sync, first explore, and warm explore were measured separately.",
+    "scoring": "One reviewer assigned 0-4 quality scores: 0 wrong or no evidence; 1 fragment; 2 core flow partial; 3 essential flow complete; 4 complete and accurate including material boundaries and fallbacks. Automated metrics covered citation validity and expected-path recall.",
+    "usage_and_cost": "Scout prompt, cached prompt, uncached prompt, completion, reasoning output, and tool calls are reported separately. Subscription execution supplied no defensible per-trial USD, and no parent Sol ran, so complete-task or dollar cost is intentionally absent.",
+    "failure_policy": "Provider, harness, or repository setup failure invalidates and reruns the complete matched three-arm block. Model timeout, malformed output, unnecessary calls, missing evidence, and weak answers remain scored outcomes. No main block required resampling.",
+    "retention": "Raw stdout, stderr, result JSON, blind bundles, grades, tool logs, and lifecycle measurements remain under the ignored private directory; sanitized protocol and summary stay tracked."
+  },
+  "interpretation": [
+    "The placebo arm was materially worse than both real graph evidence and native tools. An unavailable fourth tool adds a failed call and encourages weak fallback behavior.",
+    "CodeGraph reduced mean Scout prompt tokens by 13.0% and mean wall time by 10.2% versus control, but mean quality fell by 0.208 points and expected-path recall fell by 5.9 percentage points.",
+    "On graph-suitable tasks, CodeGraph reduced mean prompt tokens by 20.1% and mean wall time by 12.4%, but quality fell by 0.278 points.",
+    "On exact negative controls, quality stayed perfect but CodeGraph increased prompt tokens by 36.4% and was unnecessarily selected in 5 of 6 trials.",
+    "This Scout-only study neither measures nor meets the product's 60% complete-task cost target. Parent Sol usage and complete MAHswe task economics remain later-stage evidence.",
+    "The revised selection policy eliminated all 6 unnecessary negative-control calls and selected CodeGraph on all 18 graph-suitable trials.",
+    "That selection fix did not establish quality parity: CodeGraph trailed native tools by 0.208 points at low reasoning and 0.125 at high; the medium gain was 0.125 with a bootstrap interval spanning -0.25 to 0.5.",
+    "Prompt-token reductions remained consistent across low, medium, and high reasoning, but lower usage does not justify a quality regression. The adapter and its public configuration seam were removed."
+  ],
+  "limitations": [
+    "One repository and eight retrieval tasks; this is a tool-stage diagnostic, not a complete-task MAHswe result.",
+    "One human reviewer scored quality. Main labels were hidden, but output behavior can still make an arm guessable.",
+    "Pilot grading was not blind because absolute citation links leaked arm names; pilot results remain diagnostic only.",
+    "The placebo matched schema and selection opportunity, not CodeGraph output bytes or retrieval latency.",
+    "Treatment indices were preinitialized for efficacy trials; cold initialization was measured separately.",
+    "CodeGraph 1.5.0 was installed; 1.6.0 was available but deliberately not introduced mid-study.",
+    "Subscription usage has no defensible per-trial USD conversion, so prompt, cached prompt, uncached prompt, completion, and reasoning usage are reported separately."
+  ],
+  "reproduction": [
+    "benchmarks/runners/build-rust-arm.sh scout-tools-candidate repotracer -p repotracer",
+    "benchmarks/runners/measure_codegraph.py",
+    "benchmarks/runners/run_scout_tools.py --phase pilot --repeats 1 --binary <candidate> --workers 4",
+    "benchmarks/runners/run_scout_tools.py --phase main --repeats 3 --binary <candidate> --workers 4",
+    "benchmarks/runners/analyze_scout_tools.py --phase main",
+    "benchmarks/runners/run_scout_tools.py --phase selection-medium --repeats 3 --binary <candidate> --workers 4 --arms control codegraph --seed 20260830",
+    "benchmarks/runners/run_scout_tools.py --phase reasoning-low --repeats 3 --binary <candidate> --workers 4 --arms codegraph --reasoning-effort low --seed 20260831",
+    "benchmarks/runners/run_scout_tools.py --phase reasoning-low-control --repeats 3 --binary <candidate> --workers 4 --arms control --reasoning-effort low --seed 20260832",
+    "benchmarks/runners/run_scout_tools.py --phase reasoning-high --repeats 3 --binary <candidate> --workers 4 --arms codegraph --reasoning-effort high --seed 20260833",
+    "benchmarks/runners/run_scout_tools.py --phase reasoning-high-control --repeats 3 --binary <candidate> --workers 4 --arms control --reasoning-effort high --seed 20260834"
+  ],
+  "artifacts": {
+    "protocol": "protocol.json",
+    "sanitized_summary": "summary.json",
+    "private_raw_results": "private/main/results.json",
+    "private_analysis": "private/main/analysis.json",
+    "private_blind_review": "private/main/blind-review.json",
+    "private_grades": "private/main/blind-grades.json",
+    "private_tool_logs": ["private/main/treatment-bin/calls.log", "private/main/placebo-bin/calls.log"],
+    "private_selection_analysis": "private/selection-medium/analysis.json",
+    "private_low_reasoning_analysis": ["private/reasoning-low/analysis.json", "private/reasoning-low-control/analysis.json"],
+    "private_high_reasoning_analysis": ["private/reasoning-high/analysis.json", "private/reasoning-high-control/analysis.json"],
+    "private_lifecycle_metrics": "private/operations/results.json"
+  }
+}
