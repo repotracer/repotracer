@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-29-parent-routing-mechanisms",
+  "status": "complete",
+  "objective": "Recover parent routing misses without materially reducing skip precision, then determine whether a mechanism reduces complete Sol work enough to improve quality, complete cost, or wall time.",
+  "priority": ["complete_task_quality", "complete_parent_plus_scout_cost", "wall_time"],
+  "provider": "real Codex subscription through codex app-server",
+  "models": {
+    "parent": "gpt-5.6-sol",
+    "parent_reasoning": "high",
+    "classifier": "gpt-5.6-luna",
+    "classifier_reasoning": "medium",
+    "scout": "gpt-5.6-luna",
+    "scout_reasoning": "medium"
+  },
+  "focused_suite": {
+    "tasks": "all 37 versioned benchmark tasks carrying expected_scout",
+    "eligible": 23,
+    "skip": 14,
+    "repeats_for_model_routes": 3,
+    "randomization_seed": 20260839,
+    "metrics": ["route_accuracy", "scout_recall", "skip_precision", "false_positive_ids", "false_negative_ids", "routing_wall_time", "routing_usage"]
+  },
+  "arms": [
+    {
+      "id": "current-natural",
+      "mechanism": "Current managed instructions and current repo_scout MCP metadata; Sol chooses naturally.",
+      "execution": "Fresh paired Sol routing calls. The Scout endpoint returns a bounded stub so this stage measures selection rather than Scout answer quality."
+    },
+    {
+      "id": "metadata",
+      "mechanism": "Current managed instructions plus concise decision-oriented repo_scout metadata with positive and negative examples; no instruction change.",
+      "execution": "Fresh paired Sol routing calls with the same bounded Scout stub."
+    },
+    {
+      "id": "deterministic",
+      "mechanism": "A locked prompt-only rule routes direct when a file or symbol gives a complete local surface; routes Scout for explicit cross-owner propagation or multi-component tracing; otherwise direct until one targeted lookup fails.",
+      "execution": "Pure local classification. No model call. This is a diagnostic unless a deployable parent interception point exists."
+    },
+    {
+      "id": "luna-classifier",
+      "mechanism": "A bounded Luna request returns only scout or direct from the user request and currently supplied context, before Sol starts repository work.",
+      "execution": "Three independent classifications per task, no repository tools. Diagnostic unless a deployable parent interception point exists."
+    },
+    {
+      "id": "second-chance",
+      "mechanism": "Natural Sol routing gets one recovery trigger after broad exploration starts without Scout.",
+      "trigger": "Before the first edit, trigger after repository operations touch at least two distinct top-level ownership areas or after two broad search/list operations without a precise file/symbol surface.",
+      "execution": "Replay the fresh current-natural event stream. Fresh complete-task execution only if the mechanism is deployable and wins the focused screen."
+    },
+    {
+      "id": "speculative",
+      "mechanism": "Start Scout concurrently when the selected pre-router predicts Scout; Sol may continue non-repository reasoning while Scout runs.",
+      "execution": "Focused routing score equals the selected pre-router. Scout latency and complete-task effects are measured only for a finalist because classification alone determines focused routing."
+    },
+    {
+      "id": "always-scout",
+      "mechanism": "Run Scout before every task.",
+      "execution": "Routing metrics are derived mechanically: 100% recall, 0% skip precision, and 23/37 route accuracy. No focused model calls. Retained only as a complete-task upper bound if needed."
+    }
+  ],
+  "metadata_candidate": "Repository exploration delegate. Call before broad Read, Grep, or Glob work when the request requires tracing behavior across multiple ownership areas and the relevant implementation is not already in context. Examples: propagation through CLI, configuration, runtime, and output boundaries; a lifecycle spanning server, queue, provider, and cleanup. Do not call for one named file or symbol, an exact value or command, a tiny repository, or when one targeted lookup identifies the complete change surface. If one targeted lookup fails to localize the work, call repo_scout instead of continuing broad exploration. Its citations and excerpts replace repository-wide searching.",
+  "classifier_prompt": "Decide whether solving the request requires broad repository exploration before a precise change surface is known. Return scout for cross-owner propagation, multi-component lifecycle tracing, or broad evidence synthesis. Return direct when named files or symbols form the complete surface, for exact values or commands, or when supplied context already localizes the work. Unknown location alone is direct until one targeted lookup fails. Output exactly scout or direct.",
+  "fast_mode_overlay": {
+    "question": "Does Luna medium with Codex Fast service preserve Scout quality while materially reducing wall time?",
+    "setting": "service_tier=priority",
+    "control": "service_tier=default",
+    "tasks": ["direct-tool-dispatch-flow", "setup-integration-flow", "subscription-app-server-flow"],
+    "repeats": 3,
+    "paired_randomized": true,
+    "metrics": ["blind_quality", "valid_citation_rate", "expected_path_recall", "wall_time", "tokens", "provider_billed_cost"]
+  },
+  "progression": {
+    "focused_screen": "Run or derive every named mechanism. Do not spend Sol calls where routing metrics follow mechanically.",
+    "finalists": "Advance only mechanisms that are deployable or establish enough benefit to justify adding a parent interception layer. Reject any model arm below current skip precision or recall unless complete-task quality proves the tradeoff valuable.",
+    "complete_tasks": "Run at least one broad and one localized representative repository task, three repeats per retained arm, with hidden functional verification and arm-blind review. Count parent, classifier, Scout, repeated Scout calls, and every turn.",
+    "decision": "Prefer the smallest deployable mechanism that preserves quality and improves complete cost or time. A diagnostic-only simulation cannot become the product recommendation."
+  },
+  "controls": [
+    "Prompts are byte-identical between comparable arms.",
+    "No evaluator labels, expected paths, or hidden checks enter model prompts.",
+    "All model-backed runs use codex app-server and existing subscription authentication.",
+    "Raw trajectories and credentials remain in ignored private directories; credentials are never copied into result artifacts.",
+    "Provider or harness failures remain recorded and matched blocks are rerun rather than silently dropped."
+  ],
+  "limitations": [
+    "The 37-task focused suite has been used in prior routing development, so it screens mechanisms but cannot alone establish generalization.",
+    "Second-chance, speculative, classifier, deterministic, and always-Scout policies require a parent interception point unless current Codex integration exposes one.",
+    "Fast mode changes service tier, not reasoning effort. Its cost and latency evidence is reported separately from routing quality."
+  ]
+}

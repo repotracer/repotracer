@@ -1,0 +1,638 @@
+{
+  "schema_version": 2,
+  "study_id": "2026-08-29-parent-routing-mechanisms",
+  "generated_at": "2026-08-29T23:03:03.431252+00:00",
+  "status": "complete",
+  "suite_root": "benchmarks/tasks",
+  "arms": [
+    "baseline",
+    "repotracer"
+  ],
+  "repeats_per_arm": 3,
+  "trial_count": 12,
+  "tasks": [
+    {
+      "schema_version": 1,
+      "suite": "parent-routing-complete",
+      "id": "route-cli-08",
+      "prompt": "In `crates/cli/src/agents.rs`, explain whether `replace_managed_block` preserves user text before and after an existing RepoTracer-managed block, and what it does when the closing marker is missing.",
+      "expected_scout": false,
+      "expected_paths": [
+        "crates/cli/src/agents.rs"
+      ],
+      "headline_eligible": false
+    },
+    {
+      "schema_version": 1,
+      "suite": "parent-routing-complete",
+      "id": "route-runtime-03",
+      "prompt": "When a scout deadline expires during a batch of repository searches, completed sibling results are lost and slow subprocesses may keep running. Cancel outstanding work at the deadline, retain results that already completed when possible, and report failure and duration metadata consistently.",
+      "expected_scout": true,
+      "expected_paths": [
+        "crates/core/src/engine.rs",
+        "crates/repo-tools/src/exec.rs",
+        "crates/repo-tools/src/grep.rs",
+        "crates/repo-tools/src/types.rs"
+      ],
+      "headline_eligible": false
+    }
+  ],
+  "result_layout": "Focused diagnostics and raw complete-task artifacts live under ignored private/; summary.json is the sanitized aggregate.",
+  "methodology": "Current-natural and forced always-Scout complete tasks ran three repeats each through the real Codex subscription and repotracer MCP. Outputs were arm-blind reviewed; runtime patches ran targeted cargo tests. Focused mechanism diagnostics are declared in protocol.json.",
+  "protocol": {
+    "main_model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "setup_command": "target/debug/repotracer --config <trial>/repotracer.toml serve",
+    "order_policy": "fixed-seed randomized independently per arm; two concurrent workers",
+    "timeout_seconds": 3600,
+    "network_policy": "normal Codex subscription access in both arms",
+    "cache_policy": "isolated HOME/CODEX_HOME per trial; provider caching unchanged"
+  },
+  "trials": [
+    {
+      "task_id": "route-cli-08",
+      "repeat": 1,
+      "arm": "baseline",
+      "order": 4,
+      "status": "complete",
+      "started_at": "2026-08-29T22:41:50.519Z",
+      "finished_at": "2026-08-29T22:42:08.481Z",
+      "prompt_sha256": "7e560639794c729eeb3e7e3cbe665b99505d38c0bb6c2c13ef8f9012ac5aa0f0",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/current/trials/route-cli-08-r0-current/trajectory.jsonl",
+        "patch": "private/complete/current/trials/route-cli-08-r0-current/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/current/trials/route-cli-08-r0-current/trajectory.jsonl": "e3bb4ae4ac28489113b3ecf51284385ce1f40fe32cc1d74545d6bece1a79b31b",
+          "private/complete/current/trials/route-cli-08-r0-current/model.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 3,
+            "input_tokens": 33937,
+            "cached_input_tokens": 0,
+            "output_tokens": 469,
+            "reasoning_tokens": 155,
+            "cost_usd": 0.183755
+          }
+        },
+        "scout": {},
+        "complete_provider_cost_usd": 0.183755
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": true,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-cli-08",
+      "repeat": 2,
+      "arm": "baseline",
+      "order": 6,
+      "status": "complete",
+      "started_at": "2026-08-29T22:48:55.587Z",
+      "finished_at": "2026-08-29T22:49:12.721Z",
+      "prompt_sha256": "7e560639794c729eeb3e7e3cbe665b99505d38c0bb6c2c13ef8f9012ac5aa0f0",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/current/trials/route-cli-08-r1-current/trajectory.jsonl",
+        "patch": "private/complete/current/trials/route-cli-08-r1-current/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/current/trials/route-cli-08-r1-current/trajectory.jsonl": "ac87d4591338f85f6c96440dae37747ce16182f7f45efeda161a5efa5121d481",
+          "private/complete/current/trials/route-cli-08-r1-current/model.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 3,
+            "input_tokens": 34686,
+            "cached_input_tokens": 0,
+            "output_tokens": 478,
+            "reasoning_tokens": 110,
+            "cost_usd": 0.18777
+          }
+        },
+        "scout": {},
+        "complete_provider_cost_usd": 0.18777
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": true,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-cli-08",
+      "repeat": 3,
+      "arm": "baseline",
+      "order": 3,
+      "status": "complete",
+      "started_at": "2026-08-29T22:41:23.271Z",
+      "finished_at": "2026-08-29T22:41:39.492Z",
+      "prompt_sha256": "7e560639794c729eeb3e7e3cbe665b99505d38c0bb6c2c13ef8f9012ac5aa0f0",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/current/trials/route-cli-08-r2-current/trajectory.jsonl",
+        "patch": "private/complete/current/trials/route-cli-08-r2-current/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/current/trials/route-cli-08-r2-current/trajectory.jsonl": "ed1430369df25139a3c89006df5e59ca1943321290a360c584d75d155d1d90fd",
+          "private/complete/current/trials/route-cli-08-r2-current/model.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 3,
+            "input_tokens": 34145,
+            "cached_input_tokens": 0,
+            "output_tokens": 446,
+            "reasoning_tokens": 137,
+            "cost_usd": 0.184105
+          }
+        },
+        "scout": {},
+        "complete_provider_cost_usd": 0.184105
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": true,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-runtime-03",
+      "repeat": 1,
+      "arm": "baseline",
+      "order": 2,
+      "status": "complete",
+      "started_at": "2026-08-29T22:34:39.183Z",
+      "finished_at": "2026-08-29T22:41:21.871Z",
+      "prompt_sha256": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/current/trials/route-runtime-03-r0-current/trajectory.jsonl",
+        "patch": "private/complete/current/trials/route-runtime-03-r0-current/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/current/trials/route-runtime-03-r0-current/trajectory.jsonl": "3d7d84ba43db99eff5552ce17bb702c8b151889f94a5c549bcacaea03dac329a",
+          "private/complete/current/trials/route-runtime-03-r0-current/model.patch": "170a55d8eca2c6672c020636666cf6fed56ea9515e59678cac300e6d741ca46a"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 55,
+            "input_tokens": 2449742,
+            "cached_input_tokens": 2105600,
+            "output_tokens": 25821,
+            "reasoning_tokens": 12164,
+            "cost_usd": 3.54814
+          }
+        },
+        "scout": {},
+        "complete_provider_cost_usd": 3.54814
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": false,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-runtime-03",
+      "repeat": 2,
+      "arm": "baseline",
+      "order": 5,
+      "status": "complete",
+      "started_at": "2026-08-29T22:43:03.019Z",
+      "finished_at": "2026-08-29T22:47:47.059Z",
+      "prompt_sha256": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/current/trials/route-runtime-03-r1-current/trajectory.jsonl",
+        "patch": "private/complete/current/trials/route-runtime-03-r1-current/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/current/trials/route-runtime-03-r1-current/trajectory.jsonl": "d7f69a3269f768b263e73eb05924eca1df2d1a874c03f6a5b171e632b184eacf",
+          "private/complete/current/trials/route-runtime-03-r1-current/model.patch": "f67ac73dc17197cb3cf57bf1b5ef16634bee52f6aab5cef27e1a6914b297ea2e"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 71,
+            "input_tokens": 2988558,
+            "cached_input_tokens": 2643968,
+            "output_tokens": 36865,
+            "reasoning_tokens": 20064,
+            "cost_usd": 4.150884
+          }
+        },
+        "scout": {},
+        "complete_provider_cost_usd": 4.150884
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": false,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-runtime-03",
+      "repeat": 3,
+      "arm": "baseline",
+      "order": 1,
+      "status": "complete",
+      "started_at": "2026-08-29T22:34:39.232Z",
+      "finished_at": "2026-08-29T22:48:45.450Z",
+      "prompt_sha256": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/current/trials/route-runtime-03-r2-current/trajectory.jsonl",
+        "patch": "private/complete/current/trials/route-runtime-03-r2-current/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/current/trials/route-runtime-03-r2-current/trajectory.jsonl": "8b3482476e6dac7f65cb54ef1e52792cf152dab88c16dbc567a4c84ac7515889",
+          "private/complete/current/trials/route-runtime-03-r2-current/model.patch": "39da24d6d7fcd90f55a3baf4e98ee5bbf1d3f7aa3819d061956215c3188a5c64"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 77,
+            "input_tokens": 4086578,
+            "cached_input_tokens": 3642368,
+            "output_tokens": 36123,
+            "reasoning_tokens": 17129,
+            "cost_usd": 5.125924
+          }
+        },
+        "scout": {},
+        "complete_provider_cost_usd": 5.125924
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": false,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-cli-08",
+      "repeat": 1,
+      "arm": "repotracer",
+      "order": 1,
+      "status": "complete",
+      "started_at": "2026-08-29T22:34:41.067Z",
+      "finished_at": "2026-08-29T22:35:31.548Z",
+      "prompt_sha256": "7e560639794c729eeb3e7e3cbe665b99505d38c0bb6c2c13ef8f9012ac5aa0f0",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/always/trials/route-cli-08-r0-always/trajectory.jsonl",
+        "patch": "private/complete/always/trials/route-cli-08-r0-always/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/always/trials/route-cli-08-r0-always/trajectory.jsonl": "89e1fe125bbd78599e412952281fde7fbbf5de848a72b1670baa04a27ab3dd9a",
+          "private/complete/always/trials/route-cli-08-r0-always/model.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 4,
+            "input_tokens": 43930,
+            "cached_input_tokens": 9984,
+            "output_tokens": 591,
+            "reasoning_tokens": 161,
+            "cost_usd": 0.192452
+          }
+        },
+        "scout": {
+          "cached_prompt_tokens": 8960,
+          "completion_tokens": 493,
+          "duration_ms": 26616,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 10827,
+          "reasoning_output_tokens": 116,
+          "tool_calls": 3,
+          "turns": 4
+        },
+        "complete_provider_cost_usd": null
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": true,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-cli-08",
+      "repeat": 2,
+      "arm": "repotracer",
+      "order": 2,
+      "status": "complete",
+      "started_at": "2026-08-29T22:34:41.134Z",
+      "finished_at": "2026-08-29T22:35:25.907Z",
+      "prompt_sha256": "7e560639794c729eeb3e7e3cbe665b99505d38c0bb6c2c13ef8f9012ac5aa0f0",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/always/trials/route-cli-08-r1-always/trajectory.jsonl",
+        "patch": "private/complete/always/trials/route-cli-08-r1-always/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/always/trials/route-cli-08-r1-always/trajectory.jsonl": "ca498c3076834c416fa4301190a9be6696665c413b3a8e948e8e7c57864607df",
+          "private/complete/always/trials/route-cli-08-r1-always/model.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 4,
+            "input_tokens": 44167,
+            "cached_input_tokens": 9984,
+            "output_tokens": 582,
+            "reasoning_tokens": 110,
+            "cost_usd": 0.193367
+          }
+        },
+        "scout": {
+          "cached_prompt_tokens": 8960,
+          "completion_tokens": 792,
+          "duration_ms": 25713,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 11001,
+          "reasoning_output_tokens": 280,
+          "tool_calls": 2,
+          "turns": 3
+        },
+        "complete_provider_cost_usd": null
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": true,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-cli-08",
+      "repeat": 3,
+      "arm": "repotracer",
+      "order": 5,
+      "status": "complete",
+      "started_at": "2026-08-29T22:43:47.204Z",
+      "finished_at": "2026-08-29T22:44:38.271Z",
+      "prompt_sha256": "7e560639794c729eeb3e7e3cbe665b99505d38c0bb6c2c13ef8f9012ac5aa0f0",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/always/trials/route-cli-08-r2-always/trajectory.jsonl",
+        "patch": "private/complete/always/trials/route-cli-08-r2-always/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/always/trials/route-cli-08-r2-always/trajectory.jsonl": "291cec91c5f516bf1491ea99bde244bcfced7a86d1b0bbecfe185df9e97c14bf",
+          "private/complete/always/trials/route-cli-08-r2-always/model.patch": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 4,
+            "input_tokens": 43867,
+            "cached_input_tokens": 9984,
+            "output_tokens": 503,
+            "reasoning_tokens": 122,
+            "cost_usd": 0.189497
+          }
+        },
+        "scout": {
+          "cached_prompt_tokens": 8960,
+          "completion_tokens": 621,
+          "duration_ms": 28031,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 10723,
+          "reasoning_output_tokens": 253,
+          "tool_calls": 3,
+          "turns": 4
+        },
+        "complete_provider_cost_usd": null
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": true,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-runtime-03",
+      "repeat": 1,
+      "arm": "repotracer",
+      "order": 3,
+      "status": "complete",
+      "started_at": "2026-08-29T22:35:27.158Z",
+      "finished_at": "2026-08-29T22:44:24.867Z",
+      "prompt_sha256": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/always/trials/route-runtime-03-r0-always/trajectory.jsonl",
+        "patch": "private/complete/always/trials/route-runtime-03-r0-always/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/always/trials/route-runtime-03-r0-always/trajectory.jsonl": "95057edfe795984f5a4e3753883d98b04c3f7c0accab96c492435a9853cf218e",
+          "private/complete/always/trials/route-runtime-03-r0-always/model.patch": "88f8349979d0dbf6662a21a9f8a31bbb2a58da2fe4a5a6d1b962b4ac68dd38bc"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 34,
+            "input_tokens": 1418426,
+            "cached_input_tokens": 1317120,
+            "output_tokens": 18059,
+            "reasoning_tokens": 7304,
+            "cost_usd": 1.70686
+          }
+        },
+        "scout": {
+          "cached_prompt_tokens": 33536,
+          "completion_tokens": 1148,
+          "duration_ms": 51281,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 38058,
+          "reasoning_output_tokens": 374,
+          "tool_calls": 6,
+          "turns": 7
+        },
+        "complete_provider_cost_usd": null
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": true,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-runtime-03",
+      "repeat": 2,
+      "arm": "repotracer",
+      "order": 4,
+      "status": "complete",
+      "started_at": "2026-08-29T22:35:33.264Z",
+      "finished_at": "2026-08-29T22:43:45.802Z",
+      "prompt_sha256": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/always/trials/route-runtime-03-r1-always/trajectory.jsonl",
+        "patch": "private/complete/always/trials/route-runtime-03-r1-always/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/always/trials/route-runtime-03-r1-always/trajectory.jsonl": "aa03ec230f53a1a0b00537244967baf4a00487b7f3e03719a5ef39c2f39e3774",
+          "private/complete/always/trials/route-runtime-03-r1-always/model.patch": "4277b599b411adfeb6bc32a036a7c1a53e333476f87a8ce5ade9a84240590423"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 31,
+            "input_tokens": 1074148,
+            "cached_input_tokens": 927488,
+            "output_tokens": 18172,
+            "reasoning_tokens": 8329,
+            "cost_usd": 1.742204
+          }
+        },
+        "scout": {
+          "cached_prompt_tokens": 45824,
+          "completion_tokens": 1116,
+          "duration_ms": 67600,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 50070,
+          "reasoning_output_tokens": 516,
+          "tool_calls": 8,
+          "turns": 9
+        },
+        "complete_provider_cost_usd": null
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": false,
+        "grader_artifact": "summary.json"
+      }
+    },
+    {
+      "task_id": "route-runtime-03",
+      "repeat": 3,
+      "arm": "repotracer",
+      "order": 6,
+      "status": "complete",
+      "started_at": "2026-08-29T22:45:43.979Z",
+      "finished_at": "2026-08-29T22:47:10.766Z",
+      "prompt_sha256": "78d62f2618459fc26202fa7cd15c53878c9241b5d4314916209a4fbe8affed7a",
+      "repository": "RepoTracer",
+      "commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+      "agent_version": "0.150.1",
+      "model": "gpt-5.6-sol",
+      "artifacts": {
+        "trajectory": "private/complete/always/trials/route-runtime-03-r2-always/trajectory.jsonl",
+        "patch": "private/complete/always/trials/route-runtime-03-r2-always/model.patch",
+        "test_log": "summary.json",
+        "sha256": {
+          "private/complete/always/trials/route-runtime-03-r2-always/trajectory.jsonl": "92b484037d8ad92253de837dbd6cc965c21b68f003d06c89298f8bffe2556ee6",
+          "private/complete/always/trials/route-runtime-03-r2-always/model.patch": "bad2c1c39ac4b1a1c6a7f12125e28ea59aa5b739f2c78454f7e89bc4251a4060"
+        }
+      },
+      "billing": {
+        "source": "Codex-LB request_logs; Scout per-trial provider cost unavailable under concurrent app-server runs",
+        "main": {
+          "gpt-5.6-sol": {
+            "requests": 38,
+            "input_tokens": 1337009,
+            "cached_input_tokens": 1190144,
+            "output_tokens": 16997,
+            "reasoning_tokens": 8078,
+            "cost_usd": 1.839307
+          },
+          "gpt-5.6-terra": {
+            "requests": 8,
+            "input_tokens": 98379,
+            "cached_input_tokens": 56064,
+            "output_tokens": 1209,
+            "reasoning_tokens": 277,
+            "cost_usd": 0.11035080000000001
+          }
+        },
+        "scout": {
+          "cached_prompt_tokens": 29440,
+          "completion_tokens": 1047,
+          "duration_ms": 55341,
+          "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+          "prompt_tokens": 37212,
+          "reasoning_output_tokens": 231,
+          "tool_calls": 10,
+          "turns": 11
+        },
+        "complete_provider_cost_usd": null
+      },
+      "quality": {
+        "method": "arm-blind 0-4 patch/final review plus targeted cargo verification for route-runtime-03",
+        "passed": false,
+        "grader_artifact": "summary.json"
+      }
+    }
+  ],
+  "limitations": [
+    "Focused Sol routing arms used a bounded app-server dynamic-tool harness; complete-task trials used the real repotracer MCP path.",
+    "The complete-task comparison covers two repository tasks and three repeats per arm; it is enough to reject unsafe mechanisms, not to claim general routing superiority.",
+    "Concurrent Scout runs prevent defensible per-trial provider-log attribution. The always-Scout arm aggregate uses the exact union of Luna billing windows; parent billing remains trial-attributed.",
+    "All runtime patches passed targeted existing and model-added tests, but no independent hidden behavioral fixture was available for this synthetic task; arm-blind patch review is the quality authority.",
+    "Always-Scout was forced by managed instructions only as an upper bound and is not the requested implementation mechanism."
+  ]
+}
