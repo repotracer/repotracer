@@ -16,6 +16,8 @@ use tokio::io::{
     Lines,
 };
 use tokio::process::Command;
+use tokio::sync::mpsc;
+use tokio::time::Instant as TokioInstant;
 
 const MAX_CAPTURE_BYTES: usize = 1_048_576;
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -33,7 +35,8 @@ pub struct CliScout {
     executable: PathBuf,
     model: Option<String>,
     reasoning_effort: String,
-    timeout: Option<Duration>,
+    service_tier: String,
+    idle_timeout: Option<Duration>,
 }
 
 impl CliScout {
@@ -53,16 +56,25 @@ impl CliScout {
             model => bail!("unsupported model `{model}`; RepoTracer currently supports GPT models"),
         };
         let reasoning_effort = match cfg.model.reasoning_effort.trim() {
-            effort @ ("low" | "medium" | "high") => effort.to_string(),
-            effort => {
-                bail!("unsupported scout reasoning effort `{effort}`; use low, medium, or high")
-            }
+            effort @ ("low" | "medium" | "high" | "xhigh" | "max") => effort.to_string(),
+            effort => bail!(
+                "unsupported scout reasoning effort `{effort}`; use low, medium, high, xhigh, or max"
+            ),
         };
+        let service_tier = match cfg.model.service_tier.trim() {
+            "default" => "default",
+            "fast" | "priority" => "priority",
+            tier => {
+                bail!("unsupported scout service tier `{tier}`; use default, fast, or priority")
+            }
+        }
+        .to_string();
         Ok(Self {
             executable,
             model,
             reasoning_effort,
-            timeout: (cfg.model.timeout_ms > 0)
+            service_tier,
+            idle_timeout: (cfg.model.timeout_ms > 0)
                 .then(|| Duration::from_millis(cfg.model.timeout_ms)),
         })
     }
@@ -83,7 +95,7 @@ impl CliScout {
                 focus: None,
                 max_turns: Some(2),
                 timeout: Some(
-                    self.timeout
+                    self.idle_timeout
                         .unwrap_or(Duration::from_secs(60))
                         .min(Duration::from_secs(60)),
                 ),
@@ -102,7 +114,7 @@ impl CliScout {
             .map(|path| format!(" Prefer `{}` when relevant.", path.display()))
             .unwrap_or_default();
         format!(
-            "Read-only repository scout. Search the repository; never edit, use the network, or delegate. Use at most 3 repository tool calls; batch independent searches and reads, and keep each tool result under 120 lines. Answer concisely, then cite the smallest direct evidence covering the question: normally 3-4 repository-relative ranges, at most 5, each ideally 40 lines or fewer. Every material claim needs a citation; cite leaf implementations rather than only dispatch callers. Put implementation and tests first; omit optional context.{}\n\nQuestion: {}",
+            "Read-only repository scout. Search the repository; never edit, use the network, or delegate. Use the fewest repository tool calls that support every requested facet; batch independent searches and reads, keep each tool result under 120 lines, and stop when each material claim has direct code evidence. Do not repeat searches or browse unrelated files. Answer concisely, then cite the smallest direct evidence covering the question: normally 3-4 repository-relative ranges, at most 5, each ideally 40 lines or fewer. Every material claim needs a citation; cite leaf implementations rather than only dispatch callers. Put implementation and tests first; omit optional context.{}\n\nQuestion: {}",
             focus, request.query
         )
     }
@@ -132,8 +144,6 @@ impl CliScout {
             "default_permissions=\":read-only\"",
             "--config",
             "project_doc_max_bytes=0",
-            "--config",
-            "service_tier=\"default\"",
         ]
         .into_iter()
         .map(Into::into)
@@ -143,6 +153,12 @@ impl CliScout {
             format!(
                 "model_reasoning_effort={}",
                 toml::Value::String(self.reasoning_effort.clone())
+            )
+            .into(),
+            OsString::from("--config"),
+            format!(
+                "service_tier={}",
+                toml::Value::String(self.service_tier.clone())
             )
             .into(),
         ]);
@@ -163,7 +179,7 @@ impl CliScout {
             .run_app_server(
                 &request.root,
                 &self.prompt(&request),
-                request.timeout.or(self.timeout),
+                request.timeout.or(self.idle_timeout),
             )
             .await?;
         let raw = response.raw;
@@ -204,7 +220,7 @@ impl CliScout {
         &self,
         cwd: &Path,
         prompt: &str,
-        timeout: Option<Duration>,
+        idle_timeout: Option<Duration>,
     ) -> Result<AppServerResult> {
         let codex_home = IsolatedCodexHome::create()?;
         let mut command = Command::new(&self.executable);
@@ -222,36 +238,56 @@ impl CliScout {
         let mut child = command
             .spawn()
             .with_context(|| format!("could not start `{}`", self.executable.display()))?;
+        let process_group = child.id();
         let mut stdin = child.stdin.take().context("missing provider stdin")?;
         let stdout = child.stdout.take().context("missing provider stdout")?;
         let stderr = child.stderr.take().context("missing provider stderr")?;
-        let stderr_task = tokio::spawn(drain_limited(stderr, MAX_CAPTURE_BYTES));
-        let session = app_server_session(
-            &mut stdin,
-            BufReader::new(stdout).lines(),
-            cwd,
-            prompt,
-            self.model.as_deref(),
-            &self.reasoning_effort,
-        );
-        let result = match timeout {
-            Some(timeout) => match tokio::time::timeout(timeout, session).await {
-                Ok(result) => result,
-                Err(_) => Err(anyhow::anyhow!(
-                    "{} timed out after {}s",
-                    self.label(),
-                    timeout.as_secs_f32()
-                )),
-            },
-            None => session.await,
+        let (activity_tx, mut activity_rx) = mpsc::channel(1);
+        let stderr_task = tokio::spawn(drain_limited(
+            stderr,
+            MAX_CAPTURE_BYTES,
+            activity_tx.clone(),
+        ));
+        let result = {
+            let session = app_server_session(
+                &mut stdin,
+                BufReader::new(stdout).lines(),
+                cwd,
+                prompt,
+                self,
+                activity_tx,
+            );
+            tokio::pin!(session);
+            if let Some(idle_timeout) = idle_timeout {
+                let deadline = tokio::time::sleep_until(TokioInstant::now() + idle_timeout);
+                tokio::pin!(deadline);
+                let mut activity_open = true;
+                loop {
+                    tokio::select! {
+                        biased;
+                        result = &mut session => break result,
+                        activity = activity_rx.recv(), if activity_open => match activity {
+                            Some(()) => deadline.as_mut().reset(TokioInstant::now() + idle_timeout),
+                            None => activity_open = false,
+                        },
+                        _ = &mut deadline => {
+                            kill_process_tree(&mut child, process_group).await;
+                            let _ = stderr_task.await;
+                            bail!(
+                                "{} produced no output for {}s",
+                                self.label(),
+                                idle_timeout.as_secs_f32()
+                            );
+                        }
+                    }
+                }
+            } else {
+                session.as_mut().await
+            }
         };
         drop(stdin);
-        if !matches!(
-            tokio::time::timeout(Duration::from_millis(250), child.wait()).await,
-            Ok(Ok(_))
-        ) {
-            kill_process_tree(&mut child).await;
-        }
+        let _ = tokio::time::timeout(Duration::from_millis(250), child.wait()).await;
+        kill_process_tree(&mut child, process_group).await;
         let stderr = stderr_task.await.context("provider stderr task failed")??;
         match result {
             Ok(result) => Ok(result),
@@ -307,8 +343,8 @@ async fn app_server_session<R, W>(
     mut lines: Lines<R>,
     cwd: &Path,
     prompt: &str,
-    model: Option<&str>,
-    reasoning_effort: &str,
+    scout: &CliScout,
+    activity: mpsc::Sender<()>,
 ) -> Result<AppServerResult>
 where
     R: AsyncBufRead + Unpin,
@@ -317,31 +353,32 @@ where
     send_message(
         stdin,
         &json!({"id": 1, "method": "initialize", "params": {
-            "clientInfo": {"name": "repotracer", "version": env!("CARGO_PKG_VERSION")}
+            "clientInfo": {"name": "repotracer", "version": env!("CARGO_PKG_VERSION")},
+            "capabilities": {}
         }}),
     )
     .await?;
-    wait_for_response(stdin, &mut lines, 1).await?;
+    wait_for_response(stdin, &mut lines, 1, &activity).await?;
     send_message(stdin, &json!({"method": "initialized", "params": {}})).await?;
-
+    let thread_params = json!({
+        "cwd": cwd,
+        "ephemeral": true,
+        "approvalPolicy": "never",
+        "developerInstructions": APP_SERVER_INSTRUCTIONS,
+        "model": scout.model.as_deref(),
+        "serviceTier": scout.service_tier,
+        "config": {
+            "approval_policy": "never",
+            "default_permissions": ":read-only",
+            "project_doc_max_bytes": 0
+        }
+    });
     send_message(
         stdin,
-        &json!({"id": 2, "method": "thread/start", "params": {
-            "cwd": cwd,
-            "ephemeral": true,
-            "approvalPolicy": "never",
-            "developerInstructions": APP_SERVER_INSTRUCTIONS,
-            "model": model,
-            "serviceTier": "default",
-            "config": {
-                "approval_policy": "never",
-                "default_permissions": ":read-only",
-                "project_doc_max_bytes": 0
-            }
-        }}),
+        &json!({"id": 2, "method": "thread/start", "params": thread_params}),
     )
     .await?;
-    let started = wait_for_response(stdin, &mut lines, 2).await?;
+    let started = wait_for_response(stdin, &mut lines, 2, &activity).await?;
     let thread_id = started["thread"]["id"]
         .as_str()
         .context("Codex app-server returned no thread id")?;
@@ -351,17 +388,17 @@ where
         &json!({"id": 3, "method": "turn/start", "params": {
             "threadId": thread_id,
             "input": [{"type": "text", "text": prompt}],
-            "effort": reasoning_effort,
+            "effort": scout.reasoning_effort,
             "outputSchema": output_schema()
         }}),
     )
     .await?;
-    wait_for_response(stdin, &mut lines, 3).await?;
+    wait_for_response(stdin, &mut lines, 3, &activity).await?;
 
     let mut raw = None;
     let mut metrics = CodexMetrics::default();
     loop {
-        let message = next_message(&mut lines).await?;
+        let message = next_message(&mut lines, &activity).await?;
         if message.get("id").is_some() && message.get("method").is_some() {
             reject_server_request(stdin, &message).await?;
             continue;
@@ -423,13 +460,18 @@ where
     }
 }
 
-async fn wait_for_response<R, W>(stdin: &mut W, lines: &mut Lines<R>, id: u64) -> Result<Value>
+async fn wait_for_response<R, W>(
+    stdin: &mut W,
+    lines: &mut Lines<R>,
+    id: u64,
+    activity: &mpsc::Sender<()>,
+) -> Result<Value>
 where
     R: AsyncBufRead + Unpin,
     W: AsyncWrite + Unpin,
 {
     loop {
-        let message = next_message(lines).await?;
+        let message = next_message(lines, activity).await?;
         if message["id"].as_u64() == Some(id) {
             if let Some(error) = message.get("error") {
                 bail!(
@@ -458,12 +500,18 @@ where
     }
 }
 
-async fn next_message<R: AsyncBufRead + Unpin>(lines: &mut Lines<R>) -> Result<Value> {
+async fn next_message<R: AsyncBufRead + Unpin>(
+    lines: &mut Lines<R>,
+    activity: &mpsc::Sender<()>,
+) -> Result<Value> {
     let line = lines
         .next_line()
         .await?
         .context("Codex app-server closed its output")?;
-    serde_json::from_str(&line).context("Codex app-server returned malformed JSON")
+    let message =
+        serde_json::from_str(&line).context("Codex app-server returned malformed JSON")?;
+    let _ = activity.try_send(());
+    Ok(message)
 }
 
 async fn send_message<W: AsyncWrite + Unpin>(stdin: &mut W, message: &Value) -> Result<()> {
@@ -659,6 +707,7 @@ fn output_schema() -> serde_json::Value {
 async fn drain_limited<R: AsyncRead + Unpin>(
     mut reader: R,
     limit: usize,
+    activity: mpsc::Sender<()>,
 ) -> std::io::Result<Vec<u8>> {
     let mut kept = Vec::with_capacity(limit.min(8192));
     let mut buffer = [0u8; 8192];
@@ -667,14 +716,20 @@ async fn drain_limited<R: AsyncRead + Unpin>(
         if read == 0 {
             return Ok(kept);
         }
+        if buffer[..read]
+            .iter()
+            .any(|byte| !byte.is_ascii_whitespace())
+        {
+            let _ = activity.try_send(());
+        }
         let remaining = limit.saturating_sub(kept.len());
         kept.extend_from_slice(&buffer[..read.min(remaining)]);
     }
 }
 
-async fn kill_process_tree(child: &mut tokio::process::Child) {
+async fn kill_process_tree(child: &mut tokio::process::Child, process_group: Option<u32>) {
     #[cfg(unix)]
-    if let Some(pid) = child.id() {
+    if let Some(pid) = process_group {
         unsafe extern "C" {
             fn kill(pid: i32, signal: i32) -> i32;
         }
@@ -684,7 +739,7 @@ async fn kill_process_tree(child: &mut tokio::process::Child) {
         }
     }
     #[cfg(windows)]
-    if let Some(pid) = child.id() {
+    if let Some(pid) = process_group {
         let _ = Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .stdout(Stdio::null())
@@ -750,7 +805,7 @@ mod tests {
             .any(|pair| pair == ["--config", "default_permissions=\":read-only\""]));
         assert!(codex_args
             .windows(2)
-            .any(|pair| pair == ["--config", "service_tier=\"default\""]));
+            .any(|pair| pair == ["--config", "service_tier=\"priority\""]));
         #[cfg(windows)]
         assert!(codex_args
             .windows(2)
@@ -759,14 +814,38 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_reasoning_effort() {
+    fn accepts_supported_and_rejects_unknown_reasoning_effort() {
+        for effort in ["low", "medium", "high", "xhigh", "max"] {
+            let mut cfg = config("codex-cli", Path::new("codex"));
+            cfg.model.reasoning_effort = effort.into();
+            assert!(CliScout::from_config(&cfg).is_ok());
+        }
         let mut cfg = config("codex-cli", Path::new("codex"));
         cfg.model.reasoning_effort = "maximum".into();
         assert!(CliScout::from_config(&cfg)
             .err()
             .unwrap()
             .to_string()
-            .contains("use low, medium, or high"));
+            .contains("use low, medium, high, xhigh, or max"));
+    }
+
+    #[test]
+    fn fast_service_tier_maps_to_priority() {
+        let mut cfg = config("codex-cli", Path::new("codex"));
+        cfg.model.service_tier = "fast".into();
+        let scout = CliScout::from_config(&cfg).unwrap();
+        assert_eq!(scout.service_tier, "priority");
+        assert!(scout
+            .app_server_args()
+            .windows(2)
+            .any(|pair| pair == ["--config", "service_tier=\"priority\""]));
+
+        cfg.model.service_tier = "slow".into();
+        assert!(CliScout::from_config(&cfg)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("use default, fast, or priority"));
     }
 
     #[tokio::test]
@@ -776,7 +855,8 @@ mod tests {
             &b"{\"method\":\"error\",\"params\":{\"willRetry\":false,\"error\":{\"message\":\"sandbox failed\"}}}\n"[..],
         )
         .lines();
-        let error = wait_for_response(&mut sink, &mut lines, 1)
+        let (activity, _activity_rx) = mpsc::channel(1);
+        let error = wait_for_response(&mut sink, &mut lines, 1, &activity)
             .await
             .unwrap_err();
         assert!(error.to_string().contains("sandbox failed"));
@@ -792,7 +872,7 @@ mod tests {
     }
 
     #[test]
-    fn scout_prompt_requests_a_ranked_bounded_handoff() {
+    fn scout_prompt_requests_an_evidence_bounded_handoff() {
         let scout = CliScout::from_config(&config("codex-cli", Path::new("codex"))).unwrap();
         let root = tempfile::tempdir().unwrap();
         let prompt = scout.prompt(&ScoutRequest {
@@ -802,7 +882,8 @@ mod tests {
             max_turns: None,
             timeout: None,
         });
-        assert!(prompt.contains("at most 3 repository tool calls"));
+        assert!(prompt.contains("fewest repository tool calls"));
+        assert!(prompt.contains("each material claim has direct code evidence"));
         assert!(prompt.contains("under 120 lines"));
         assert!(prompt.contains("normally 3-4"));
         assert!(prompt.contains("at most 5"));
@@ -814,7 +895,7 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn fake_codex_result_is_validated_and_timeout_kills_child() {
+    async fn activity_extends_idle_deadline_and_silence_kills_tree() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("source.rs"), "fn main() {}\n").unwrap();
@@ -833,9 +914,13 @@ while IFS= read -r line; do
     3) printf '%s\n' '{"id":2,"result":{"thread":{"id":"thread-1"}}}' ;;
     4)
       printf '%s\n' '{"id":3,"result":{"turn":{"id":"turn-1","status":"inProgress","items":[]}}}'
+      sleep 0.1
       printf '%s\n' '{"method":"item/completed","params":{"item":{"type":"commandExecution"},"threadId":"thread-1","turnId":"turn-1","completedAtMs":1}}'
+      sleep 0.1
       printf '%s\n' '{"method":"item/completed","params":{"item":{"type":"agentMessage","text":"{\"answer\":\"found\",\"citations\":[{\"path\":\"source.rs\",\"start_line\":1,\"end_line\":1,\"reason\":\"entry\"}]}"},"threadId":"thread-1","turnId":"turn-1","completedAtMs":2}}'
+      sleep 0.1
       printf '%s\n' '{"method":"thread/tokenUsage/updated","params":{"threadId":"thread-1","turnId":"turn-1","tokenUsage":{"last":{"inputTokens":100,"cachedInputTokens":40,"outputTokens":20,"reasoningOutputTokens":5,"totalTokens":120}}}}'
+      sleep 0.1
       printf '%s\n' '{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed","items":[]}}}'
       ;;
   esac
@@ -845,7 +930,10 @@ done
         .unwrap();
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        let scout = CliScout::from_config(&config("codex-cli", &fake)).unwrap();
+        let mut active_cfg = config("codex-cli", &fake);
+        active_cfg.model.timeout_ms = 300;
+        let scout = CliScout::from_config(&active_cfg).unwrap();
+        let started = Instant::now();
         let result = scout
             .scout(ScoutRequest {
                 query: "find entry".into(),
@@ -856,6 +944,7 @@ done
             })
             .await
             .unwrap();
+        assert!(started.elapsed() >= Duration::from_millis(350));
         assert_eq!(result.citations[0].path, "source.rs");
         assert_eq!(result.stats.turns, 2);
         assert_eq!(result.stats.tool_calls, 1);
@@ -871,7 +960,11 @@ done
             std::env::var("CODEX_HOME").unwrap_or_default()
         );
 
-        std::fs::write(&fake, "#!/bin/sh\nsleep 5\n").unwrap();
+        std::fs::write(
+            &fake,
+            "#!/bin/sh\n(sleep 0.5; touch descendant-survived) &\nsleep 5\n",
+        )
+        .unwrap();
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
         let mut timeout_cfg = config("codex-cli", &fake);
         timeout_cfg.model.timeout_ms = 50;
@@ -887,8 +980,30 @@ done
             })
             .await
             .unwrap_err();
-        assert!(error.to_string().contains("timed out"));
+        assert!(error.to_string().contains("produced no output"));
         assert!(started.elapsed() < Duration::from_secs(2));
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert!(!dir.path().join("descendant-survived").exists());
+
+        std::fs::write(
+            &fake,
+            "#!/bin/sh\n(sleep 0.5; touch descendant-after-exit) >/dev/null 2>&1 &\nexit 1\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let scout = CliScout::from_config(&timeout_cfg).unwrap();
+        assert!(scout
+            .scout(ScoutRequest {
+                query: "provider exit".into(),
+                root: dir.path().to_path_buf(),
+                focus: None,
+                max_turns: None,
+                timeout: None,
+            })
+            .await
+            .is_err());
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert!(!dir.path().join("descendant-after-exit").exists());
     }
 
     #[test]
