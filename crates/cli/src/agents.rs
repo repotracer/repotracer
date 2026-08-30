@@ -53,7 +53,10 @@ fn detect_codex() -> AgentInfo {
 
 fn file_contains_repotracer(path: &Path) -> bool {
     fs::read_to_string(path)
-        .map(|s| s.contains("repotracer"))
+        .map(|text| {
+            text.lines()
+                .any(|line| line.trim() == "[mcp_servers.repotracer]")
+        })
         .unwrap_or(false)
 }
 
@@ -261,6 +264,21 @@ mod tests {
         assert_eq!(once, twice);
         assert_eq!(once.matches("[mcp_servers.repotracer]").count(), 1);
         assert!(once.contains("[other]"));
+    }
+
+    #[test]
+    fn uninstall_residue_is_not_a_configured_install() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let installed =
+            "model_provider = \"repotracer\"\n[mcp_servers.repotracer]\ncommand = \"repotracer\"\n";
+        fs::write(
+            &path,
+            remove_toml_section(installed, "[mcp_servers.repotracer]"),
+        )
+        .unwrap();
+
+        assert!(!file_contains_repotracer(&path));
     }
 
     #[test]

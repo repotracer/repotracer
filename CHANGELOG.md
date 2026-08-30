@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 — 2026-08-30
+
+### Fixed
+- Setup no longer treats unrelated `repotracer` text left in Codex configuration as an installed MCP integration after uninstall
+
 ## 1.0.0 — 2026-08-30
 
 ### Changed

@@ -1,6 +1,6 @@
 {
   "name": "repotracer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Get up to 60% more from your Codex limits. A cheaper model searches your repo so Codex stops burning turns on it.",
   "bin": {
     "repotracer": "bin/repotracer.js"

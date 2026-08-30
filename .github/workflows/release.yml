@@ -15,7 +15,7 @@ jobs:
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
-      - name: Test v0.1.9 upgrade
+      - name: Test v1.0.0 upgrade
         run: python3 scripts/test-version-upgrade.py
 
   build:

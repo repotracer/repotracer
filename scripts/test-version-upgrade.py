@@ -61,8 +61,8 @@ def version(executable: Path, env: dict[str, str] | None = None) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--from-tag", default="v0.1.9")
-    parser.add_argument("--to-version", default="1.0.0")
+    parser.add_argument("--from-tag", default="v1.0.0")
+    parser.add_argument("--to-version", default="1.0.1")
     args = parser.parse_args()
 
     run("git", "rev-parse", "--verify", args.from_tag)
