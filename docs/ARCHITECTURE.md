@@ -7,7 +7,7 @@ Codex Sol
   → MCP call: repo_scout(query)
     → RepoTracer MCP server
       → isolated codex app-server thread
-        → GPT-5.6 Luna, medium reasoning
+        → GPT-5.6 Luna, medium reasoning, fast service tier
           → Read / Glob / Grep
       ← structured scout result
     ← validated citations and source excerpts
@@ -15,7 +15,7 @@ Codex Sol
   → edit and verify
 ```
 
-`repotracer setup` registers the stdio MCP server and writes a managed routing block into Codex instructions. The routing block selects `repo_scout` for unfamiliar or cross-file exploration and skips it when the prompt already identifies the file or symbol.
+`repotracer setup` registers the stdio MCP server and writes a managed routing block into Codex instructions. The block classifies the user's requested ownership surface before planning searches. A single command, function, symbol, file, or localized behavior starts with one targeted lookup even when its paths are unknown. Exhaustive caller, API, configuration, test, dependency, ownership, and cross-component maps go to `repo_scout` first.
 
 ## Components
 

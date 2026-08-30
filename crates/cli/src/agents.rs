@@ -5,7 +5,21 @@ use std::path::{Path, PathBuf};
 const MANAGED_START: &str = "<!-- repotracer:start -->";
 const MANAGED_END: &str = "<!-- repotracer:end -->";
 
-const ROUTING_INSTRUCTIONS: &str = "Classify repository scope from the request and current context before repository operations. Unknown location or an unfamiliar repository alone is not enough. Scope follows ownership boundaries, not the number of acceptance outcomes: a cache invalidation bug or request-cancellation lifecycle within one server remains localized, while a focus/root option that must propagate through prompting, repository tools, path containment, and citation or output normalization is cross-component. For a localized bug or change, use one targeted lookup first and call repo_scout only if that lookup fails to identify a precise change surface. A matching task or benchmark manifest that names an expected path is a precise change surface; follow that path with one narrow read instead of calling repo_scout. When the request explicitly spans multiple subsystems, packages, integrations, or requires broad read-only mapping, call repo_scout as the first repository operation; do not run preliminary pwd, listing, CodeGraph, Grep, Glob, Read, or shell searches. Do not call it merely because a task is difficult. Validated citations complete broad exploration; use the handoff summary and evidence excerpts, and do not repeat broad searches. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup before selecting the fix.";
+const ROUTING_INSTRUCTIONS: &str = concat!(
+    "Choose the repository route from the user's requested change surface and current context before planning the first repository operation. ",
+    "Scope follows ownership boundaries and explicit exhaustive inventory. ",
+    "Start with one targeted local lookup for a request about one command, function, symbol, file, or localized behavior, even when its exact source and test paths are unknown. ",
+    "Locating that implementation and its ordinary regression coverage stays in the local route. ",
+    "Call repo_scout first when the request itself requires an exhaustive relationship, inventory, or propagation across ownership boundaries: ",
+    "locate every caller or implementation; trace exported configuration or API blast radius; map an unfamiliar repository's ownership or change surface; ",
+    "inventory tests and fixtures across behaviors or components; trace dependency and module relationships; compare plausible implementation owners; ",
+    "or investigate cross-owner behavior before edits. ",
+    "Examples that stay local: change one named CLI command's output when its source path is unknown; fix one function and add its regression coverage. ",
+    "Examples that use Scout: find every caller of an exported timeout setting and trace its API blast radius; inventory setup tests and fixtures across install, update, preservation, and removal. ",
+    "If the targeted local lookup fails to identify a precise surface or reveals multiple owners, call repo_scout. ",
+    "After a successful handoff, use its summary and citations instead of repeating broad searches. Read one narrow cited range only for an unresolved implementation fact. ",
+    "RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup before selecting the fix."
+);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInfo {
@@ -266,15 +280,29 @@ mod tests {
     }
 
     #[test]
-    fn codex_routing_starts_with_the_scout_and_stops_after_handoff() {
-        assert!(ROUTING_INSTRUCTIONS.contains("first repository operation"));
-        assert!(ROUTING_INSTRUCTIONS.contains("complete broad exploration"));
-        assert!(ROUTING_INSTRUCTIONS.contains("do not repeat broad searches"));
+    fn codex_routing_uses_ownership_and_contrasting_examples() {
+        for delegated_work in [
+            "locate every caller or implementation",
+            "exported configuration or API blast radius",
+            "map an unfamiliar repository",
+            "inventory tests and fixtures",
+            "dependency and module relationships",
+            "compare plausible implementation owners",
+            "cross-owner behavior before edits",
+        ] {
+            assert!(ROUTING_INSTRUCTIONS.contains(delegated_work));
+        }
+        for local_boundary in [
+            "requested change surface",
+            "source and test paths are unknown",
+            "ordinary regression coverage stays in the local route",
+            "Examples that stay local",
+            "Examples that use Scout",
+        ] {
+            assert!(ROUTING_INSTRUCTIONS.contains(local_boundary));
+        }
+        assert!(ROUTING_INSTRUCTIONS.contains("before planning the first repository operation"));
+        assert!(ROUTING_INSTRUCTIONS.contains("instead of repeating broad searches"));
         assert!(ROUTING_INSTRUCTIONS.contains("one targeted history lookup"));
-        assert!(ROUTING_INSTRUCTIONS.contains("Unknown location"));
-        assert!(ROUTING_INSTRUCTIONS.contains("localized bug or change"));
-        assert!(ROUTING_INSTRUCTIONS.contains("request-cancellation lifecycle"));
-        assert!(ROUTING_INSTRUCTIONS.contains("focus/root option"));
-        assert!(ROUTING_INSTRUCTIONS.contains("manifest that names an expected path"));
     }
 }
