@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-30-routing-v2",
+  "status": "completed-rejected",
+  "objective": "Measure whether routing v2 delegates seven repository-discovery categories without losing local-task precision, then check one representative complete task for quality, cost, latency, citation validity, and timeout reliability.",
+  "source_head": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+  "selected_system": {
+    "parent_model": "gpt-5.6-sol",
+    "parent_reasoning_effort": "high",
+    "parent_service_tier": "default",
+    "scout_model": "gpt-5.6-luna",
+    "scout_reasoning_effort": "medium",
+    "scout_service_tier": "fast",
+    "scout_idle_timeout_ms": 180000,
+    "scout_total_timeout_seconds": 0
+  },
+  "routing_lane": {
+    "arms": {
+      "baseline": "The routing policy at source_head, with fast Scout held constant.",
+      "candidate": "Routing v2, with fast Scout held constant."
+    },
+    "broad_categories": [
+      "caller and implementation discovery",
+      "exported configuration and API blast radius",
+      "unfamiliar repository mapping",
+      "tests and fixtures discovery",
+      "dependency and module tracing",
+      "implementation-location comparison",
+      "cross-file investigation before edits"
+    ],
+    "local_controls": 7,
+    "repeats_per_task_arm": 3,
+    "tasks": 14,
+    "trials": 84,
+    "randomization_seed": "routing-v2-2026-08-30",
+    "concurrency": 1,
+    "stop_condition": "Stop after the first repository operation completes; this lane measures route choice, not patch quality.",
+    "outcomes": [
+      "Scout recall across each broad category",
+      "local skip precision",
+      "route accuracy",
+      "Scout completion and citations",
+      "complete parent plus Scout cost",
+      "wall time and timeouts"
+    ]
+  },
+  "complete_task_lane": {
+    "status": "not-run",
+    "task": "mah-swe-subscription-idle-timeout",
+    "task_path": "benchmarks/tasks/mah-swe-subscription-idle-timeout.json",
+    "base_commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+    "arms": ["baseline policy", "routing v2 policy"],
+    "rounds": 2,
+    "repeats_per_arm": 1,
+    "planned_trials": 2,
+    "trials": 0,
+    "required_checks": [
+      "cargo test -p repotracer activity_extends_idle_deadline_and_silence_kills_tree -- --nocapture",
+      "cargo test -p repotracer subscription"
+    ],
+    "limitation": "Not run because the candidate failed the predeclared routing gate. A complete-task pair cannot rescue deterministic over-routing of the local control."
+  },
+  "billing": {
+    "parent": "Exact codex-lb request-log totals for each parent conversation.",
+    "scout": "Per-call usage returned by RepoTracer and the production Luna subscription price schedule.",
+    "complete": "Parent cost plus every Scout call."
+  },
+  "decision_gates": {
+    "routing": "Candidate must route all 21 broad repeats to Scout and all 21 local repeats locally.",
+    "quality": "Candidate complete-task verifier outcome may not regress.",
+    "citations": "Every citation returned by successful Scout calls must resolve to an existing source range.",
+    "reliability": "No candidate timeout; the inactivity behavior checks must pass.",
+    "economics": "Report cost and latency without claiming a stable complete-task effect from one pair."
+  },
+  "invalidated_attempts": [
+    {
+      "path": "private/matrix",
+      "reason": "The harness escaped digit classes in its derived citation-count regex. Route rows remain preserved, but the attempt was cancelled and excluded before a summary was produced."
+    }
+  ],
+  "failure_policy": {
+    "infrastructure": "Preserve the failed attempt and rerun its matched pair.",
+    "model": "Timeout, nonzero exit, wrong route, malformed output, bad citation, or verifier failure remains scored.",
+    "retention": "Keep raw trajectories and private artifacts ignored. Never rewrite a completed valid trial."
+  }
+}

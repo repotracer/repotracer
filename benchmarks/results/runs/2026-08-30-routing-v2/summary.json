@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-30-routing-v2",
+  "status": "completed-rejected",
+  "decision": "Reject routing v2 as written. It recovered the tests-and-fixtures miss but over-routed the localized json-version task in all three repeats.",
+  "service_tier": "fast (Scout only)",
+  "runs": 84,
+  "repeats_per_task_arm": 3,
+  "arms": {
+    "baseline": {
+      "route_accuracy": 0.9761904762,
+      "correct_routes": 41,
+      "runs": 42,
+      "broad_recall": 0.9523809524,
+      "broad_correct": 20,
+      "broad_runs": 21,
+      "local_precision": 1.0,
+      "local_correct": 21,
+      "local_runs": 21,
+      "cost_usd": 5.316862,
+      "wall_seconds": 1861.94494,
+      "citations_valid": 94,
+      "citations_total": 94,
+      "timeouts": 0
+    },
+    "candidate": {
+      "route_accuracy": 0.9285714286,
+      "correct_routes": 39,
+      "runs": 42,
+      "broad_recall": 1.0,
+      "broad_correct": 21,
+      "broad_runs": 21,
+      "local_precision": 0.8571428571,
+      "local_correct": 18,
+      "local_runs": 21,
+      "cost_usd": 5.822631,
+      "wall_seconds": 1896.561506,
+      "citations_valid": 116,
+      "citations_total": 116,
+      "timeouts": 0
+    }
+  },
+  "candidate_deltas": {
+    "route_accuracy_points": -4.76190476,
+    "broad_recall_points": 4.76190476,
+    "local_precision_points": -14.28571429,
+    "cost_percent": 9.51254706,
+    "wall_percent": 1.85916162,
+    "paired_median_cost_usd": 0.000435,
+    "paired_median_wall_seconds": 0.499119
+  },
+  "category_routes": {
+    "callers": {"baseline": "3/3 Scout", "candidate": "3/3 Scout"},
+    "exported_configuration_and_api": {"baseline": "3/3 Scout", "candidate": "3/3 Scout"},
+    "unfamiliar_repository_map": {"baseline": "3/3 Scout", "candidate": "3/3 Scout"},
+    "tests_and_fixtures": {"baseline": "2/3 Scout", "candidate": "3/3 Scout"},
+    "dependencies_and_modules": {"baseline": "3/3 Scout", "candidate": "3/3 Scout"},
+    "implementation_location": {"baseline": "3/3 Scout", "candidate": "3/3 Scout"},
+    "cross_file_before_edits": {"baseline": "3/3 Scout", "candidate": "3/3 Scout"},
+    "local_controls": {"baseline": "21/21 local", "candidate": "18/21 local"}
+  },
+  "decisive_case": {
+    "task_id": "json-version",
+    "expected": "local",
+    "baseline": "3/3 local",
+    "candidate": "0/3 local; 3/3 unnecessary Scout",
+    "baseline_cost_usd": 0.198365,
+    "candidate_cost_usd": 0.46537,
+    "baseline_wall_seconds": 27.046932,
+    "candidate_wall_seconds": 170.041799
+  },
+  "complete_task_lane": {
+    "status": "not-run",
+    "reason": "The candidate failed the predeclared routing gate. A complete-task pair cannot rescue a policy that deterministically over-routes the local control."
+  },
+  "limitations": [
+    "The 84-run lane stops after the first repository operation completes; cost and time are route-decision measurements, not complete-task effects.",
+    "One cancelled harness attempt remains under private/matrix and is excluded because its derived citation counter escaped digit classes.",
+    "Fast Scout was held constant across both arms, so this study does not estimate the service-tier effect."
+  ],
+  "raw_artifacts": "private/matrix-corrected/"
+}
