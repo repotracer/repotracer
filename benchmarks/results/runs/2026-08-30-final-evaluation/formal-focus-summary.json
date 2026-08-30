@@ -1,0 +1,257 @@
+{
+  "study_id": "2026-08-30-final-formal-focus",
+  "status": "completed",
+  "protocol": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "scout": "gpt-5.6-luna / medium",
+    "provider": "Codex subscription / app-server",
+    "pairing": "same task, base commit, repeat, prompt, and parent settings; treatment adds RepoTracer",
+    "tasks": 3
+  },
+  "tasks": [
+    {
+      "task_id": "true-myth-iterable-collection-combinators",
+      "repeat": 2,
+      "arms": {
+        "baseline": {
+          "wall_seconds": 1081.82,
+          "parent_cost_usd": 7.945599,
+          "scout_cost_usd": 0.0,
+          "total_cost_usd": 7.945599,
+          "patch_bytes": 29075,
+          "changed_paths": [
+            "src/maybe.ts",
+            "src/result.ts",
+            "src/task.ts",
+            "src/toolbelt.ts",
+            "test/maybe.test.ts",
+            "test/result.test.ts",
+            "test/task.test.ts",
+            "test/toolbelt.test.ts"
+          ],
+          "scout_calls": 0,
+          "scout_first": null,
+          "citations": 0,
+          "valid_citations": 0,
+          "reward": 1,
+          "f2p_passed": 96,
+          "f2p_total": 96,
+          "p2p_passed": 561,
+          "p2p_total": 561,
+          "partial": 1.0
+        },
+        "repotracer": {
+          "wall_seconds": 1557.711,
+          "parent_cost_usd": 4.134174,
+          "scout_cost_usd": 0.00446568,
+          "total_cost_usd": 4.13863968,
+          "patch_bytes": 25456,
+          "changed_paths": [
+            "src/maybe.ts",
+            "src/result.ts",
+            "src/task.ts",
+            "src/toolbelt.ts",
+            "test/collection-combinators.test.ts"
+          ],
+          "scout_calls": 1,
+          "scout_first": true,
+          "citations": 5,
+          "valid_citations": 5,
+          "reward": 1,
+          "f2p_passed": 96,
+          "f2p_total": 96,
+          "p2p_passed": 561,
+          "p2p_total": 561,
+          "partial": 1.0
+        }
+      },
+      "candidate_delta": {
+        "cost_percent": -47.912804560109315,
+        "wall_percent": 43.98985043722617,
+        "partial": 0.0,
+        "p2p_passed": 0
+      }
+    },
+    {
+      "task_id": "sqlfmt-create-table-ddl-formatting",
+      "repeat": 1,
+      "arms": {
+        "baseline": {
+          "wall_seconds": 1157.003,
+          "parent_cost_usd": 8.210584,
+          "scout_cost_usd": 0.0,
+          "total_cost_usd": 8.210584,
+          "patch_bytes": 30211,
+          "changed_paths": [
+            "src/sqlfmt/actions.py",
+            "src/sqlfmt/ddl.py",
+            "src/sqlfmt/query_formatter.py",
+            "src/sqlfmt/rules/__init__.py",
+            "src/sqlfmt/tokens.py",
+            "tests/data/preformatted/400_create_table.sql",
+            "tests/unit_tests/test_actions.py",
+            "tests/unit_tests/test_ddl.py"
+          ],
+          "scout_calls": 0,
+          "scout_first": null,
+          "citations": 0,
+          "valid_citations": 0,
+          "reward": 0,
+          "f2p_passed": 28,
+          "f2p_total": 32,
+          "p2p_passed": 1269,
+          "p2p_total": 1273,
+          "partial": 0.9938697318007663
+        },
+        "repotracer": {
+          "wall_seconds": 1400.002,
+          "parent_cost_usd": 6.468033,
+          "scout_cost_usd": 0.00408496,
+          "total_cost_usd": 6.47211796,
+          "patch_bytes": 27796,
+          "changed_paths": [
+            "src/sqlfmt/api.py",
+            "src/sqlfmt/ddl.py",
+            "tests/data/preformatted/400_create_table.sql",
+            "tests/unit_tests/test_ddl.py"
+          ],
+          "scout_calls": 1,
+          "scout_first": true,
+          "citations": 3,
+          "valid_citations": 3,
+          "reward": 0,
+          "f2p_passed": 28,
+          "f2p_total": 32,
+          "p2p_passed": 1273,
+          "p2p_total": 1273,
+          "partial": 0.9969348659003832
+        }
+      },
+      "candidate_delta": {
+        "cost_percent": -21.17347608891158,
+        "wall_percent": 21.00245202475708,
+        "partial": 0.0030651340996168397,
+        "p2p_passed": 4
+      }
+    },
+    {
+      "task_id": "tengo-callable-instance-isolation",
+      "repeat": 1,
+      "arms": {
+        "baseline": {
+          "wall_seconds": 1197.704,
+          "parent_cost_usd": 4.65529468,
+          "scout_cost_usd": 0.0,
+          "total_cost_usd": 4.65529468,
+          "patch_bytes": 27006,
+          "changed_paths": [
+            "callable.go",
+            "callable_test.go",
+            "objects.go",
+            "script.go",
+            "vm.go"
+          ],
+          "scout_calls": 0,
+          "scout_first": null,
+          "citations": 0,
+          "valid_citations": 0,
+          "reward": 1,
+          "f2p_passed": 23,
+          "f2p_total": 23,
+          "p2p_passed": 122,
+          "p2p_total": 122,
+          "partial": 1.0
+        },
+        "repotracer": {
+          "wall_seconds": 1057.224,
+          "parent_cost_usd": 4.42958,
+          "scout_cost_usd": 0.0041673199999999995,
+          "total_cost_usd": 4.433747319999999,
+          "patch_bytes": 25884,
+          "changed_paths": [
+            "callable.go",
+            "callable_test.go",
+            "objects.go",
+            "script.go",
+            "vm.go"
+          ],
+          "scout_calls": 1,
+          "scout_first": true,
+          "citations": 5,
+          "valid_citations": 5,
+          "reward": 1,
+          "f2p_passed": 23,
+          "f2p_total": 23,
+          "p2p_passed": 122,
+          "p2p_total": 122,
+          "partial": 1.0
+        }
+      },
+      "candidate_delta": {
+        "cost_percent": -4.7590405168508205,
+        "wall_percent": -11.72910836066341,
+        "partial": 0.0,
+        "p2p_passed": 0
+      }
+    }
+  ],
+  "aggregate": {
+    "exact_rewards": {
+      "baseline": 2,
+      "repotracer": 2,
+      "total": 3
+    },
+    "f2p": {
+      "baseline_passed": 147,
+      "repotracer_passed": 147,
+      "total": 151
+    },
+    "p2p": {
+      "baseline_passed": 1952,
+      "repotracer_passed": 1956,
+      "total": 1956
+    },
+    "mean_partial": {
+      "baseline": 0.9979565772669221,
+      "repotracer": 0.998978288633461
+    },
+    "cost_usd": {
+      "baseline": 20.81147768,
+      "repotracer": 15.04450496,
+      "delta_percent": -27.710539389243404,
+      "scout": 0.01271796
+    },
+    "wall_seconds": {
+      "baseline": 3436.527,
+      "repotracer": 4014.937,
+      "delta_percent": 16.831236885378754
+    },
+    "routing": {
+      "scout_first": 3,
+      "total": 3
+    },
+    "citations": {
+      "valid": 13,
+      "total": 13
+    }
+  },
+  "manual_review": {
+    "true-myth-iterable-collection-combinators": "Both patches passed all 657 checks. No functional regression found.",
+    "sqlfmt-create-table-ddl-formatting": "Both patches missed the same four unformatted-to-canonical DDL fixtures. The RepoTracer patch preserved all 1,273 regression checks; the baseline regressed four. The RepoTracer patch uses a separate DDL tokenizer before the existing formatter, a maintainability tradeoff despite the better observed regression result.",
+    "tengo-callable-instance-isolation": "Both patches passed all 145 checks. The RepoTracer patch is slightly smaller and no functional regression was found."
+  },
+  "decision": "retain RepoTracer with corrected Scout-first routing and the inactivity timeout; quality held, paired cost fell, and latency was mixed",
+  "limitations": [
+    "Three paired formal tasks are a focused release check, not an estimate of repository-wide effect size.",
+    "The earlier 30-task by three-repeat randomized matrix was interrupted after 24 unpaired trials by subscription-account unavailability; those attempts remain preserved but are excluded from paired effects.",
+    "Formal latency favored RepoTracer on one task and baseline on two; do not claim a latency improvement.",
+    "Both sqlfmt arms missed four feature fixtures, so neither implementation is fully correct."
+  ],
+  "raw_artifacts": [
+    "private/formal/trials/",
+    "private/formal-focus-run.json",
+    "private/formal-focus-verifier.json"
+  ]
+}

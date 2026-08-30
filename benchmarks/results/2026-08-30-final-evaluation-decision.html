@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f8fbff" />
+  <meta name="description" content="RepoTracer final paired release check: quality, complete cost, latency, routing, and citations." />
+  <title>RepoTracer final evaluation — decision</title>
+  <style>
+    @font-face { font-family:"Source Serif 4"; font-style:normal; font-weight:400; font-display:swap; src:url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Regular.otf?v=1776492806") format("opentype"); }
+    @font-face { font-family:"Source Serif 4"; font-style:normal; font-weight:600; font-display:swap; src:url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Semibold.otf?v=1776492806") format("opentype"); }
+    @font-face { font-family:"Source Sans 3"; font-style:normal; font-weight:400; font-display:swap; src:url("https://gwern.net/static/font/ss3/SourceSans3-BASIC-Regular.otf?v=1747251196") format("opentype"); }
+    @font-face { font-family:"Source Sans 3"; font-style:normal; font-weight:600; font-display:swap; src:url("https://gwern.net/static/font/ss3/SourceSans3-BASIC-Semibold.otf?v=1747251196") format("opentype"); }
+    @font-face { font-family:"IBM Plex Mono"; font-style:normal; font-weight:400; font-display:swap; src:url("https://gwern.net/static/font/ibm-plex-mono/IBMPlexMono-Regular.otf?v=1606177027") format("opentype"); }
+    :root { --paper:#f8fbff; --ink:#17213d; --body:#39415b; --muted:#66708b; --rule:#d5dceb; --rule-dark:#a3aec6; --accent:#5544c4; --good:#27705b; --warn:#9a5b18; --wash:#eee9ff; --sans:"Source Sans 3",Arial,sans-serif; --serif:"Source Serif 4",Georgia,serif; --mono:"IBM Plex Mono",monospace; color-scheme:light; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--paper); color:var(--body); font:18px/1.68 var(--serif); -webkit-font-smoothing:antialiased; }
+    body.dark { --paper:#111827; --ink:#f7f5ff; --body:#d8dbea; --muted:#a6acc2; --rule:#303950; --rule-dark:#55617d; --accent:#9caeff; --good:#82d7b0; --warn:#f4bc76; --wash:#1b2440; color-scheme:dark; }
+    a { color:var(--accent); }
+    button { border:0; background:none; color:var(--muted); font:12px var(--mono); cursor:pointer; }
+    .bar { min-height:54px; border-bottom:1px solid var(--rule); display:flex; align-items:center; justify-content:space-between; gap:18px; padding:0 max(20px,calc((100vw - 1120px)/2)); color:var(--muted); font:12px/1.3 var(--mono); }
+    main { width:min(100% - 40px,1120px); margin:0 auto; padding:62px 0 84px; }
+    .kicker { color:var(--accent); font:600 13px/1.2 var(--sans); letter-spacing:.05em; text-transform:uppercase; }
+    h1 { max-width:900px; margin:14px 0 16px; color:var(--ink); font:600 clamp(44px,6vw,72px)/1.04 var(--serif); letter-spacing:-.04em; }
+    .dek { max-width:900px; margin:0 0 24px; font-size:22px; line-height:1.5; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px 24px; padding:12px 0; border-top:1px solid var(--rule-dark); border-bottom:1px solid var(--rule); color:var(--muted); font:12px/1.4 var(--mono); }
+    .decision { margin:34px 0 40px; padding:20px 24px; border-left:4px solid var(--accent); background:var(--wash); }
+    .decision strong { display:block; margin-bottom:7px; color:var(--ink); font:700 13px/1.2 var(--sans); letter-spacing:.04em; text-transform:uppercase; }
+    .decision p { margin:0; font-size:20px; }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; margin:34px 0 50px; border:1px solid var(--rule); background:var(--rule); }
+    .metric { min-height:132px; padding:18px; background:var(--paper); }
+    .metric b { display:block; color:var(--ink); font:700 33px/1.1 var(--sans); }
+    .metric span { display:block; margin-top:8px; color:var(--muted); font:14px/1.45 var(--sans); }
+    section { margin-top:50px; }
+    h2 { margin:0 0 15px; padding:0 0 13px; border-bottom:1px solid var(--rule-dark); color:var(--ink); font:600 30px/1.2 var(--sans); letter-spacing:-.02em; }
+    p { max-width:920px; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; margin:18px 0 10px; font:16px/1.45 var(--sans); }
+    th { padding:12px 10px; border-top:1px solid var(--ink); border-bottom:1px solid var(--rule-dark); color:var(--muted); font:600 11px/1.2 var(--mono); text-align:left; text-transform:uppercase; }
+    td { padding:14px 10px; border-bottom:1px solid var(--rule); vertical-align:top; }
+    td:first-child { color:var(--ink); font-weight:600; }
+    .good { color:var(--good); font-weight:700; }
+    .warn { color:var(--warn); font-weight:700; }
+    .note { color:var(--muted); font-size:15px; }
+    ul { max-width:920px; padding-left:22px; }
+    li { margin:8px 0; }
+    code { padding:.12em .35em; border-radius:4px; background:var(--wash); color:var(--ink); font:15px var(--mono); }
+    .footer { margin-top:58px; padding-top:14px; border-top:1px solid var(--rule-dark); color:var(--muted); font:12px/1.5 var(--mono); }
+    @media (max-width:800px) { .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } table { min-width:760px; } }
+    @media (max-width:480px) { main { width:min(100% - 28px,1120px); padding-top:38px; } .metrics { grid-template-columns:1fr; } }
+    @media print { .bar button { display:none; } main { width:100%; padding:24px 0; } }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+  </style>
+</head>
+<body>
+  <header class="bar"><span>RepoTracer / final evaluation / 30 Aug 2026</span><button id="theme" type="button">dark mode</button></header>
+  <main>
+    <div class="kicker">Paired release check</div>
+    <h1>Retain the system. Do not claim it is faster.</h1>
+    <p class="dek">Three verifier-backed repository tasks held feature quality, removed four baseline regressions, and cut complete cost by 27.71%. End-to-end time rose 16.83%. Routing worked; latency did not move in one direction.</p>
+    <div class="meta">
+      <span>parent <strong>gpt-5.6-sol / high</strong></span>
+      <span>scout <strong>gpt-5.6-luna / medium</strong></span>
+      <span>tier <strong>default</strong></span>
+      <span>provider <strong>Codex subscription / app-server</strong></span>
+      <span>pairs <strong>3</strong></span>
+    </div>
+
+    <div class="decision">
+      <strong>Decision</strong>
+      <p>Keep the corrected Scout-first contract, configurable Luna Scout, and inactivity timeout. No hook, pre-classifier, or total runtime cap. The evidence clears the quality gate and supports a cost reduction; it does not support a latency or repository-wide effect claim.</p>
+    </div>
+
+    <div class="metrics" aria-label="Headline results">
+      <div class="metric"><b>2/3 = 2/3</b><span>exact hidden-verifier reward, RepoTracer versus baseline</span></div>
+      <div class="metric"><b>−27.71%</b><span>complete paired cost: $15.0445 versus $20.8115</span></div>
+      <div class="metric"><b>+16.83%</b><span>complete wall time: 4014.9s versus 3436.5s</span></div>
+      <div class="metric"><b>13/13</b><span>valid Scout citations; Scout first in 3/3 treatment runs</span></div>
+    </div>
+
+    <section>
+      <h2>Quality first</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>task</th><th>baseline feature</th><th>RepoTracer feature</th><th>baseline regression</th><th>RepoTracer regression</th><th>exact</th></tr></thead>
+          <tbody>
+            <tr><td>true-myth collection APIs</td><td>96/96</td><td>96/96</td><td>561/561</td><td>561/561</td><td class="good">1 / 1</td></tr>
+            <tr><td>sqlfmt CREATE TABLE</td><td>28/32</td><td>28/32</td><td class="warn">1269/1273</td><td class="good">1273/1273</td><td>0 / 0</td></tr>
+            <tr><td>Tengo callable isolation</td><td>23/23</td><td>23/23</td><td>122/122</td><td>122/122</td><td class="good">1 / 1</td></tr>
+            <tr><td>Total</td><td>147/151</td><td>147/151</td><td>1952/1956</td><td class="good">1956/1956</td><td>2/3 / 2/3</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Both fully passing pairs were sound on manual review. Both sqlfmt patches missed the same four unformatted-to-canonical fixtures: uppercase function names in post-body clauses stayed uppercase. RepoTracer preserved every regression check; baseline lost four. RepoTracer's separate DDL tokenizer is still a maintainability cost. The slightly higher partial score, 0.99898 versus 0.99796, does not turn an incomplete implementation into a win.</p>
+    </section>
+
+    <section>
+      <h2>Complete cost and time</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>task / arm</th><th>parent cost</th><th>Scout cost</th><th>total cost</th><th>wall</th><th>result</th></tr></thead>
+          <tbody>
+            <tr><td>true-myth / baseline</td><td>$7.9456</td><td>—</td><td>$7.9456</td><td>1081.8s</td><td>full pass</td></tr>
+            <tr><td>true-myth / RepoTracer</td><td>$4.1342</td><td>$0.0045</td><td class="good">$4.1386</td><td class="warn">1557.7s</td><td>full pass</td></tr>
+            <tr><td>sqlfmt / baseline</td><td>$8.2106</td><td>—</td><td>$8.2106</td><td>1157.0s</td><td>partial</td></tr>
+            <tr><td>sqlfmt / RepoTracer</td><td>$6.4680</td><td>$0.0041</td><td class="good">$6.4721</td><td class="warn">1400.0s</td><td>partial, no regressions</td></tr>
+            <tr><td>Tengo / baseline</td><td>$4.6553</td><td>—</td><td>$4.6553</td><td>1197.7s</td><td>full pass</td></tr>
+            <tr><td>Tengo / RepoTracer</td><td>$4.4296</td><td>$0.0042</td><td class="good">$4.4337</td><td class="good">1057.2s</td><td>full pass</td></tr>
+            <tr><td>Total / baseline</td><td>$20.8115</td><td>—</td><td>$20.8115</td><td>3436.5s</td><td>2 exact</td></tr>
+            <tr><td>Total / RepoTracer</td><td>$15.0318</td><td>$0.0127</td><td class="good">$15.0445</td><td class="warn">4014.9s</td><td>2 exact</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Paired protocol: same task, base commit, repeat, prompt, Sol settings, service tier, and hidden verifier. The treatment adds RepoTracer. Cost includes all parent requests and Scout usage. Scout was the first repository operation in every treatment run.</p>
+    </section>
+
+    <section>
+      <h2>What the interrupted matrix means</h2>
+      <p>The planned 30-task × 3-repeat × 2-arm matrix stopped after 24 unpaired trials when subscription accounts became unavailable. Zero matched pairs means those runs cannot estimate a treatment effect. They remain in the ignored raw directory. The three completed matched pairs are a bounded release check, not a replacement 180-trial claim.</p>
+      <ul>
+        <li><strong>Confidence:</strong> medium-high for routing and no observed quality loss; medium for cost direction; low for latency direction.</li>
+        <li><strong>Verification:</strong> hidden verifiers completed for all six patches; workspace tests passed 87 checks; <code>cargo fmt --all --check</code> and strict workspace Clippy passed.</li>
+        <li><strong>State:</strong> <code>HEAD</code>, <code>main</code>, and <code>origin/main</code> remain at <code>603b196</code>. All work remains uncommitted in this worktree.</li>
+        <li><strong>Next action:</strong> review this decision. Do not run another matrix unless the release decision identifies a concrete unresolved risk.</li>
+      </ul>
+    </section>
+
+    <div class="footer">Decision status: retain selected system · raw results preserved under the ignored final-evaluation private directory · sanitized metrics: formal-focus-summary.json and routing-fix-summary.json</div>
+  </main>
+  <script>
+    const button = document.getElementById('theme');
+    const meta = document.querySelector('meta[name="theme-color"]');
+    button.addEventListener('click', () => {
+      const dark = document.body.classList.toggle('dark');
+      button.textContent = dark ? 'light mode' : 'dark mode';
+      meta.setAttribute('content', dark ? '#111827' : '#f8fbff');
+    });
+  </script>
+</body>
+</html>

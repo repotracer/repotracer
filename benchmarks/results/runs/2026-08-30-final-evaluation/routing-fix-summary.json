@@ -1,0 +1,122 @@
+{
+  "study_id": "2026-08-30-parent-routing-fix",
+  "status": "completed",
+  "decision": "retain instruction-and-tool-contract routing with the corrected scope boundary; do not add a hook or pre-classifier",
+  "selected_system": {
+    "parent_model": "gpt-5.6-sol",
+    "parent_reasoning": "high",
+    "parent_service_tier": "default",
+    "scout_model": "gpt-5.6-luna",
+    "scout_reasoning": "medium",
+    "scout_service_tier": "default",
+    "scout_service_tier_configurable": true,
+    "provider_path": "real Codex subscription via codex app-server"
+  },
+  "product_change": {
+    "files": [
+      "crates/cli/src/agents.rs",
+      "crates/mcp/src/lib.rs"
+    ],
+    "rule": "Call Scout first for caller, exported API/configuration, multi-component, or broad mapping work. Start a likely single-command, single-function, or single-file task with one targeted lookup; escalate to Scout only if that lookup fails or expands the change surface.",
+    "root_cause": "The previous policy treated broad lifecycle work as localized and therefore classified the MAH subscription task away from Scout even though it explicitly required every caller and exported configuration/API blast radius."
+  },
+  "focused_routing": {
+    "protocol": "three broad and three local natural tasks, two repeats, stop after the first repository operation completes",
+    "initial_attempt": {
+      "runs": 12,
+      "correct": 10,
+      "broad_first_scout": "6/6",
+      "local_skipped_scout": "4/6",
+      "failure": "json-version called Scout in both repeats",
+      "wall_seconds": 683.387,
+      "provider_cost_usd": 2.058124
+    },
+    "final": {
+      "runs": 12,
+      "correct": 12,
+      "broad_first_scout": "6/6",
+      "local_skipped_scout": "6/6",
+      "wall_seconds": 530.677,
+      "provider_cost_usd": 1.665674,
+      "wall_delta_vs_initial_percent": -22.35,
+      "cost_delta_vs_initial_percent": -19.07
+    }
+  },
+  "complete_tasks": {
+    "localized_json_version": {
+      "protocol": "one paired complete coding task with three behavioral checks per arm",
+      "baseline": {
+        "quality_checks": "3/3",
+        "scout_calls": 0,
+        "wall_seconds": 99.333,
+        "provider_cost_usd": 0.650015
+      },
+      "repotracer": {
+        "quality_checks": "3/3",
+        "scout_calls": 0,
+        "wall_seconds": 95.732,
+        "provider_cost_usd": 0.541996
+      },
+      "quality_delta": 0,
+      "wall_delta_percent": -3.63,
+      "cost_delta_percent": -16.62
+    },
+    "broad_subscription_idle_timeout": {
+      "protocol": "one new RepoTracer run compared with the three retained baseline repeats from the same MAH-SWE task",
+      "baseline_median": {
+        "quality_checks": "2/2",
+        "scout_calls": 0,
+        "wall_seconds": 741.4,
+        "provider_cost_usd": 3.285
+      },
+      "routing_fix_candidate": {
+        "quality_checks": "2/2",
+        "scout_calls": 1,
+        "first_scout_position": 0,
+        "valid_citations": "5/5",
+        "wall_seconds": 492.645,
+        "parent_cost_usd": 1.64056,
+        "scout_cost_usd": 0.00351904,
+        "provider_cost_usd": 1.64407904
+      },
+      "wall_delta_vs_baseline_median_percent": -33.6,
+      "cost_delta_vs_baseline_median_percent": -49.9
+    }
+  },
+  "formal_focus": {
+    "summary": "formal-focus-summary.json",
+    "paired_tasks": 3,
+    "exact_rewards": "2/3 in both arms",
+    "feature_checks": "147/151 in both arms",
+    "regression_checks": {
+      "baseline": "1952/1956",
+      "repotracer": "1956/1956"
+    },
+    "candidate_cost_delta_percent": -27.71,
+    "candidate_wall_delta_percent": 16.83,
+    "scout_first_routes": "3/3",
+    "valid_citations": "13/13"
+  },
+  "control_surface_decision": {
+    "codex_hooks": "not selected",
+    "reason": "PreToolUse can block a known bad tool call but cannot safely decide semantic repository scope. A UserPromptSubmit classifier would add a model call to every prompt, and the retained Luna pre-classifier reached only 50% broad-task recall. The observed failure came from the written scope rule, not from Sol ignoring a correct rule."
+  },
+  "limitations": [
+    "The focused routing matrix measures only the first repository operation.",
+    "Three paired formal tasks are a focused release check, not a repository-wide effect estimate.",
+    "Both formal arms passed 147/151 feature checks; neither solved four sqlfmt canonicalization cases.",
+    "Formal latency favored RepoTracer on one task and baseline on two, so no latency improvement is claimed.",
+    "The interrupted 180-trial matrix remains preserved but is excluded from paired effects because subscription-account failures left no matched pairs.",
+    "The priority request path remains configurable, but prior provider logs reported actual_service_tier=default on every successful call."
+  ],
+  "raw_artifacts": [
+    "private/routing-focus/",
+    "private/routing-focus-final/",
+    "private/complete-pairs/",
+    "private/mah-swe-routing-fix.json",
+    "private/mah-swe/trials/mah-swe-subscription-idle-timeout-routing-fix-r0-repotracer/",
+    "private/formal-focus-run.json",
+    "private/formal-focus-verifier.json",
+    "private/formal/trials/"
+  ]
+}
