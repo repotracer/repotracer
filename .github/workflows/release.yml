@@ -8,7 +8,18 @@ permissions:
   contents: write
 
 jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test v0.1.9 upgrade
+        run: python3 scripts/test-version-upgrade.py
+
   build:
+    needs: upgrade
     strategy:
       matrix:
         include:
