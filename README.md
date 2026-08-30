@@ -2,10 +2,10 @@
   <img src="assets/logo-lockup-stacked.svg" alt="RepoTracer" width="260">
 </p>
 
-<h3 align="center">Get up to 60% more from your Codex limits.</h3>
+<h3 align="center">Make your Codex subscription last up to 2.7x longer.</h3>
 
 <p align="center">
-  A cheaper model searches your repository and hands Codex verified <code>file:line</code> citations, so Sol stops burning turns on search.
+  RepoTracer searches your repository with a cheaper model through an MCP tool call, not a prompt instruction. Codex spends your budget writing code instead of finding it.
 </p>
 
 <p align="center">
@@ -17,6 +17,28 @@
 <p align="center">
   <img src="assets/demo/scout.gif" alt="Asking RepoTracer a plain-English question about a codebase and getting back four verified file and line-range citations with a summary in 35 seconds" width="100%">
 </p>
+
+## The problem
+
+Codex subscriptions have a fixed monthly budget. Every time Codex searches your repository, reading files, grepping for symbols, mapping dependencies, it burns that budget on work that writes zero lines of code.
+
+On the tasks we measured, search ate 30-60% of the total cost. That budget could have gone toward actual edits.
+
+RepoTracer moves search to Luna, a model that costs a fraction of Sol, through an MCP tool call. Same code gets written. Your subscription lasts longer.
+
+## What you get
+
+**Codex calls a tool, not a suggestion.** `repo_scout(query)` is an MCP tool call. Codex can't ignore it, reinterpret it, or go Google how to do it. It calls the function, gets results.
+
+**Cheap search, not cheap quality.** Each scout runs in its own thread with just the query and read-only access. No conversation history dragged along. Costs a fraction of a full subagent.
+
+**No hallucinated paths.** Every file path and line range gets checked before Codex sees it. If Luna returns a file that doesn't exist, RepoTracer drops it.
+
+**Knows when to do nothing.** 42/42 routing decisions correct. If the edit target is already obvious, no scout runs. You don't pay for a search you don't need.
+
+**One command.** `npx repotracer@latest setup`. No API keys, no background service, no Rust toolchain. Uses your existing Codex login.
+
+**Updates itself.** New versions download and verify automatically when Codex starts. Nothing to maintain.
 
 ## Install
 
@@ -83,43 +105,70 @@ repotracer update
 
 ## How it works
 
-1. The installed routing instructions tell Codex when cross-file discovery should go to Scout before local repository search.
-2. Codex calls the MCP tool `repo_scout(query)`.
-3. RepoTracer starts an isolated ephemeral thread through `codex app-server` using GPT-5.6 Luna at medium reasoning on the fast service tier. It carries over the active Codex model-provider settings, including compatible custom providers, without inheriting the rest of the Codex home.
-4. Luna can call only read-only repository tools. It receives bounded Read, Glob, and Grep results.
-5. RepoTracer validates every returned path and line range, then returns structured citations, source excerpts, and a handoff.
-6. Codex Sol reads the cited code and performs the edit.
-
 ```text
-Codex Sol
-  → MCP repo_scout(query)
-    → isolated Luna scout
-      → Read / Glob / Grep
-    ← validated citations and excerpts
-  → edit and verify
+You ask Codex to fix something
+  Codex decides it needs to find code first
+  calls repo_scout(query) via MCP
+    RepoTracer spins up an isolated Luna thread
+    Luna searches with Read, Glob, Grep
+    RepoTracer validates every path and line range
+  Codex gets back verified file:line citations
+  Codex reads the cited code and makes the edit
 ```
 
-The scout cannot edit, delete, patch, commit, or push.
+The scout runs GPT-5.6 Luna at medium reasoning on the fast service tier. It starts clean, no conversation history, no inherited context, and can only read. It cannot edit, delete, commit, or push.
 
-## Measured results
+One tool call. Structured output. Verified results. No prompt interpretation, no web searches for "how to start a Luna agent."
 
-Whole task, with Luna's usage counted in.
+## "Can't I just put 'use Luna' in agents.md?"
 
-| Run | Complete cost | Wall time |
-|---|---:|---:|
-| Real bug fix, production repo | **−62.68%** | −24.54% |
-| SWE-bench Astropy 13453 | **−50.12%** | −9.60% |
-| Median of three paired runs | **−39.20%** | +31.21% |
+You can try. We did. Here's what happens.
 
-Every run is published transparently.
+Sol doesn't have to follow prompt instructions. It interprets them however it wants, or ignores them, or goes and searches the web for "how to start a Luna agent" instead of starting one. An MCP tool call is a function call. Sol calls it, gets back results, moves on.
 
-[Methods, caveats, and raw artifacts.](./BENCHMARKS.md)
+Subagents also inherit the full conversation context. On a long session that inherited context alone can cost more than the search was supposed to save. RepoTracer starts an isolated thread with only the query and read-only tools. No history.
 
-## When Codex calls it
+And raw Luna output is inconsistent. Without validation you get wrong paths, bad line numbers, phantom files. RepoTracer checks every citation before returning it. Bad results get dropped.
 
-Start with one targeted lookup for a single command, function, symbol, file, or localized behavior, even when its source and test paths are unknown. Use `repo_scout` first when the request itself asks for an exhaustive relationship or inventory, or for behavior that propagates across ownership boundaries: callers, exported configuration and APIs, unfamiliar ownership maps, tests and fixtures across behaviors, dependencies, or implementation-owner comparisons.
+We spent weeks benchmarking both approaches. The one-line agents.md instruction consistently cost more than not using it at all. The MCP approach is the one that actually showed up in the numbers.
 
-Small edits can cost more if a scout runs unnecessarily. Routing is part of the product, not an optional benchmark trick.
+## Benchmarks
+
+Tested on DeepSWE (industry-standard multi-language coding tasks) and MAH-SWE (a benchmark built from real agentic coding sessions on production repositories, not synthetic prompts).
+
+Complete task cost, RepoTracer's usage included.
+
+| Task | Source | Cost | Budget stretch | Quality |
+|---|---|---:|---:|---|
+| Real bug fix, production repo | MAH-SWE | −62.68% | **2.68x** | Both arms worked |
+| SWE-bench Astropy 13453 | SWE-bench | −50.12% | **2.00x** | Regression passed |
+| Release benchmark (TS, Python, Go) | DeepSWE | −27.71% | **1.38x** | 147/151 features |
+| Median of 3 paired runs | DeepSWE | −39.20% | **1.64x** | 6/6 checks every arm |
+
+Budget stretch means how many times you can run the same task on a fixed budget. A task that costs 62.68% less fits 1 / 0.3732 = 2.68 times. That's not the same number as the cost reduction.
+
+Paired runs hold everything constant: same model, same prompt, same repo commit, same timeout. The only difference is whether RepoTracer is installed.
+
+42/42 routing decisions correct. 24/24 holdout. 3/3 real-task runs passed both verifiers. 87 workspace tests passing, formatting and strict Clippy clean.
+
+Every run is published with raw artifacts. [Methods, caveats, full data.](./BENCHMARKS.md)
+
+## When it kicks in
+
+Not every task needs a scout. The routing is tuned and benchmarked, 42/42 decisions correct.
+
+Scout runs when Codex needs to:
+- Find code across multiple files
+- Trace callers, dependencies, or exported APIs
+- Navigate an unfamiliar repository
+- Locate tests and fixtures for a behavior
+
+Scout stays out of the way when:
+- The edit target is already known
+- The task is a single-file change
+- Codex already has the file open
+
+Small edits stay fast.
 
 ## Current support
 
