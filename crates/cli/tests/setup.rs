@@ -121,7 +121,7 @@ fn setup_does_not_require_an_existing_codex_login() {
         .contains("mcp_servers.repotracer"));
     assert!(std::fs::read_to_string(codex_home.join("AGENTS.md"))
         .unwrap()
-        .contains("Validated citations complete broad exploration"));
+        .contains("After a successful handoff"));
 }
 
 #[test]
