@@ -1,5 +1,5 @@
-//! Read / Glob / Grep tools for repotracer.
-//! Model-facing contracts with concurrent execution and fixed count mode.
+//! Repository-scoped read-only tools for repotracer.
+//! Model-facing contracts with concurrent execution and bounded output.
 
 mod exec;
 mod glob_tool;

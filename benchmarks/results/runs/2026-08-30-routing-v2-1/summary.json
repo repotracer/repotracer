@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-30-routing-v2-1",
+  "status": "completed-retained",
+  "decision": "Retain ownership-first routing v2.1 with contrasting local and Scout examples. Every routing, citation, timeout, and complete-task quality gate passed.",
+  "boundary_pilot": {
+    "runs": 6,
+    "passed": 6,
+    "local": "3/3",
+    "scout": "3/3",
+    "citations_valid": 13,
+    "citations_total": 13,
+    "timeouts": 0,
+    "cost_usd": 0.918824,
+    "wall_seconds": 174.451407
+  },
+  "candidate_recheck": {
+    "runs": 42,
+    "passed": 42,
+    "broad": "21/21 Scout",
+    "local": "21/21 local",
+    "citations_valid": 102,
+    "citations_total": 102,
+    "timeouts": 0,
+    "cost_usd": 5.402484,
+    "wall_seconds": 1840.705523,
+    "versus_rejected_v2": {
+      "correct_routes": "+3",
+      "cost_percent": -7.215759,
+      "wall_percent": -2.945118
+    },
+    "versus_source_head": {
+      "correct_routes": "+1",
+      "cost_percent": 1.610386,
+      "wall_percent": -1.140711
+    }
+  },
+  "paired_holdouts": {
+    "runs": 48,
+    "baseline": {
+      "passed": 24,
+      "broad": "12/12 Scout",
+      "local": "12/12 local",
+      "citations_valid": 60,
+      "citations_total": 60,
+      "timeouts": 0,
+      "cost_usd": 2.944787,
+      "wall_seconds": 994.375417
+    },
+    "candidate": {
+      "passed": 24,
+      "broad": "12/12 Scout",
+      "local": "12/12 local",
+      "citations_valid": 59,
+      "citations_total": 59,
+      "timeouts": 0,
+      "cost_usd": 3.277543,
+      "wall_seconds": 1054.35937
+    },
+    "interpretation": "Route quality tied perfectly. The 11.30% cost and 6.03% wall differences are request noise in a first-operation diagnostic, not a complete-task effect."
+  },
+  "complete_task": {
+    "task": "mah-swe-subscription-idle-timeout",
+    "baseline": {
+      "rounds_completed": 2,
+      "verifiers_passed": 2,
+      "scout_calls": 0,
+      "cost_usd": 3.791598,
+      "wall_seconds": 623.811
+    },
+    "candidate": {
+      "rounds_completed": 2,
+      "verifiers_passed": 2,
+      "scout_calls": 1,
+      "citations_valid": 5,
+      "citations_total": 5,
+      "cost_usd": 2.097263,
+      "wall_seconds": 580.783
+    },
+    "candidate_deltas": {
+      "cost_percent": -44.686574,
+      "wall_percent": -6.897602
+    },
+    "limitation": "One paired task confirms quality and operation but does not establish a general cost or latency effect."
+  },
+  "workspace_verification": {
+    "tests": "87 passed across 12 suites",
+    "format": "passed",
+    "clippy": "passed with warnings denied"
+  },
+  "raw_artifacts": "../2026-08-30-routing-v2/private/"
+}

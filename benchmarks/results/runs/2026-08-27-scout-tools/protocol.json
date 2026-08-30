@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-27-scout-tools",
+  "status": "preregistered",
+  "objective": "Determine when graph retrieval adds useful repository evidence beyond native Scout tools while separating graph benefit from fourth-tool novelty and failed-tool overhead.",
+  "priority": ["quality", "complete_subscription_usage", "wall_time"],
+  "execution": {
+    "provider": "Codex subscription through codex app-server only",
+    "scout_model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "concurrency": 4,
+    "pilot_repeats": 1,
+    "main_repeats": 3,
+    "randomization_seed": 20260827,
+    "repository_base_commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+    "prompt_policy": "Byte-identical query and Scout prompt across arms.",
+    "scout_idle_timeout_ms": 180000,
+    "repository_tool_timeout_seconds": 30,
+    "efficacy_index_state": "Preinitialize one treatment index per repeat, then allow the production adapter to run its bounded incremental sync before each Scout request. Measure cold init, unchanged sync, changed sync, and cold/warm explore separately so index construction cannot masquerade as retrieval quality or model latency.",
+    "raw_artifacts": "private/"
+  },
+  "pilot_amendments": [
+    {
+      "timing": "After inspecting the first treatment pilot answer and before any main trials",
+      "change": "Replace crates/cli/src/subscription.rs with crates/core/src/citations.rs in the MCP request-flow expected paths; add crates/core/src/citations.rs to direct tool dispatch.",
+      "reason": "The task asks for the backend interface and citation-validation boundary. Subscription.rs is one backend implementation, not part of MCP dispatch; citations.rs owns the requested validation boundary. Pilot metrics retain the original rubric; main metrics use this correction."
+    },
+    {
+      "timing": "After blinded pilot review and before any main trials",
+      "change": "Replace select.rs with agents.rs for setup; replace mcp/lib.rs with agents.rs for self-update.",
+      "reason": "Pilot review showed those expected paths named adjacent concepts instead of the owners of integration generation and refresh. Main prompts and arm contracts are unchanged."
+    },
+    {
+      "timing": "After pilot grading and before main grading",
+      "change": "Strip arm-specific absolute repository prefixes from summaries before creating the main blind-review bundle.",
+      "reason": "Pilot summaries could embed absolute citation links containing r0-control, r0-placebo, or r0-codegraph. Pilot grades therefore remain diagnostic and are not treated as blinded primary evidence; the main bundle is regenerated with those prefixes removed before review."
+    }
+  ],
+  "arms": [
+    {
+      "id": "control",
+      "contract": "Current Read, Glob, and Grep tools only."
+    },
+    {
+      "id": "placebo",
+      "contract": "Control plus the same codegraph_explore schema and selection opportunity as treatment, but the adapter returns a bounded unavailable result and no graph evidence.",
+      "purpose": "Estimate fourth-tool novelty, selection, and failed-call overhead independently of graph evidence."
+    },
+    {
+      "id": "codegraph",
+      "contract": "Control plus real bounded codegraph_explore with lazy initialization and incremental synchronization."
+    }
+  ],
+  "task_groups": {
+    "graph_suitable": 6,
+    "negative_control": 2
+  },
+  "task_provenance": "Repository-local diagnostic questions authored from current runtime ownership boundaries before the main trials. Six tasks require multi-file flow or impact tracing; two negative controls require exact declarations from one or two known files. Evaluator-only expected paths identify current source owners, not model-visible hints. Pilot review corrected three adjacent-but-wrong owner paths before the main run, and the amendments preserve those changes.",
+  "tasks": [
+    {
+      "id": "mcp-scout-request-flow",
+      "group": "graph_suitable",
+      "query": "Trace one repo_scout MCP request from JSON-RPC dispatch through the Scout backend to the structured response. Include cancellation and citation validation boundaries.",
+      "expected_paths": ["crates/mcp/src/lib.rs", "crates/core/src/types.rs", "crates/core/src/citations.rs"]
+    },
+    {
+      "id": "subscription-app-server-flow",
+      "group": "graph_suitable",
+      "query": "Trace a subscription Scout app-server session from process spawn through dynamic repository tool calls, stream activity tracking, token accounting, and process-tree cleanup.",
+      "expected_paths": ["crates/cli/src/subscription.rs", "crates/repo-tools/src/codegraph.rs"]
+    },
+    {
+      "id": "direct-tool-dispatch-flow",
+      "group": "graph_suitable",
+      "query": "Trace a direct Scout model tool request through tool schema construction, bounded concurrent execution, returned evidence, and final citation validation.",
+      "expected_paths": ["crates/core/src/engine.rs", "crates/repo-tools/src/lib.rs", "crates/repo-tools/src/exec.rs", "crates/core/src/citations.rs"]
+    },
+    {
+      "id": "setup-integration-flow",
+      "group": "graph_suitable",
+      "query": "Trace repotracer setup from CLI dispatch through integration selection, generated configuration, dry-run behavior, and uninstall cleanup.",
+      "expected_paths": ["crates/cli/src/main.rs", "crates/cli/src/setup.rs", "crates/cli/src/agents.rs"]
+    },
+    {
+      "id": "self-update-flow",
+      "group": "graph_suitable",
+      "query": "Trace the self-update lifecycle from the MCP startup check through release selection, checksum verification, binary replacement, and integration refresh.",
+      "expected_paths": ["crates/cli/src/main.rs", "crates/cli/src/selfupdate.rs", "crates/cli/src/agents.rs"]
+    },
+    {
+      "id": "codegraph-change-impact",
+      "group": "graph_suitable",
+      "query": "Identify every runtime path affected by changing the explorer.codegraph setting, from configuration deserialization through direct and subscription Scout tool exposure.",
+      "expected_paths": ["crates/core/src/config.rs", "crates/cli/src/main.rs", "crates/cli/src/subscription.rs", "crates/repo-tools/src/lib.rs"]
+    },
+    {
+      "id": "exact-package-version",
+      "group": "negative_control",
+      "query": "Find the exact current workspace and npm package version declarations. Cite only the files that directly declare those values.",
+      "expected_paths": ["Cargo.toml", "packages/npm/package.json"]
+    },
+    {
+      "id": "exact-install-command",
+      "group": "negative_control",
+      "query": "Find the exact documented one-command installation and dry-run commands. Cite the smallest relevant README locations.",
+      "expected_paths": ["README.md"]
+    }
+  ],
+  "primary_analysis": {
+    "manual_quality": "Blind 0-4 score: 0 wrong/no evidence; 1 relevant fragment; 2 core flow partial; 3 complete essential flow; 4 complete, accurate flow including material limits and fallbacks.",
+    "citation_metrics": ["valid_citation_rate", "expected_path_recall", "changed_path_recall_when_applicable"],
+    "usage_metrics": ["prompt_tokens", "cached_prompt_tokens", "completion_tokens", "reasoning_output_tokens", "tool_calls"],
+    "time_metrics": ["complete_scout_wall_time", "index_init_time", "index_sync_time", "cold_explore_time", "warm_explore_time"],
+    "operational_metrics": ["index_disk_bytes", "init_cpu", "sync_cpu", "returned_bytes", "fallback_calls"]
+  },
+  "hypotheses": [
+    "On graph-suitable tasks, treatment improves or ties manual quality while reducing native repository calls or subscription usage versus control and placebo.",
+    "Placebo does not reproduce treatment gains; otherwise fourth-tool prompting or selection behavior, not graph evidence, explains the result.",
+    "On negative controls, treatment avoids CodeGraph and does not regress quality, usage, or time materially.",
+    "Incremental sync is substantially cheaper than initial indexing and unchanged repositories avoid rebuild work."
+  ],
+  "failure_policy": {
+    "infrastructure": "Provider, harness, or repository setup failure invalidates the matched arm group for that task and repeat; rerun the complete three-arm block.",
+    "model": "Timeout, malformed final answer, unnecessary tool use, missing evidence, or poor answer remains a scored model outcome.",
+    "retention": "Keep every losing, invalidated, and failed attempt with its classification."
+  },
+  "report_requirements": [
+    "hypotheses and counter-hypotheses",
+    "arm and placebo construction",
+    "task provenance",
+    "randomization and blinding",
+    "subscription execution settings",
+    "index lifecycle and compute accounting",
+    "scoring and manual review",
+    "failure and invalidation handling",
+    "raw artifact locations and reproduction commands",
+    "results, limitations, decision, and rejected interpretations"
+  ]
+}

@@ -32,7 +32,7 @@ const ROUTER_IGNORED_DIRS: &[&str] = &[
 const SUCCESSFUL_HANDOFF: &str = "Broad repository exploration is complete. Use the summary and included evidence excerpts. For read-only explanation or planning, you MUST answer immediately and MUST NOT make another repository tool call. For edits, read one narrow cited range only when the handoff does not resolve a specific fact needed for the change. Do not run repository-wide file listings, broad Grep/Glob searches, or unrelated documentation reads. RepoTracer cannot inspect Git history; when the task describes a regression and current-source evidence does not establish what changed, run one targeted history lookup before selecting the fix.";
 const EMPTY_HANDOFF: &str =
     "No validated evidence was returned. Fall back to normal repository exploration.";
-const REPO_SCOUT_DESC: &str = "Use repo_scout only when it replaces broad repository exploration. Unknown location or an unfamiliar repository alone is not enough. For a localized bug or change, use one targeted lookup first and call repo_scout only if that lookup fails to identify a precise change surface. Skip when the prompt names the relevant files or symbols and that is the complete change surface. Call repo_scout immediately when the request itself requires broad multi-component or cross-file tracing. A successful result completes broad exploration and includes bounded source excerpts. For read-only explanation or planning, answer immediately without another repository tool call. For edits, read one narrow cited range only for a specific unresolved fact. Do not repeat repository-wide searches or unrelated documentation reads. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup before selecting the fix.";
+const REPO_SCOUT_DESC: &str = "Use repo_scout as the first repository operation when the request requires tracing callers, exported APIs or configuration across files, multiple components, or any broad read-only map. For a likely single command, function, or file change, begin with one targeted lookup even when the prompt does not name its exact path; call repo_scout if that lookup fails or expands the change surface. A topic name such as auth, subscriptions, or timeouts is not a precise boundary when the request asks for caller, API, or configuration blast radius. Difficulty and unfamiliarity alone do not make a task broad. A successful result completes broad exploration and includes bounded source excerpts. For read-only explanation or planning, answer immediately without another repository tool call. For edits, read one narrow cited range only for a specific unresolved fact. Do not repeat repository-wide searches or unrelated documentation reads. RepoTracer cannot inspect Git history; after a regression handoff, use one targeted history lookup before selecting the fix.";
 
 pub struct McpServer {
     scout: Arc<dyn ScoutBackend>,
@@ -504,10 +504,11 @@ mod tests {
     fn repo_scout_description_matches_routing_contract() {
         let tool = repo_scout_tool_def();
         let description = tool["description"].as_str().unwrap();
-        assert!(description.contains("replaces broad repository exploration"));
-        assert!(description.contains("prompt names the relevant files or symbols"));
-        assert!(description.contains("Unknown location"));
-        assert!(description.contains("localized bug or change"));
+        assert!(description.contains("first repository operation"));
+        assert!(description.contains("tracing callers"));
+        assert!(description.contains("exported APIs or configuration"));
+        assert!(description.contains("single command, function, or file change"));
+        assert!(description.contains("expands the change surface"));
         assert!(description.contains("includes bounded source excerpts"));
         assert!(description.contains("Do not repeat repository-wide searches"));
         assert!(description.contains("answer immediately without another repository tool call"));

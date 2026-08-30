@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-28-deepswe-hard-reasoning",
+  "status": "preregistered",
+  "objective": "Test whether Luna high reasoning rescues end-to-end hard repository tasks that Luna medium cannot solve when Sol naturally routes through RepoTracer Scout.",
+  "scope": {
+    "suite": "DeepSWE",
+    "task_count": 2,
+    "selection": "Chosen before any model run from public task contracts for long-horizon cross-component behavior, with one Rust runtime task and one TypeScript multi-agent task.",
+    "not_claimed": [
+      "A DeepSWE leaderboard score",
+      "A release-grade result",
+      "A validated Sol classifier for choosing reasoning effort",
+      "Cross-repository generality beyond these two tasks"
+    ]
+  },
+  "source": {
+    "repository": "https://github.com/datacurve-ai/deep-swe",
+    "commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea"
+  },
+  "tasks": [
+    {
+      "id": "boa-hierarchical-evaluation-cancellation",
+      "language": "rust",
+      "repository": "https://github.com/boa-dev/boa",
+      "base_commit": "70409a5052984325dccfdc5f6520818568a81f39",
+      "reason": "Crosses Context, Script, Module, nested evaluations, cancellation lineage, and queued jobs with 17 held-out feature checks."
+    },
+    {
+      "id": "claude-code-by-agents-recursive-delegation",
+      "language": "typescript",
+      "repository": "https://github.com/baryhuang/claude-code-by-agents",
+      "base_commit": "5e0a2247d446c49a9951a06bb83b6e956dc7eb41",
+      "reason": "Crosses streamed tool calls, agent registry lookup, recursive execution, feedback, error handling, and cycle detection with 7 held-out feature checks."
+    }
+  ],
+  "execution": {
+    "parent_model": "gpt-5.6-sol",
+    "parent_reasoning_effort": "high",
+    "parent_path": "Codex subscription through codex-lb",
+    "scout_model": "gpt-5.6-luna",
+    "scout_arms": ["medium", "high"],
+    "scout_path": "RepoTracer codex app-server subscription backend",
+    "repotracer_binary_sha256": "df494aae309b56ca5dffd4ec047669bea709bf564d19df4efa1ee8498f47d2b1",
+    "routing": "Sol receives the retained production routing policy and the original DeepSWE prompt. Scout is neither forced nor named by the benchmark harness.",
+    "repeats_per_arm": 3,
+    "planned_trials": 12,
+    "concurrency": 4,
+    "parent_timeout_seconds": 10800,
+    "scout_idle_timeout_ms": 180000,
+    "scout_max_turns": 6,
+    "scout_max_tool_calls": 40,
+    "scout_tool_timeout_seconds": 30,
+    "prompt_policy": "Byte-identical official DeepSWE instruction in every arm and repeat.",
+    "parent_sandbox": "Codex workspace-write with the isolated trial repository .git directory explicitly writable so the official task's branch and commit requirement can run.",
+    "raw_artifacts": "private/"
+  },
+  "controls": [
+    "Same task base commit and official verifier",
+    "Same Sol model, parent reasoning, routing policy, authentication, and Codex configuration",
+    "Same RepoTracer binary, Scout prompt, native tools, budgets, and inactivity timeout",
+    "Only Scout reasoning_effort differs between medium and high",
+    "No task solution or held-out test content is exposed to Sol or Scout",
+    "No early stopping after favorable or unfavorable trials"
+  ],
+  "metrics": {
+    "quality": [
+      "Official DeepSWE binary reward",
+      "Held-out feature-to-pass fraction",
+      "Preserved-to-preserved regression fraction",
+      "Blind patch and trajectory review after verifier results"
+    ],
+    "routing": [
+      "Whether Sol called repo_scout",
+      "Scout call count and position",
+      "Whether Sol used Scout evidence in the implementation"
+    ],
+    "economics": [
+      "Complete parent plus Scout subscription requests",
+      "Input, cached input, output, and reasoning tokens",
+      "Provider-recorded cost when available"
+    ],
+    "time": ["Complete end-to-end trial wall seconds", "Scout wall seconds"]
+  },
+  "decision_rule": {
+    "adaptive_high_requires": [
+      "High converts a medium verifier failure into a pass in at least two of three repeats for at least one task",
+      "High introduces no new required-behavior or preserved-test failure on the other task",
+      "The informative task actually invokes Scout",
+      "Blind review attributes the rescue to better repository evidence rather than unrelated parent variance"
+    ],
+    "tie": "Keep medium; latency or usage cannot justify high without a repeated quality rescue.",
+    "insufficient": "If Sol does not call Scout or both arms fail for reasons unrelated to repository evidence, retain medium and report that these tasks do not answer the question."
+  },
+  "failure_policy": {
+    "infrastructure": "Resample the complete medium/high pair for provider, harness, checkout, or verifier infrastructure failure.",
+    "model": "Timeout, context exhaustion, bad patch, missed requirement, verifier failure, and unnecessary or missed Scout routing count as observed model behavior."
+  }
+}

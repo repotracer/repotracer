@@ -3,7 +3,7 @@ name = "repotracer-repo-tools"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Read/Glob/Grep tools for repotracer"
+description = "Read-only repository tools for repotracer"
 repository.workspace = true
 
 [dependencies]
@@ -23,3 +23,6 @@ which.workspace = true
 [dev-dependencies]
 tempfile = "3"
 tokio = { workspace = true, features = ["full", "test-util"] }
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true

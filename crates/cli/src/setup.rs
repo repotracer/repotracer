@@ -195,6 +195,10 @@ mod tests {
         let selected = gpt_config(&legacy).unwrap();
         assert_eq!(selected.model.backend, "codex-cli");
         assert_eq!(selected.model.model, "gpt-5.6-luna");
+        assert_eq!(selected.model.service_tier, "fast");
+
+        legacy.updates.automatic = false;
+        assert!(!gpt_config(&legacy).unwrap().updates.automatic);
 
         legacy.updates.automatic = false;
         assert!(!gpt_config(&legacy).unwrap().updates.automatic);

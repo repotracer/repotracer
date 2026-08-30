@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#111827" />
+<meta name="description" content="Decision report for the held-out Luna medium versus high complete-task benchmark." />
+<title>Keep Luna medium — hard-task decision</title>
+<style>
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Regular.otf?v=1776492806") format("opentype"); }
+@font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ss3/SourceSans3-Regular.otf?v=1776492806") format("opentype"); }
+@font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 700; font-display: swap; src: url("https://gwern.net/static/font/ss3/SourceSans3-Bold.otf?v=1776492806") format("opentype"); }
+:root { color-scheme: light dark; --paper:#f7f5ef; --ink:#20242b; --muted:#667085; --line:#d8d3c6; --panel:#eeebe2; --accent:#6750a4; --good:#236b45; --warn:#935f16; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:"Source Serif 4", Georgia, serif; line-height:1.55; }
+main { width:min(1120px, calc(100% - 36px)); margin:0 auto; padding:52px 0 80px; }
+header { border-top:5px solid var(--accent); padding-top:24px; margin-bottom:32px; }
+.eyebrow, th, .label, nav { font-family:"Source Sans 3", system-ui, sans-serif; text-transform:uppercase; letter-spacing:.08em; font-size:.78rem; }
+h1 { font-size:clamp(2.25rem, 5vw, 4.5rem); line-height:1; letter-spacing:-.035em; max-width:900px; margin:.25rem 0 1rem; }
+.deck { max-width:790px; font-size:1.2rem; margin:0; }
+.decision { border:1px solid var(--line); border-left:7px solid var(--good); background:var(--panel); padding:22px 24px; margin:30px 0; }
+.decision strong { font-family:"Source Sans 3", system-ui, sans-serif; font-size:1.2rem; }
+.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:26px 0 38px; }
+.metric { border-top:2px solid var(--ink); padding:12px 0; }
+.metric b { display:block; font-family:"Source Sans 3", system-ui, sans-serif; font-size:1.6rem; line-height:1.15; }
+.metric span { color:var(--muted); font-size:.91rem; }
+h2 { font-size:1.6rem; margin:42px 0 12px; border-bottom:1px solid var(--line); padding-bottom:7px; }
+p, li { max-width:820px; }
+table { width:100%; border-collapse:collapse; margin:16px 0 28px; font-family:"Source Sans 3", system-ui, sans-serif; font-size:.92rem; }
+th { color:var(--muted); text-align:left; border-bottom:2px solid var(--ink); padding:10px 8px; }
+td { border-bottom:1px solid var(--line); padding:11px 8px; vertical-align:top; }
+td:first-child { font-weight:700; }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+.callout { border-left:4px solid var(--warn); padding:4px 0 4px 18px; margin:24px 0; }
+.small { color:var(--muted); font-size:.9rem; }
+code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.86em; }
+a { color:var(--accent); text-underline-offset:3px; }
+footer { border-top:1px solid var(--line); margin-top:48px; padding-top:18px; color:var(--muted); font-size:.9rem; }
+@media (max-width:780px) { .grid { grid-template-columns:repeat(2,1fr); } table { display:block; overflow-x:auto; white-space:nowrap; } }
+@media (prefers-color-scheme:dark) { :root { --paper:#111318; --ink:#ece9e1; --muted:#a9afba; --line:#353943; --panel:#1b1e25; --accent:#b9a4ff; --good:#62bd88; --warn:#e2aa55; } }
+@media print { :root { --paper:#fff; --ink:#000; --muted:#444; --line:#bbb; --panel:#f2f2f2; --accent:#000; --good:#000; --warn:#000; } main { width:100%; padding:0; } a { color:#000; text-decoration:none; } }
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="eyebrow">RepoTracer benchmark decision · 29 August 2026</div>
+<h1>Keep Luna medium.</h1>
+<p class="deck">High reasoning produced one extra official pass across six held-out complete tasks. It did not meet the preregistered rescue gate, ran slower on both repositories, and used 3.9× the Scout requests.</p>
+</header>
+
+<section class="decision">
+<div class="label">Decision</div>
+<strong>Retain medium globally. Do not add adaptive high.</strong>
+<p>High had a real result on recursive delegation, but the signal did not repeat on the harder cancellation task. Blind review traced most failed patches to Sol's implementation rather than weak Scout localization. Raising Scout reasoning is the wrong fix.</p>
+</section>
+
+<div class="grid" aria-label="Decision metrics">
+<div class="metric"><b>3/6 → 4/6</b><span>official passes, medium to high</span></div>
+<div class="metric"><b>79 → 251</b><span>Luna requests across six Scout calls</span></div>
+<div class="metric"><b>$0.1865 → $0.7328</b><span>Scout usage cost</span></div>
+<div class="metric"><b>0 tasks</b><span>met the two-of-three rescue gate</span></div>
+</div>
+
+<h2>Official quality and latency</h2>
+<table>
+<thead><tr><th>Held-out task</th><th>Arm</th><th class="num">Passes</th><th class="num">Blind quality</th><th class="num">Median wall</th><th class="num">Solver cost</th></tr></thead>
+<tbody>
+<tr><td>Boa hierarchical cancellation</td><td>Medium</td><td class="num">1/3</td><td class="num">1.67/4</td><td class="num">1,239.61s</td><td class="num">$19.1608</td></tr>
+<tr><td>Boa hierarchical cancellation</td><td>High</td><td class="num">1/3</td><td class="num">2.67/4</td><td class="num">1,370.86s</td><td class="num">$25.0615</td></tr>
+<tr><td>Recursive delegation</td><td>Medium</td><td class="num">2/3</td><td class="num">2.67/4</td><td class="num">657.22s</td><td class="num">$8.6769</td></tr>
+<tr><td>Recursive delegation</td><td>High</td><td class="num">3/3</td><td class="num">3.67/4</td><td class="num">935.87s</td><td class="num">$6.8423</td></tr>
+</tbody>
+</table>
+<p class="small">Solver cost includes every request in each retained isolated Codex home. Scout cost is reported separately below. Wall time is task median across three repeats.</p>
+
+<div class="callout">
+<strong>The pass delta was narrow.</strong>
+<p>High rescued recursive-delegation repeat 2. On Boa, medium and high each passed one repeat, but different repeats. High therefore did not rescue at least two of three repeats on either task—the gate fixed before execution.</p>
+</div>
+
+<h2>Scout usage</h2>
+<table>
+<thead><tr><th>Reasoning</th><th class="num">Requests</th><th class="num">Input</th><th class="num">Cached input</th><th class="num">Output</th><th class="num">Reasoning</th><th class="num">Cost</th></tr></thead>
+<tbody>
+<tr><td>Medium</td><td class="num">79</td><td class="num">2,960,143</td><td class="num">2,434,816</td><td class="num">27,314</td><td class="num">7,272</td><td class="num">$0.1865</td></tr>
+<tr><td>High</td><td class="num">251</td><td class="num">15,419,450</td><td class="num">14,136,832</td><td class="num">161,312</td><td class="num">100,714</td><td class="num">$0.7328</td></tr>
+</tbody>
+</table>
+<p>The 12 complete-task trials cost $59.7415 for Sol and $0.9194 for Luna, $60.6609 total. Scout requests ran concurrently, so billing can be assigned to the medium or high arm by reasoning effort, not to one task or trial.</p>
+
+<h2>What blind review found</h2>
+<ul>
+<li>All 12 patches were scored without arm identity. Official verifier results were also recorded.</li>
+<li>Seven cases used Scout evidence strongly. Five others had no usable Scout handoff or were attributed directly to parent execution.</li>
+<li>The strongest failed medium patches had accurate cross-component maps but missed implementation invariants such as emitting the recursive tool result or compiling the cancellation machinery.</li>
+<li>One Boa high pass succeeded after Scout timed out. That is evidence for Sol's fallback execution, not high Scout reasoning.</li>
+</ul>
+
+<h2>Scope and limits</h2>
+<p>Two repositories and three repeats per arm are enough to apply this decision gate, not enough to estimate a general pass rate. One reviewer scored each blinded case. The study compares medium and high only; the prior 72-run Scout-only matrix already rejected low for cross-file completeness defects.</p>
+
+<h2>Evidence</h2>
+<ul>
+<li><a href="runs/2026-08-28-deepswe-hard-reasoning/protocol.json"><code>protocol.json</code></a> — locked tasks, arms, prompts, verifier commands, and gate.</li>
+<li><a href="runs/2026-08-28-deepswe-hard-reasoning/summary.json"><code>summary.json</code></a> — trial, review, latency, token, and billing aggregates.</li>
+<li><a href="runs/2026-08-28-scout-reasoning/summary.json"><code>Scout-only summary.json</code></a> — the earlier low/medium/high native-tool matrix.</li>
+</ul>
+
+<footer>Next benchmark stage: improve parent routing. Scout behavior is locked to the adaptive evidence-stop prompt with medium reasoning.</footer>
+</main>
+</body>
+</html>

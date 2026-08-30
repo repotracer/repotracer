@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f8fbff" />
+    <meta name="description" content="Final decision report for the RepoTracer Scout CodeGraph experiment." />
+    <title>Scout search tools — final decision</title>
+    <style>
+      @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Regular.otf?v=1776492806") format("opentype"); }
+      @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 600; font-display: swap; src: url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Semibold.otf?v=1776492806") format("opentype"); }
+      @font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ss3/SourceSans3-BASIC-Regular.otf?v=1747251196") format("opentype"); }
+      @font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 600; font-display: swap; src: url("https://gwern.net/static/font/ss3/SourceSans3-BASIC-Semibold.otf?v=1747251196") format("opentype"); }
+      @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ibm-plex-mono/IBMPlexMono-Regular.otf?v=1606177027") format("opentype"); }
+      :root {
+        --paper: #f8fbff;
+        --ink: #17213d;
+        --body: #39415b;
+        --muted: #66708b;
+        --faint: #8f98af;
+        --rule: #d5dceb;
+        --rule-dark: #a3aec6;
+        --accent: #5544c4;
+        --soft: #eee9ff;
+        --good: #21624d;
+        --warn: #8a4d17;
+        --bad: #8c3443;
+        --sans: "Source Sans 3", Arial, sans-serif;
+        --serif: "Source Serif 4", Georgia, serif;
+        --mono: "IBM Plex Mono", monospace;
+        --max: 1180px;
+        --measure: 920px;
+        --gutter: clamp(18px, 4vw, 48px);
+        color-scheme: light;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: var(--paper); color: var(--body); font: 18px/1.68 var(--serif); -webkit-font-smoothing: antialiased; }
+      a { color: var(--accent); text-underline-offset: 2px; }
+      code { font: .82em/1.4 var(--mono); overflow-wrap: anywhere; }
+      .utility { width: min(100% - var(--gutter) * 2, var(--max)); min-height: 54px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--rule); color: var(--muted); font: 11px/1.2 var(--mono); }
+      .utility strong { color: var(--ink); font-weight: 400; }
+      .layout { width: min(100% - var(--gutter) * 2, var(--max)); margin: auto; display: grid; grid-template-columns: 155px minmax(0, var(--measure)); gap: clamp(30px, 5vw, 70px); }
+      aside { padding-top: 86px; }
+      .sticky { position: sticky; top: 28px; }
+      .nav-title { margin-bottom: 15px; color: var(--faint); font: 11px/1.2 var(--mono); text-transform: uppercase; }
+      nav { display: grid; gap: 9px; }
+      nav a { padding-left: 10px; border-left: 1px solid transparent; color: var(--muted); font: 14px/1.4 var(--sans); text-decoration: none; }
+      nav a:hover { border-color: var(--accent); color: var(--ink); }
+      .stamp { margin-top: 40px; color: var(--faint); font: 11px/1.55 var(--mono); }
+      .stamp span { color: var(--accent); }
+      main { min-width: 0; }
+      article { padding: 76px 0 105px; }
+      .kicker { margin-bottom: 13px; color: var(--accent); font: 600 13px/1.2 var(--sans); text-transform: uppercase; letter-spacing: .03em; }
+      h1, h2, h3, p { margin-top: 0; }
+      h1 { max-width: 850px; margin-bottom: 18px; color: var(--ink); font: 600 clamp(44px, 6vw, 70px)/1.04 var(--serif); letter-spacing: -.038em; }
+      .dek { max-width: 820px; margin-bottom: 23px; color: var(--body); font-size: 22px; line-height: 1.52; }
+      .metadata { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 12px 0; border-top: 1px solid var(--rule-dark); border-bottom: 1px solid var(--rule); color: var(--muted); font: 11px/1.45 var(--mono); }
+      .metadata strong { color: var(--ink); font-weight: 400; }
+      .abstract { margin: 38px 0 50px; padding: 18px 0 18px 22px; border-left: 3px solid var(--accent); }
+      .abstract-label { margin-bottom: 8px; color: var(--accent); font: 600 11px/1.2 var(--sans); text-transform: uppercase; }
+      .abstract p { margin: 0; color: var(--ink); font-size: 20px; }
+      section { scroll-margin-top: 28px; margin-top: 62px; }
+      h2 { padding-bottom: 12px; border-bottom: 1px solid var(--rule-dark); color: var(--ink); font: 600 30px/1.2 var(--sans); letter-spacing: -.012em; }
+      h2 span { margin-right: 9px; color: var(--accent); font: 11px/1 var(--mono); vertical-align: 5px; }
+      h3 { margin: 26px 0 7px; color: var(--ink); font: 600 18px/1.3 var(--sans); }
+      .decision-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 20px 0 22px; border: 1px solid var(--rule); background: var(--rule); }
+      .decision-grid div { padding: 19px; background: var(--paper); }
+      .decision-grid b { display: block; margin-bottom: 7px; color: var(--accent); font: 600 11px/1.2 var(--mono); text-transform: uppercase; }
+      .decision-grid strong { display: block; margin-bottom: 7px; color: var(--ink); font: 600 18px/1.3 var(--sans); }
+      .decision-grid p { margin: 0; font-size: 16px; line-height: 1.5; }
+      .table-wrap { overflow-x: auto; margin: 18px 0 12px; }
+      table { width: 100%; min-width: 760px; border-collapse: collapse; font: 16px/1.48 var(--sans); }
+      th { padding: 11px 10px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule-dark); color: var(--muted); font: 10px/1.2 var(--mono); text-align: left; text-transform: uppercase; }
+      td { padding: 13px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+      td:first-child { color: var(--ink); font-weight: 600; }
+      tr:hover td { background: var(--soft); }
+      .good { color: var(--good); font-weight: 600; }
+      .warn { color: var(--warn); font-weight: 600; }
+      .bad { color: var(--bad); font-weight: 600; }
+      .stages { margin-top: 18px; border-top: 1px solid var(--ink); }
+      .stage { display: grid; grid-template-columns: 48px 155px 1fr; gap: 17px; padding: 17px 0; border-bottom: 1px solid var(--rule); }
+      .stage .num { color: var(--accent); font: 11px/1.5 var(--mono); }
+      .stage strong { color: var(--ink); font: 600 17px/1.35 var(--sans); }
+      .stage p { margin: 0; font-size: 17px; line-height: 1.58; }
+      .callout { margin: 23px 0; padding: 17px 19px; background: var(--soft); border-left: 3px solid var(--accent); color: var(--ink); font-size: 17px; }
+      .plain-list { margin: 14px 0; padding: 0; list-style: none; }
+      .plain-list li { display: grid; grid-template-columns: 28px 1fr; gap: 9px; padding: 11px 0; border-top: 1px solid var(--rule); }
+      .plain-list li::before { content: "—"; color: var(--accent); font-family: var(--mono); }
+      .small { color: var(--muted); font: 14px/1.55 var(--sans); }
+      .refs { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: ref; }
+      .refs li { display: grid; grid-template-columns: 30px 1fr; gap: 8px; padding: 10px 0; border-top: 1px solid var(--rule); counter-increment: ref; font: 15px/1.48 var(--sans); }
+      .refs li::before { content: counter(ref, decimal-leading-zero); color: var(--faint); font: 11px/1.5 var(--mono); }
+      .refs small { display: block; color: var(--muted); }
+      .footer { margin-top: 48px; padding-top: 12px; border-top: 1px solid var(--rule-dark); color: var(--muted); font: 11px/1.5 var(--mono); }
+      @media (max-width: 760px) { body { font-size: 17px; } .layout { display: block; } aside { padding-top: 18px; } .sticky { position: static; } .nav-title, .stamp { display: none; } nav { display: flex; flex-wrap: wrap; gap: 10px 14px; } nav a { padding: 0; border: 0; } article { padding-top: 40px; } .decision-grid { grid-template-columns: 1fr; } .stage { grid-template-columns: 40px 1fr; } .stage p { grid-column: 2; } }
+      @media print { aside { display: none; } .utility, .layout { width: 100%; } .layout { display: block; } article { padding: 28px 0; } a { color: inherit; } }
+    </style>
+  </head>
+  <body>
+    <header class="utility"><strong>RepoTracer / decision report 002</strong><span>Scout tool gate · 28 Aug 2026</span></header>
+    <div class="layout">
+      <aside aria-label="Report contents">
+        <div class="sticky">
+          <div class="nav-title">contents</div>
+          <nav>
+            <a href="#decision">decision</a>
+            <a href="#quality">quality</a>
+            <a href="#usage">usage and time</a>
+            <a href="#selection">selection</a>
+            <a href="#evidence">evidence</a>
+          </nav>
+          <div class="stamp"><span>tool gate</span><br />status: closed<br />decision: reject</div>
+        </div>
+      </aside>
+
+      <main>
+        <article>
+          <div class="kicker">Scout tools / final decision</div>
+          <h1>Remove CodeGraph.</h1>
+          <p class="dek">It consistently reduced prompt usage, and the revised policy selected it correctly. It still failed the quality floor at low and high reasoning. RepoTracer keeps native Read, Glob, and Grep only.</p>
+          <div class="metadata">
+            <span>priority <strong>quality → cost → time</strong></span>
+            <span>decision <strong>reject and remove</strong></span>
+            <span>evaluated <strong>216 scored tool-stage trials</strong></span>
+            <span>citations <strong>100% valid</strong></span>
+          </div>
+
+          <div class="abstract" id="decision">
+            <div class="abstract-label">decision</div>
+            <p>Delete the adapter and its public configuration seam. Do not auto-index, retain an opt-in, or replace the failed quality result with a larger-model requirement. The native control remains the product path.</p>
+          </div>
+
+          <div class="decision-grid" aria-label="Decision summary">
+            <div><b>quality</b><strong>Failed twice</strong><p>CodeGraph trailed native tools by 0.208 points at low reasoning and 0.125 at high.</p></div>
+            <div><b>usage</b><strong>12–16% fewer prompt tokens</strong><p>The reduction held at low, medium, and high reasoning. It is real, but it did not buy quality parity.</p></div>
+            <div><b>selection</b><strong>24 / 24 correct</strong><p>The revised policy selected CodeGraph on all 18 graph tasks and skipped all 6 exact controls.</p></div>
+          </div>
+
+          <section id="quality">
+            <h2><span>01</span>Quality review</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>reasoning</th><th>native control</th><th>CodeGraph</th><th>difference</th><th>decision signal</th></tr></thead>
+                <tbody>
+                  <tr><td>Low</td><td>3.9167 / 4</td><td>3.7083 / 4</td><td class="bad">−0.2084</td><td class="bad">Fails quality parity</td></tr>
+                  <tr><td>Medium</td><td>3.5417 / 4</td><td>3.6667 / 4</td><td class="good">+0.1250</td><td>Unstable; 95% bootstrap interval −0.25 to +0.50</td></tr>
+                  <tr><td>High</td><td>3.9167 / 4</td><td>3.7917 / 4</td><td class="bad">−0.1250</td><td class="bad">More reasoning does not recover parity</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>The original blinded three-arm matrix agreed with the low-reasoning result: control scored 3.9167, real CodeGraph 3.7083, and the unavailable-tool placebo 3.3333. Real graph evidence was better than a failed fourth tool, but native tools were better than both. Every scored phase had a 100% valid-citation rate, so citation syntax does not explain the quality gap.</p>
+          </section>
+
+          <section id="usage">
+            <h2><span>02</span>Usage and latency</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>reasoning</th><th>prompt-token change</th><th>wall-time change</th><th>expected-path recall change</th></tr></thead>
+                <tbody>
+                  <tr><td>Low</td><td class="good">−2,560 (−11.6%)</td><td>−0.76 s</td><td>+3.1 points</td></tr>
+                  <tr><td>Medium</td><td class="good">−3,757 (−15.6%)</td><td>−3.40 s</td><td>−3.5 points</td></tr>
+                  <tr><td>High</td><td class="good">−2,880 (−12.3%)</td><td class="good">−15.47 s</td><td>+3.8 points</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>Cost boundary:</strong> these subscription trials expose prompt, cached-prompt, completion, and reasoning usage, not defensible provider USD. Token counts are operational evidence, not a dollar-cost claim. The separate production Gigo matrix recorded exact routing cost, but it had no repository index and cannot measure CodeGraph impact.</div>
+          </section>
+
+          <section id="selection">
+            <h2><span>03</span>The selection fix worked; the tool still lost</h2>
+            <div class="stages">
+              <div class="stage"><div class="num">01</div><strong>Original policy</strong><p>CodeGraph was unnecessarily selected in 5 of 6 exact negative controls. Native tools kept higher final-answer quality.</p></div>
+              <div class="stage"><div class="num">02</div><strong>Revised policy</strong><p>One explicit rule reserved graph use for cross-file structure, request flow, and change impact. It chose CodeGraph on 18 of 18 suitable trials and skipped 6 of 6 exact controls.</p></div>
+              <div class="stage"><div class="num">03</div><strong>Reasoning sweep</strong><p>Three repeats per task at low, medium, and high reasoning tested whether more model effort recovered quality. Low and high still trailed control.</p></div>
+              <div class="stage"><div class="num">04</div><strong>Clean cutover</strong><p>The adapter, dynamic app-server tool bridge, repository-tool schema, and <code>explorer.codegraph</code> setting were removed. No compatibility shim remains.</p></div>
+            </div>
+          </section>
+
+          <section id="evidence">
+            <h2><span>04</span>Evidence and limits</h2>
+            <ul class="plain-list">
+              <li><div><strong>Primary tool matrix.</strong> 72 blinded trials: eight tasks, three repeats, control/placebo/CodeGraph. Quality, path recall, citation validity, usage, tool activity, and wall time were retained.</div></li>
+              <li><div><strong>Follow-up matrix.</strong> 144 control/CodeGraph trials across low, medium, and high reasoning. All processes succeeded; every citation set validated.</div></li>
+              <li><div><strong>Scope.</strong> This is one repository and eight retrieval tasks. It supports the adapter decision, not a general claim that graph retrieval never helps.</div></li>
+              <li><div><strong>No hidden dollar claim.</strong> The report leaves subscription usage in native counters. Complete provider cost remains separate production-Gigo evidence.</div></li>
+            </ul>
+            <ol class="refs">
+              <li><div><code>benchmarks/results/runs/2026-08-27-scout-tools/summary.json</code><small>Sanitized protocol, primary matrix, follow-up reasoning comparison, interpretation, and artifact map.</small></div></li>
+              <li><div><code>benchmarks/results/runs/2026-08-27-scout-tools/private/*/analysis.json</code><small>Ignored arm and phase aggregates, matched deltas, tool activity, and manual-grade status.</small></div></li>
+              <li><div><code>benchmarks/results/runs/2026-08-27-release-grade/summary.json</code><small>Independent inactivity, routing, production Gigo, cost, latency, and failure evidence.</small></div></li>
+            </ol>
+          </section>
+
+          <div class="footer">Decision closed · CodeGraph rejected · native repository tools retained · raw benchmark artifacts remain ignored in this worktree</div>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

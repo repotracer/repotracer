@@ -1,0 +1,620 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-29-parent-routing-mechanisms",
+  "generated_at": "2026-08-29T23:03:03.431252+00:00",
+  "status": "complete",
+  "decision": {
+    "routing": "Do not ship metadata, deterministic, classifier, second-chance, or speculative routing. None both recovered the tested misses and was deployable at the current integration boundary.",
+    "always_scout": "Evidence upper bound on two tasks only. It improved sampled complex-task quality and aggregate economics, but it adds 174% localized-task median latency, has zero skip precision by construction, and is unavailable without instruction-only forcing or upstream parent control.",
+    "fast_mode": "Approve only a scoped Luna medium fast/priority service-tier pilot. Nine paired runs held citation validity and reduced wall time 19.0%, but mean quality fell 0.11 and the sample cannot justify a default change.",
+    "next_gate": "User approval before the scoped fast-tier pilot; no routing product change."
+  },
+  "focused_routing": {
+    "deterministic_pre_router": {
+      "runs": 111,
+      "completed": 111,
+      "failures": 0,
+      "route_accuracy": 0.7027027027027027,
+      "scout_recall": 0.5217391304347826,
+      "skip_precision": 1.0,
+      "median_wall_seconds": 0.0,
+      "false_negatives": [
+        "gemini-setup",
+        "route-cli-03",
+        "route-protocol-01",
+        "route-protocol-02",
+        "route-protocol-03",
+        "route-runtime-02",
+        "route-runtime-05",
+        "route-runtime-06",
+        "session-recurring-problems",
+        "subbridge-google-signup",
+        "subbridge-npx-setup"
+      ],
+      "false_positives": []
+    },
+    "luna_classifier_boundary": {
+      "runs": 12,
+      "completed": 12,
+      "failures": 0,
+      "route_accuracy": 0.6666666666666666,
+      "scout_recall": 0.5,
+      "skip_precision": 0.8333333333333334,
+      "median_wall_seconds": 5.59,
+      "false_negatives": [
+        "subbridge-google-signup"
+      ],
+      "false_positives": [
+        "mcp-cancellation"
+      ]
+    },
+    "current_natural_boundary": {
+      "runs": 12,
+      "completed": 12,
+      "failures": 0,
+      "route_accuracy": 0.5,
+      "scout_recall": 0.0,
+      "skip_precision": 1.0,
+      "median_wall_seconds": 9.917,
+      "false_negatives": [
+        "route-runtime-03",
+        "subbridge-google-signup"
+      ],
+      "false_positives": []
+    },
+    "metadata_boundary": {
+      "runs": 12,
+      "completed": 12,
+      "failures": 0,
+      "route_accuracy": 0.5,
+      "scout_recall": 0.0,
+      "skip_precision": 1.0,
+      "median_wall_seconds": 9.681,
+      "false_negatives": [
+        "route-runtime-03",
+        "subbridge-google-signup"
+      ],
+      "false_positives": []
+    },
+    "second_chance_boundary": {
+      "runs": 12,
+      "completed": 12,
+      "failures": 0,
+      "route_accuracy": 0.5,
+      "scout_recall": 0.0,
+      "skip_precision": 1.0,
+      "median_wall_seconds": 9.28,
+      "false_negatives": [
+        "route-runtime-03",
+        "subbridge-google-signup"
+      ],
+      "false_positives": []
+    },
+    "always_scout_mechanical": {
+      "runs": 37,
+      "route_accuracy": 0.6216216216216216,
+      "scout_recall": 1.0,
+      "skip_precision": 0.0,
+      "false_positives": 14
+    },
+    "speculative_parallel": {
+      "status": "not_deployable",
+      "reason": "Codex app-server cannot inject a parallel Scout result into an already-running parent turn; waiting first is sequential."
+    },
+    "boundary_tasks": [
+      "mcp-cancellation",
+      "route-cli-08",
+      "route-runtime-03",
+      "subbridge-google-signup"
+    ],
+    "boundary_repeats": 3
+  },
+  "complete_tasks": {
+    "tasks": [
+      "route-cli-08",
+      "route-runtime-03"
+    ],
+    "repeats_per_arm": 3,
+    "verification": {
+      "targeted_cargo_trials": 6,
+      "passed": 6,
+      "failed": 0,
+      "command": "cargo test -p repotracer-core -p repotracer-repo-tools -p repotracer"
+    },
+    "arms": {
+      "current": {
+        "runs": 6,
+        "completed": 6,
+        "mean_quality": 3,
+        "perfect": 3,
+        "quality_scores": [
+          2,
+          4,
+          4,
+          4,
+          2,
+          2
+        ],
+        "median_wall_seconds": 215.53900000000002,
+        "sum_wall_seconds": 1890.9,
+        "scout_calls": 0,
+        "billing": {
+          "requests": 212,
+          "input_tokens": 9627646,
+          "cached_input_tokens": 8391936,
+          "output_tokens": 100202,
+          "reasoning_tokens": 49759,
+          "cost_usd": 13.380578
+        },
+        "tasks": {
+          "route-cli-08": {
+            "mean_quality": 4,
+            "median_wall_seconds": 19.034,
+            "sum_cost_usd_parent_only": 0.55563
+          },
+          "route-runtime-03": {
+            "mean_quality": 2,
+            "median_wall_seconds": 565.913,
+            "sum_cost_usd_parent_only": 12.824948
+          }
+        }
+      },
+      "always": {
+        "runs": 6,
+        "completed": 6,
+        "mean_quality": 3.3333333333333335,
+        "perfect": 4,
+        "quality_scores": [
+          4,
+          2,
+          4,
+          4,
+          4,
+          2
+        ],
+        "median_wall_seconds": 272.716,
+        "sum_wall_seconds": 1676.28,
+        "scout_calls": 6,
+        "billing": {
+          "requests": 163,
+          "input_tokens": 4826262,
+          "cached_input_tokens": 4085760,
+          "output_tokens": 67873,
+          "reasoning_tokens": 28123,
+          "cost_usd": 6.039718440000001
+        },
+        "tasks": {
+          "route-cli-08": {
+            "mean_quality": 4,
+            "median_wall_seconds": 52.156,
+            "sum_cost_usd_parent_only": 0.575316
+          },
+          "route-runtime-03": {
+            "mean_quality": 2.6666666666666665,
+            "median_wall_seconds": 493.783,
+            "sum_cost_usd_parent_only": 5.398721800000001
+          }
+        }
+      }
+    },
+    "comparison": {
+      "quality_delta": 0.3333333333333335,
+      "cost_delta_percent": -54.86205125070083,
+      "sum_wall_delta_percent": -11.350150721878471,
+      "median_wall_delta_percent": 26.527449788669323,
+      "sol_request_delta_percent": -41.98113207547169
+    },
+    "always_parent_only_billing": {
+      "requests": 123,
+      "input_tokens": 4059926,
+      "cached_input_tokens": 3520768,
+      "output_tokens": 56113,
+      "reasoning_tokens": 24381,
+      "cost_usd": 5.9740378000000005
+    },
+    "always_scout_billing": {
+      "requests": 40,
+      "input_tokens": 766336,
+      "cached_input_tokens": 564992,
+      "output_tokens": 11760,
+      "reasoning_tokens": 3742,
+      "cost_usd": 0.06568064,
+      "mean_latency_ms": 6364.775,
+      "mean_first_token_ms": 3135.529411764706
+    },
+    "always_scout_evidence": {
+      "valid_citation_rate": 1,
+      "mean_expected_path_recall": 0.875,
+      "cases": [
+        {
+          "id": "route-cli-08-r0-always",
+          "task_id": "route-cli-08",
+          "citation_count": 2,
+          "valid_citation_rate": 1,
+          "expected_path_recall": 1.0,
+          "changed_path_evidence_recall": null,
+          "cited_paths": [
+            "crates/cli/src/agents.rs"
+          ]
+        },
+        {
+          "id": "route-cli-08-r1-always",
+          "task_id": "route-cli-08",
+          "citation_count": 3,
+          "valid_citation_rate": 1,
+          "expected_path_recall": 1.0,
+          "changed_path_evidence_recall": null,
+          "cited_paths": [
+            "crates/cli/src/agents.rs"
+          ]
+        },
+        {
+          "id": "route-cli-08-r2-always",
+          "task_id": "route-cli-08",
+          "citation_count": 3,
+          "valid_citation_rate": 1,
+          "expected_path_recall": 1.0,
+          "changed_path_evidence_recall": null,
+          "cited_paths": [
+            "crates/cli/src/agents.rs"
+          ]
+        },
+        {
+          "id": "route-runtime-03-r0-always",
+          "task_id": "route-runtime-03",
+          "citation_count": 5,
+          "valid_citation_rate": 1,
+          "expected_path_recall": 0.5,
+          "changed_path_evidence_recall": 0.6,
+          "cited_paths": [
+            "crates/cli/src/subscription.rs",
+            "crates/core/src/engine.rs",
+            "crates/repo-tools/src/exec.rs"
+          ]
+        },
+        {
+          "id": "route-runtime-03-r1-always",
+          "task_id": "route-runtime-03",
+          "citation_count": 4,
+          "valid_citation_rate": 1,
+          "expected_path_recall": 1.0,
+          "changed_path_evidence_recall": 0.75,
+          "cited_paths": [
+            "crates/core/src/engine.rs",
+            "crates/repo-tools/src/exec.rs",
+            "crates/repo-tools/src/grep.rs",
+            "crates/repo-tools/src/types.rs"
+          ]
+        },
+        {
+          "id": "route-runtime-03-r2-always",
+          "task_id": "route-runtime-03",
+          "citation_count": 5,
+          "valid_citation_rate": 1,
+          "expected_path_recall": 0.75,
+          "changed_path_evidence_recall": 1.0,
+          "cited_paths": [
+            "crates/cli/src/subscription.rs",
+            "crates/core/src/engine.rs",
+            "crates/repo-tools/src/exec.rs",
+            "crates/repo-tools/src/grep.rs",
+            "crates/repo-tools/src/lib.rs"
+          ]
+        }
+      ]
+    },
+    "blind_grades": [
+      {
+        "arm": "always",
+        "task_id": "route-cli-08",
+        "repeat": 0,
+        "id": "route-cli-08-r0-always",
+        "case_id": "case-01",
+        "score": 4,
+        "covered": [
+          "valid-block prefix preservation",
+          "valid-block suffix preservation",
+          "missing-closing-marker append fallback",
+          "trailing-whitespace trimming and orphan-marker retention"
+        ],
+        "missing_or_incorrect": [],
+        "rationale": "The answer matches the implementation exactly for both valid markers and a missing closing marker, and it accurately limits the existing test's coverage."
+      },
+      {
+        "arm": "always",
+        "task_id": "route-runtime-03",
+        "repeat": 1,
+        "id": "route-runtime-03-r1-always",
+        "case_id": "case-02",
+        "score": 2,
+        "covered": [
+          "absolute scout deadline propagated to model and tool work",
+          "completed batch results retained in input order",
+          "cancelled and queued calls receive failed results with measured durations",
+          "direct ripgrep child uses kill-on-drop",
+          "batch and direct-child cancellation regressions"
+        ],
+        "missing_or_incorrect": [
+          "completed sibling payloads are not retained in the returned ScoutResult, only their count is summarized",
+          "provider subprocess descendants are not killed when the owning future is cancelled; kill-on-drop covers only the direct child",
+          "interrupted model calls are counted as completed turns and queued synthetic failures inflate tool-call statistics"
+        ],
+        "rationale": "The batch cancellation machinery is useful, but observable result retention and full subprocess-tree cleanup are required stages and remain incomplete."
+      },
+      {
+        "arm": "current",
+        "task_id": "route-runtime-03",
+        "repeat": 2,
+        "id": "route-runtime-03-r2-current",
+        "case_id": "case-03",
+        "score": 2,
+        "covered": [
+          "absolute deadline enforcement for model and tool calls",
+          "boundary-ready sibling draining and ordered retention inside the batch",
+          "unstarted calls excluded from execution statistics",
+          "failed cancellation results with run durations",
+          "cooperative Glob cancellation and direct ripgrep kill-on-drop",
+          "batch race and metadata regressions"
+        ],
+        "missing_or_incorrect": [
+          "completed sibling payloads disappear when the engine returns its empty timeout result",
+          "provider subprocess descendants are not cleaned up on cancellation",
+          "no regression proves subprocess or subprocess-tree termination"
+        ],
+        "rationale": "This is a careful batch implementation, but it misses the required end-to-end retention and process-tree cleanup stages."
+      },
+      {
+        "arm": "always",
+        "task_id": "route-cli-08",
+        "repeat": 2,
+        "id": "route-cli-08-r2-always",
+        "case_id": "case-04",
+        "score": 4,
+        "covered": [
+          "valid-block prefix preservation",
+          "valid-block suffix preservation",
+          "missing-closing-marker append fallback",
+          "trailing-whitespace trimming and malformed-block retention"
+        ],
+        "missing_or_incorrect": [],
+        "rationale": "The explanation is correct and explicitly distinguishes exact replacement from the malformed-block append fallback."
+      },
+      {
+        "arm": "always",
+        "task_id": "route-cli-08",
+        "repeat": 1,
+        "id": "route-cli-08-r1-always",
+        "case_id": "case-05",
+        "score": 4,
+        "covered": [
+          "valid-block prefix preservation",
+          "valid-block suffix preservation",
+          "missing-closing-marker append fallback",
+          "trailing-whitespace trimming and orphan-marker retention"
+        ],
+        "missing_or_incorrect": [],
+        "rationale": "Every requested behavior is stated accurately, including the possibility of two opening markers after fallback."
+      },
+      {
+        "arm": "current",
+        "task_id": "route-cli-08",
+        "repeat": 1,
+        "id": "route-cli-08-r1-current",
+        "case_id": "case-06",
+        "score": 4,
+        "covered": [
+          "valid-block prefix preservation",
+          "valid-block suffix preservation",
+          "missing-closing-marker append fallback",
+          "trailing-whitespace trimming and orphan-marker retention"
+        ],
+        "missing_or_incorrect": [],
+        "rationale": "The answer correctly covers exact surrounding-text preservation and the malformed-block fallback without overclaiming removal."
+      },
+      {
+        "arm": "current",
+        "task_id": "route-cli-08",
+        "repeat": 0,
+        "id": "route-cli-08-r0-current",
+        "case_id": "case-07",
+        "score": 4,
+        "covered": [
+          "valid-block prefix preservation",
+          "valid-block suffix preservation including whitespace",
+          "missing-closing-marker append fallback",
+          "trim_end behavior and unmatched opening-marker retention"
+        ],
+        "missing_or_incorrect": [],
+        "rationale": "The answer is concise and fully matches both branches of replace_managed_block."
+      },
+      {
+        "arm": "current",
+        "task_id": "route-cli-08",
+        "repeat": 2,
+        "id": "route-cli-08-r2-current",
+        "case_id": "case-08",
+        "score": 4,
+        "covered": [
+          "valid-block prefix preservation",
+          "valid-block suffix preservation",
+          "missing-closing-marker append fallback",
+          "trailing-whitespace trimming and orphan-marker retention"
+        ],
+        "missing_or_incorrect": [],
+        "rationale": "The valid and malformed marker cases are both described correctly and completely."
+      },
+      {
+        "arm": "always",
+        "task_id": "route-runtime-03",
+        "repeat": 0,
+        "id": "route-runtime-03-r0-always",
+        "case_id": "case-09",
+        "score": 4,
+        "covered": [
+          "one absolute deadline across model and repository work",
+          "ordered retention of completed sibling payloads in raw_final",
+          "failed cancellation results with measured in-flight and zero queued durations",
+          "direct ripgrep cleanup",
+          "provider process-group cleanup when the owning future is dropped or times out",
+          "scout progress and elapsed-duration metadata",
+          "regressions for partial completion, model timeout, future cancellation, and descendant-process termination"
+        ],
+        "missing_or_incorrect": [],
+        "rationale": "This is the only runtime patch that closes the full path: batch cancellation, observable partial results, direct search cleanup, and descendant process-tree cleanup, with tests for the risky behavior."
+      },
+      {
+        "arm": "current",
+        "task_id": "route-runtime-03",
+        "repeat": 0,
+        "id": "route-runtime-03-r0-current",
+        "case_id": "case-10",
+        "score": 2,
+        "covered": [
+          "absolute deadline propagated through model and repository calls",
+          "ordered completed sibling retention inside the batch",
+          "cancelled calls marked failed with measured durations",
+          "direct ripgrep kill-on-drop and termination regression",
+          "scout progress accounting regression"
+        ],
+        "missing_or_incorrect": [
+          "subsecond scout timeouts are reported as 0s because timeout_result uses as_secs",
+          "queued calls are admitted after the shared deadline instead of being rejected before execution",
+          "completed sibling payloads are discarded by the engine timeout result",
+          "provider subprocess descendants are not cleaned up on cancellation"
+        ],
+        "rationale": "Core cancellation works, but metadata is observably wrong for subsecond deadlines and two required end-to-end stages are missing."
+      },
+      {
+        "arm": "always",
+        "task_id": "route-runtime-03",
+        "repeat": 2,
+        "id": "route-runtime-03-r2-always",
+        "case_id": "case-11",
+        "score": 2,
+        "covered": [
+          "deadline-aware model and batch cancellation",
+          "ordered boundary-ready result retention inside the batch",
+          "failed cancellation results with measured durations",
+          "completed turn and tool statistics preserved",
+          "direct ripgrep kill-on-drop",
+          "batch ordering and timeout-stat regressions"
+        ],
+        "missing_or_incorrect": [
+          "completed sibling payloads are reduced to counts and are not retained in the returned ScoutResult",
+          "provider subprocess descendants are not killed on cancellation",
+          "the subprocess cleanup change has no termination regression"
+        ],
+        "rationale": "The executor handles deadline races well, but required observable retention and subprocess-tree cleanup are still absent."
+      },
+      {
+        "arm": "current",
+        "task_id": "route-runtime-03",
+        "repeat": 1,
+        "id": "route-runtime-03-r1-current",
+        "case_id": "case-12",
+        "score": 2,
+        "covered": [
+          "shared deadline across model and repository batches",
+          "ordered boundary-ready result retention inside the executor",
+          "in-flight and queued failure metadata with measured or zero durations",
+          "queued work prevented from starting after expiry",
+          "direct ripgrep termination on cancellation",
+          "regressions for races, queued work, per-tool metadata, and direct-child cleanup"
+        ],
+        "missing_or_incorrect": [
+          "the engine discards completed sibling payloads when it returns empty_result at the deadline",
+          "provider subprocess descendants are not killed when the provider future is dropped",
+          "an interrupted model request is counted as a completed turn"
+        ],
+        "rationale": "The executor and tests are strong, but the patch still misses end-to-end result retention and full subprocess-tree cleanup, both required for a top score."
+      }
+    ]
+  },
+  "fast_mode": {
+    "status": "completed",
+    "arms": {
+      "default": {
+        "mean_quality": 3.6666666666666665,
+        "perfect": 6,
+        "scores": [
+          4,
+          4,
+          4,
+          4,
+          3,
+          3,
+          4,
+          4,
+          3
+        ],
+        "median_wall_seconds": 63.825,
+        "mean_valid_citation_rate": 1.0,
+        "mean_expected_path_recall": 0.75,
+        "billing": {
+          "requests": 76,
+          "cost_usd": 0.16279648,
+          "input_tokens": 1880138,
+          "cached_input_tokens": 1383424,
+          "output_tokens": 29821,
+          "reasoning_tokens": 12707,
+          "mean_request_latency_ms": 8523.276315789473,
+          "mean_first_token_ms": 4421.1973684210525
+        },
+        "token_totals": {
+          "prompt_tokens": 353888,
+          "cached_prompt_tokens": 318208,
+          "completion_tokens": 12212,
+          "reasoning_output_tokens": 6834
+        }
+      },
+      "fast": {
+        "mean_quality": 3.5555555555555554,
+        "perfect": 5,
+        "scores": [
+          4,
+          3,
+          3,
+          3,
+          4,
+          4,
+          4,
+          3,
+          4
+        ],
+        "median_wall_seconds": 51.693,
+        "mean_valid_citation_rate": 1.0,
+        "mean_expected_path_recall": 0.7777777777777778,
+        "billing": {
+          "requests": 76,
+          "cost_usd": 0.14232576,
+          "input_tokens": 1657842,
+          "cached_input_tokens": 1228288,
+          "output_tokens": 26541,
+          "reasoning_tokens": 11024,
+          "mean_request_latency_ms": 6405.8421052631575,
+          "mean_first_token_ms": 3853.089552238806
+        },
+        "token_totals": {
+          "prompt_tokens": 330221,
+          "cached_prompt_tokens": 292608,
+          "completion_tokens": 13700,
+          "reasoning_output_tokens": 8155
+        }
+      }
+    },
+    "paired_wall_delta_percent": -19.00822561692128,
+    "decision": "retain fast/priority if quality gate passes; measured paired task quality and billing below"
+  },
+  "limitations": [
+    "Focused Sol routing arms used a bounded app-server dynamic-tool harness; complete-task trials used the real repotracer MCP path.",
+    "The complete-task comparison covers two repository tasks and three repeats per arm; it is enough to reject unsafe mechanisms, not to claim general routing superiority.",
+    "Concurrent Scout runs prevent defensible per-trial provider-log attribution. The always-Scout arm aggregate uses the exact union of Luna billing windows; parent billing remains trial-attributed.",
+    "All runtime patches passed targeted existing and model-added tests, but no independent hidden behavioral fixture was available for this synthetic task; arm-blind patch review is the quality authority.",
+    "Always-Scout was forced by managed instructions only as an upper bound and is not the requested implementation mechanism."
+  ],
+  "artifacts": {
+    "protocol": "protocol.json",
+    "private_raw": "private/",
+    "report": "routing-decision.html"
+  }
+}

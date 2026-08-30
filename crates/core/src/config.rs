@@ -54,11 +54,14 @@ pub struct ModelSettings {
     pub model: String,
     #[serde(default = "default_reasoning_effort")]
     pub reasoning_effort: String,
+    /// Codex service tier. `fast` is accepted as an alias for `priority` by the subscription backend.
+    #[serde(default = "default_service_tier")]
+    pub service_tier: String,
     #[serde(default = "default_base_url")]
     pub base_url: String,
     #[serde(default)]
     pub api_key: Option<String>,
-    /// Whole model/scout timeout in milliseconds. Zero disables it.
+    /// Model request timeout in milliseconds. Subscription CLIs use it as a stream inactivity timeout. Zero disables it.
     #[serde(default)]
     pub timeout_ms: u64,
     #[serde(default)]
@@ -82,6 +85,9 @@ fn default_model() -> String {
 fn default_reasoning_effort() -> String {
     "medium".into()
 }
+fn default_service_tier() -> String {
+    "fast".into()
+}
 fn default_base_url() -> String {
     "https://api.openai.com/v1".into()
 }
@@ -93,6 +99,7 @@ impl Default for ModelSettings {
             executable: None,
             model: default_model(),
             reasoning_effort: default_reasoning_effort(),
+            service_tier: default_service_tier(),
             base_url: default_base_url(),
             api_key: None,
             timeout_ms: 0,
@@ -175,6 +182,7 @@ mod tests {
     fn whole_run_timeouts_are_opt_in() {
         let config = RepoTracerConfig::default();
         assert_eq!(config.model.timeout_ms, 0);
+        assert_eq!(config.model.service_tier, "fast");
         assert_eq!(config.explorer.total_timeout(), None);
     }
 }

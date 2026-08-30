@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-30-final-evaluation",
+  "status": "preregistered",
+  "objective": "Make the production go/no-go decision for RepoTracer Scout using functional public-task outcomes, representative multi-round work, routing behavior, citations, timeout reliability, complete cost, and wall time.",
+  "source_head": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+  "selected_system": {
+    "parent_model": "gpt-5.6-sol",
+    "parent_reasoning_effort": "high",
+    "parent_service_tier": "default",
+    "scout_model": "gpt-5.6-luna",
+    "scout_reasoning_effort": "medium",
+    "scout_service_tier": "default",
+    "scout_idle_timeout_ms": 180000,
+    "scout_total_timeout_seconds": 0,
+    "selection_basis": "The 48-trial tier pilot requested priority for the fast arm, but all 155 successful non-guardian Luna requests reported actual_service_tier=default. The service-tier exposure was not established, so the preregistered tie rule keeps default."
+  },
+  "formal_lane": {
+    "corpus": "DeepSWE public task and hidden-verifier artifacts from deep-swe-1-1",
+    "selection": "Thirty unique tasks from thirty unique repositories, sampled before model execution with seed 20260830 and language quotas TypeScript 9, Python 9, Go 9, Rust 2, JavaScript 1.",
+    "selection_path": "private/formal-selection.json",
+    "selection_sha256": "b3072aa9f4d2f7e00670f2a06bcae6cd61157ef0dd2adf9eb183bd05f8eaca43",
+    "excluded_prior_tasks": [
+      "boa-hierarchical-evaluation-cancellation",
+      "claude-code-by-agents-recursive-delegation"
+    ],
+    "arms": {
+      "baseline": "Parent Codex only.",
+      "repotracer": "Same parent with RepoTracer MCP and the current production routing policy."
+    },
+    "repeats_per_task_arm": 3,
+    "trials": 180,
+    "randomization_seed": 20260845,
+    "concurrency": 8,
+    "outer_trial_timeout_seconds": 10800,
+    "sandbox": "workspace-write plus the trial .git directory",
+    "verifier": "Pinned task Dockerfile and test.sh, linux/amd64, no network, two CPUs, 8 GiB, 1800-second cap. The agent never sees verifier files.",
+    "primary_outcome": "Hidden-verifier reward and pass rate.",
+    "secondary_outcomes": [
+      "paired task-level pass wins and losses",
+      "parent and complete cost",
+      "wall time",
+      "timeouts and nonzero exits",
+      "Scout call position and count",
+      "Scout citation validity"
+    ]
+  },
+  "mah_swe_lane": {
+    "task": "mah-swe-subscription-idle-timeout",
+    "task_path": "benchmarks/tasks/mah-swe-subscription-idle-timeout.json",
+    "base_commit": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+    "rounds": 2,
+    "repeats_per_arm": 3,
+    "trials": 6,
+    "randomization_seed": 20260846,
+    "concurrency": 3,
+    "session_policy": "Round two resumes the exact round-one Codex thread and working tree.",
+    "required_checks": [
+      "cargo test -p repotracer activity_extends_idle_deadline_and_silence_kills_tree -- --nocapture",
+      "cargo test -p repotracer subscription"
+    ],
+    "manual_review": "Inspect every final patch, both final answers, both trajectories, test logs, Scout calls, and citations. Score requirements and maintainability 0-4 after functional checks."
+  },
+  "billing": {
+    "parent": "Exact codex-lb request-log totals for each parent conversation.",
+    "scout": "Per-call uncached input at $0.20/M, cached input at $0.02/M, and output including reasoning at $1.20/M from returned Scout usage.",
+    "complete": "Parent cost plus every Scout-call estimate.",
+    "warning": "Never call parent-only cost complete. Report guardian, failed, and zero-output request rows where present."
+  },
+  "decision_gates": {
+    "quality": "Candidate verified pass rate may be at most 5 percentage points below baseline, with paired pass wins not fewer than paired pass losses.",
+    "economics": "Candidate median complete cost must not exceed baseline median complete cost.",
+    "latency": "Candidate median wall time may be at most 20% slower than baseline.",
+    "reliability": "Candidate may not add more than two model timeouts or nonzero exits across 90 formal trials, and all MAH-SWE required checks must pass in at least as many candidate as baseline repeats.",
+    "citations": "Every citation returned by successful Scout calls must name an existing source file and valid line range.",
+    "representative_work": "Candidate MAH-SWE manual score may be at most 0.25/4 below baseline and may not introduce a repeated requirement-boundary failure.",
+    "go": "Ship RepoTracer only if every floor passes. Otherwise retain the parent-only baseline and name the failed gate."
+  },
+  "failure_policy": {
+    "infrastructure": "A source, Docker, billing-store, or subscription infrastructure failure invalidates and reruns the complete matched pair.",
+    "model": "Timeout, nonzero exit, malformed output, bad patch, missing citation, or verifier failure remains a scored outcome.",
+    "retention": "Keep every losing, failed, and invalidated attempt in ignored private artifacts. Never rewrite a completed valid trial."
+  },
+  "binary_sha256": "06601b0e6e88c8f611f65fccfc313f8bf29bd2aa8c2edb64b379ab7a108cf8ba"
+}

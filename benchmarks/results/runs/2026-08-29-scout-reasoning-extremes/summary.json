@@ -1,0 +1,126 @@
+{
+  "study_id": "2026-08-29-scout-reasoning-extremes",
+  "status": "completed",
+  "scope": "six task-repeat cases where Luna low previously scored below 4; Scout only, no Sol",
+  "arms": {
+    "low": {
+      "scores": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "mean_quality": 3,
+      "perfect": 0,
+      "median_wall_seconds": 38.489000000000004,
+      "valid_citation_rate": 1.0,
+      "mean_expected_path_recall": 0.9166666666666666,
+      "tokens": {
+        "prompt_tokens": 182507,
+        "cached_prompt_tokens": 163328,
+        "completion_tokens": 4673,
+        "reasoning_output_tokens": 250
+      },
+      "median_tool_calls": 5.0
+    },
+    "medium": {
+      "scores": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "mean_quality": 4,
+      "perfect": 6,
+      "median_wall_seconds": 63.251,
+      "valid_citation_rate": 1.0,
+      "mean_expected_path_recall": 0.8333333333333334,
+      "tokens": {
+        "prompt_tokens": 236903,
+        "cached_prompt_tokens": 184832,
+        "completion_tokens": 8022,
+        "reasoning_output_tokens": 4783
+      },
+      "median_tool_calls": 7.0
+    },
+    "high": {
+      "scores": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "mean_quality": 4,
+      "perfect": 6,
+      "median_wall_seconds": 141.11399999999998,
+      "valid_citation_rate": 1.0,
+      "mean_expected_path_recall": 0.8333333333333334,
+      "tokens": {
+        "prompt_tokens": 223883,
+        "cached_prompt_tokens": 202240,
+        "completion_tokens": 24307,
+        "reasoning_output_tokens": 20789
+      },
+      "median_tool_calls": 9.0
+    },
+    "xhigh": {
+      "scores": [
+        4,
+        3,
+        4,
+        4,
+        3,
+        3
+      ],
+      "mean_quality": 3.5,
+      "perfect": 3,
+      "median_wall_seconds": 257.10900000000004,
+      "valid_citation_rate": 1.0,
+      "mean_expected_path_recall": 0.8333333333333334,
+      "tokens": {
+        "prompt_tokens": 284832,
+        "cached_prompt_tokens": 237056,
+        "completion_tokens": 41888,
+        "reasoning_output_tokens": 39281
+      },
+      "median_tool_calls": 11.5
+    },
+    "max": {
+      "scores": [
+        4,
+        2,
+        4,
+        3,
+        4,
+        4
+      ],
+      "mean_quality": 3.5,
+      "perfect": 4,
+      "median_wall_seconds": 406.4625,
+      "valid_citation_rate": 1.0,
+      "mean_expected_path_recall": 0.7777777777777778,
+      "tokens": {
+        "prompt_tokens": 271711,
+        "cached_prompt_tokens": 222720,
+        "completion_tokens": 76153,
+        "reasoning_output_tokens": 73556
+      },
+      "median_tool_calls": 14.5
+    }
+  },
+  "decision": {
+    "selected": "medium",
+    "xhigh_or_max": false,
+    "reason": "On the targeted failures, medium and high were already 6/6 perfect. Xhigh and max both averaged 3.5/4; xhigh had three perfect answers and max four. Max introduced one score-2 omission. Both were much slower and used more reasoning output than medium/high."
+  },
+  "limitations": [
+    "Targeted post-hoc failure set, not an independent quality estimate.",
+    "One blind reviewer; arm identity hidden until all 12 outputs were scored."
+  ]
+}

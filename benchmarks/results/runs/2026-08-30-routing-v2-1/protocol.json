@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-30-routing-v2-1",
+  "status": "completed-retained",
+  "objective": "Verify that ownership-first routing with contrasting examples preserves all seven Scout discovery categories without making pathless localized work call Scout.",
+  "source_head": "603b196d444969dbdaabbbe2852cebe0cc8136de",
+  "selected_system": {
+    "parent_model": "gpt-5.6-sol",
+    "parent_reasoning_effort": "high",
+    "parent_service_tier": "default",
+    "scout_model": "gpt-5.6-luna",
+    "scout_reasoning_effort": "medium",
+    "scout_service_tier": "fast",
+    "scout_idle_timeout_ms": 180000,
+    "scout_total_timeout_seconds": 0
+  },
+  "change": "Classify the ownership surface explicitly requested by the user before search planning. Localized work remains local when source and test paths are unknown. Exhaustive relationships, inventories, and cross-owner propagation call Scout first. Contrasting local and Scout examples anchor both boundaries.",
+  "lanes": {
+    "boundary_pilot": {
+      "tasks": ["pathless localized command", "cross-behavior test and fixture inventory"],
+      "repeats": 3,
+      "trials": 6,
+      "gate": "3/3 local and 3/3 Scout"
+    },
+    "candidate_recheck": {
+      "tasks": 14,
+      "repeats": 3,
+      "trials": 42,
+      "gate": "21/21 broad Scout routes and 21/21 local routes"
+    },
+    "paired_holdouts": {
+      "tasks": 8,
+      "repeats": 3,
+      "trials": 48,
+      "arms": ["source-head routing", "routing v2.1"],
+      "local_holdouts": ["pathless command", "pathless symbol", "pathless localized config behavior", "pathless schema behavior"],
+      "broad_holdouts": ["caller and API inventory", "cross-behavior test inventory", "cross-owner propagation", "implementation-owner comparison"],
+      "gate": "12/12 broad and 12/12 local per arm"
+    },
+    "complete_task": {
+      "task": "mah-swe-subscription-idle-timeout",
+      "rounds": 2,
+      "repeats_per_arm": 1,
+      "trials": 2,
+      "required_checks": [
+        "cargo test -p repotracer activity_extends_idle_deadline_and_silence_kills_tree -- --nocapture",
+        "cargo test -p repotracer subscription"
+      ],
+      "limitation": "One complete-task pair is a verifier-backed regression check, not an effect-size estimate."
+    }
+  },
+  "billing": {
+    "parent": "Exact codex-lb request-log totals for each parent conversation.",
+    "scout": "Per-call usage returned by RepoTracer and the production Luna subscription price schedule.",
+    "complete": "Parent cost plus every Scout call."
+  },
+  "failure_policy": {
+    "invalidated_pilot": "The first pilot wrapper reused prior rows because it changed a copied runpy dictionary. No v2.1 model call occurred; the corrected pilot used isolated function globals.",
+    "disk_exhaustion": "One holdout pair and one incomplete local trial were invalidated when retained Codex homes filled the disk. Raw homes were compressed without credentials, completed repository clones were removed, and the complete affected pair reran.",
+    "retention": "Raw trajectories, results, prompts, stderr, configs, and compressed Codex sessions remain ignored under the original routing-v2 private directory."
+  },
+  "decision_gates": {
+    "routing": "All candidate recheck and holdout route labels must pass.",
+    "citations": "Every returned citation must resolve to an existing source range.",
+    "reliability": "No candidate timeout; inactivity behavior verifiers must pass.",
+    "quality": "Candidate complete-task verifier outcome may not regress.",
+    "decision": "Retain v2.1 only if every gate passes."
+  },
+  "raw_artifacts": "../2026-08-30-routing-v2/private/"
+}

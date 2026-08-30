@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-28-scout-reasoning",
+  "status": "preregistered",
+  "objective": "Select the Luna reasoning effort that preserves the retained adaptive Scout's repository-answer quality while minimizing complete Scout wall time; record subscription usage as a secondary diagnostic.",
+  "priority": [
+    "manual_quality",
+    "wall_time",
+    "complete_subscription_usage"
+  ],
+  "scope": {
+    "component": "complete Scout request only",
+    "not_measured": [
+      "Sol parent routing",
+      "parent use of Scout evidence",
+      "complete coding-task cost",
+      "provider USD"
+    ],
+    "reasoning_note": "The prior low/medium/high sweep measured whether reasoning rescued the rejected CodeGraph adapter. It is not evidence for the final native-tool Scout reasoning level. The user reports Luna cost is negligible for the product objective, so this diagnostic ranks quality first and wall time second; usage remains recorded but does not override those priorities."
+  },
+  "execution": {
+    "provider": "Codex subscription through codex app-server",
+    "scout_model": "gpt-5.6-luna",
+    "reasoning_arms": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "tools": [
+      "Read",
+      "Glob",
+      "Grep"
+    ],
+    "prompt_policy": "Byte-identical retained adaptive evidence-stop prompt in every arm.",
+    "source_snapshot": "Preserved repository snapshot used by the corrected Scout behavior matrix.",
+    "source_subscription_sha256": "6d3fdf21b90030ac4f56b556ccb8c3be2970ccade4f6e5667360e14bef973448",
+    "binary_sha256": "df494aae309b56ca5dffd4ec047669bea709bf564d19df4efa1ee8498f47d2b1",
+    "tasks": 8,
+    "repeats": 3,
+    "planned_trials": 72,
+    "concurrency": 4,
+    "randomization_seed": 20260835,
+    "raw_artifacts": "private/"
+  },
+  "controls": [
+    "Same Luna model snapshot and subscription path.",
+    "Same adaptive prompt, native tools, output schema, citation cap, and inactivity timeout.",
+    "Same task text, repository snapshot, repeats, concurrency, and blind grading rubric.",
+    "Only model_reasoning_effort changes between arms."
+  ],
+  "quality": {
+    "manual_scale": "Blind 0-4 score: 0 wrong/no evidence; 1 relevant fragment; 2 core flow partial; 3 complete essential flow; 4 complete accurate flow including material limits and fallbacks.",
+    "secondary_metrics": [
+      "valid_citation_rate",
+      "expected_path_recall",
+      "score_distribution",
+      "task-level regressions"
+    ]
+  },
+  "usage": [
+    "prompt_tokens",
+    "cached_prompt_tokens",
+    "uncached_prompt_tokens",
+    "completion_tokens",
+    "reasoning_output_tokens",
+    "repository_tool_calls"
+  ],
+  "time": [
+    "complete_scout_wall_seconds"
+  ],
+  "decision_rule": {
+    "quality_gate": "An arm fails if it introduces a score below 2 or its mean manual quality is more than 0.25 points below the best arm. Inspect every task-level regression before selection.",
+    "selection": "Among quality-passing arms, select the fastest reasoning effort unless a slower arm produces a measured quality gain large enough to justify the delay. Subscription usage is reported but Luna's negligible cost makes it a secondary diagnostic.",
+    "threshold_status": "Approved by the user for this diagnostic: a 0.25-point allowance is one quarter of one rubric grade, or 6.25% of the four-point scale.",
+    "release_limit": "The selected arm remains provisional until complete Sol-to-Scout workflows pass MAH-SWE and public task checks."
+  },
+  "exploratory_hypothesis": {
+    "claim": "Different task shapes may prefer different reasoning levels, such as low for exact lookups and higher effort for cross-file lifecycle tracing.",
+    "analysis": "Report task-by-reasoning interactions and repeat consistency after the preregistered global comparison.",
+    "guardrail": "Do not choose a production task classifier from this same eight-task dataset. A hybrid policy requires a separate preregistered follow-up with held-out tasks so post-hoc patterns cannot masquerade as a routing rule."
+  },
+  "failure_policy": {
+    "provider_or_harness_failure": "Retain the failed trial, diagnose the cause, and rerun the complete matched block rather than silently dropping one arm.",
+    "malformed_output": "Score the produced behavior; do not repair it before blind review.",
+    "credentials": "Use existing subscription authentication only. Never print, copy, retain, or commit credentials."
+  },
+  "sources": [
+    {
+      "url": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+      "use": "Confirms Luna supports low, medium, and high reasoning and targets cost-sensitive workloads."
+    },
+    {
+      "url": "https://learn.chatgpt.com/docs/models#pick-a-reasoning-effort",
+      "use": "Recommends the lowest reasoning effort that produces the required result and measuring familiar tasks at lower settings."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "mcp-scout-request-flow",
+      "group": "graph_suitable",
+      "query": "Trace one repo_scout MCP request from JSON-RPC dispatch through the Scout backend to the structured response. Include cancellation and citation validation boundaries.",
+      "expected_paths": [
+        "crates/mcp/src/lib.rs",
+        "crates/core/src/types.rs",
+        "crates/core/src/citations.rs"
+      ]
+    },
+    {
+      "id": "subscription-app-server-flow",
+      "group": "graph_suitable",
+      "query": "Trace a subscription Scout app-server session from process spawn through dynamic repository tool calls, stream activity tracking, token accounting, and process-tree cleanup.",
+      "expected_paths": [
+        "crates/cli/src/subscription.rs",
+        "crates/repo-tools/src/codegraph.rs"
+      ]
+    },
+    {
+      "id": "direct-tool-dispatch-flow",
+      "group": "graph_suitable",
+      "query": "Trace a direct Scout model tool request through tool schema construction, bounded concurrent execution, returned evidence, and final citation validation.",
+      "expected_paths": [
+        "crates/core/src/engine.rs",
+        "crates/repo-tools/src/lib.rs",
+        "crates/repo-tools/src/exec.rs",
+        "crates/core/src/citations.rs"
+      ]
+    },
+    {
+      "id": "setup-integration-flow",
+      "group": "graph_suitable",
+      "query": "Trace repotracer setup from CLI dispatch through integration selection, generated configuration, dry-run behavior, and uninstall cleanup.",
+      "expected_paths": [
+        "crates/cli/src/main.rs",
+        "crates/cli/src/setup.rs",
+        "crates/cli/src/agents.rs"
+      ]
+    },
+    {
+      "id": "self-update-flow",
+      "group": "graph_suitable",
+      "query": "Trace the self-update lifecycle from the MCP startup check through release selection, checksum verification, binary replacement, and integration refresh.",
+      "expected_paths": [
+        "crates/cli/src/main.rs",
+        "crates/cli/src/selfupdate.rs",
+        "crates/cli/src/agents.rs"
+      ]
+    },
+    {
+      "id": "codegraph-change-impact",
+      "group": "graph_suitable",
+      "query": "Identify every runtime path affected by changing the explorer.codegraph setting, from configuration deserialization through direct and subscription Scout tool exposure.",
+      "expected_paths": [
+        "crates/core/src/config.rs",
+        "crates/cli/src/main.rs",
+        "crates/cli/src/subscription.rs",
+        "crates/repo-tools/src/lib.rs"
+      ]
+    },
+    {
+      "id": "exact-package-version",
+      "group": "negative_control",
+      "query": "Find the exact current workspace and npm package version declarations. Cite only the files that directly declare those values.",
+      "expected_paths": [
+        "Cargo.toml",
+        "packages/npm/package.json"
+      ]
+    },
+    {
+      "id": "exact-install-command",
+      "group": "negative_control",
+      "query": "Find the exact documented one-command installation and dry-run commands. Cite the smallest relevant README locations.",
+      "expected_paths": [
+        "README.md"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,405 @@
+{
+  "status": "completed",
+  "decision": {
+    "selected_scout_reasoning": "medium",
+    "adaptive_high": false,
+    "reason": "High produced one additional pass on recursive delegation but did not rescue two of three repeats on either task; Boa pass counts tied 1/3 with opposite repeat winners. Blind review attributed failed runs to parent execution despite generally strong Scout evidence."
+  },
+  "groups": {
+    "boa-hierarchical-evaluation-cancellation": {
+      "medium": {
+        "trials": 3,
+        "verifier_passes": 1,
+        "mean_f2p": 0.3333333333333333,
+        "mean_p2p": 0.3333333333333333,
+        "timeouts": 0,
+        "nonzero_exits": 0,
+        "scout_call_rate": 1,
+        "median_scout_calls": 1,
+        "median_wall_seconds": 1239.606,
+        "median_solver_cost_usd": 6.414484,
+        "total_solver_cost_usd": 19.1608468,
+        "median_solver_requests": 99,
+        "median_reasoning_tokens": 23152,
+        "median_input_tokens": 6828391,
+        "median_cached_input_tokens": 6354688,
+        "median_output_tokens": 48696,
+        "median_patch_bytes": 40572
+      },
+      "high": {
+        "trials": 3,
+        "verifier_passes": 1,
+        "mean_f2p": 0.3333333333333333,
+        "mean_p2p": 0.3333333333333333,
+        "timeouts": 0,
+        "nonzero_exits": 0,
+        "scout_call_rate": 1,
+        "median_scout_calls": 1,
+        "median_wall_seconds": 1370.856,
+        "median_solver_cost_usd": 8.419196,
+        "total_solver_cost_usd": 25.061549999999997,
+        "median_solver_requests": 135,
+        "median_reasoning_tokens": 22317,
+        "median_input_tokens": 9550366,
+        "median_cached_input_tokens": 9108992,
+        "median_output_tokens": 55261,
+        "median_patch_bytes": 46057
+      }
+    },
+    "claude-code-by-agents-recursive-delegation": {
+      "medium": {
+        "trials": 3,
+        "verifier_passes": 2,
+        "mean_f2p": 0.7619047619047619,
+        "mean_p2p": 1.0,
+        "timeouts": 0,
+        "nonzero_exits": 0,
+        "scout_call_rate": 1,
+        "median_scout_calls": 1,
+        "median_wall_seconds": 657.218,
+        "median_solver_cost_usd": 2.709513,
+        "total_solver_cost_usd": 8.676870000000001,
+        "median_solver_requests": 63,
+        "median_reasoning_tokens": 11166,
+        "median_input_tokens": 2117049,
+        "median_cached_input_tokens": 1927936,
+        "median_output_tokens": 26666,
+        "median_patch_bytes": 25519
+      },
+      "high": {
+        "trials": 3,
+        "verifier_passes": 3,
+        "mean_f2p": 1.0,
+        "mean_p2p": 1.0,
+        "timeouts": 0,
+        "nonzero_exits": 0,
+        "scout_call_rate": 1,
+        "median_scout_calls": 1,
+        "median_wall_seconds": 935.873,
+        "median_solver_cost_usd": 2.096032,
+        "total_solver_cost_usd": 6.842280000000001,
+        "median_solver_requests": 45,
+        "median_reasoning_tokens": 8769,
+        "median_input_tokens": 1642976,
+        "median_cached_input_tokens": 1515264,
+        "median_output_tokens": 23328,
+        "median_patch_bytes": 24743
+      }
+    }
+  },
+  "pairs": [
+    {
+      "task_id": "boa-hierarchical-evaluation-cancellation",
+      "repeat": 0,
+      "medium_reward": 0,
+      "high_reward": 1,
+      "f2p_delta": 1.0,
+      "p2p_delta": 1.0,
+      "wall_delta_seconds": 265.61300000000006,
+      "solver_cost_delta_usd": 3.3034169999999996,
+      "medium_scout_calls": 1,
+      "high_scout_calls": 1
+    },
+    {
+      "task_id": "boa-hierarchical-evaluation-cancellation",
+      "repeat": 1,
+      "medium_reward": 1,
+      "high_reward": 0,
+      "f2p_delta": -1.0,
+      "p2p_delta": -1.0,
+      "wall_delta_seconds": 221.327,
+      "solver_cost_delta_usd": 2.990522199999999,
+      "medium_scout_calls": 1,
+      "high_scout_calls": 1
+    },
+    {
+      "task_id": "boa-hierarchical-evaluation-cancellation",
+      "repeat": 2,
+      "medium_reward": 0,
+      "high_reward": 0,
+      "f2p_delta": 0.0,
+      "p2p_delta": 0.0,
+      "wall_delta_seconds": 13.557000000000016,
+      "solver_cost_delta_usd": -0.3932359999999999,
+      "medium_scout_calls": 1,
+      "high_scout_calls": 1
+    },
+    {
+      "task_id": "claude-code-by-agents-recursive-delegation",
+      "repeat": 0,
+      "medium_reward": 1,
+      "high_reward": 1,
+      "f2p_delta": 0.0,
+      "p2p_delta": 0.0,
+      "wall_delta_seconds": 149.34900000000005,
+      "solver_cost_delta_usd": -1.440185,
+      "medium_scout_calls": 1,
+      "high_scout_calls": 1
+    },
+    {
+      "task_id": "claude-code-by-agents-recursive-delegation",
+      "repeat": 1,
+      "medium_reward": 1,
+      "high_reward": 1,
+      "f2p_delta": 0.0,
+      "p2p_delta": 0.0,
+      "wall_delta_seconds": 443.4860000000001,
+      "solver_cost_delta_usd": 0.21907599999999983,
+      "medium_scout_calls": 1,
+      "high_scout_calls": 1
+    },
+    {
+      "task_id": "claude-code-by-agents-recursive-delegation",
+      "repeat": 2,
+      "medium_reward": 0,
+      "high_reward": 1,
+      "f2p_delta": 0.7142857142857143,
+      "p2p_delta": 0.0,
+      "wall_delta_seconds": 278.6550000000001,
+      "solver_cost_delta_usd": -0.6134809999999997,
+      "medium_scout_calls": 1,
+      "high_scout_calls": 1
+    }
+  ],
+  "blind_review": {
+    "arm_hidden_during_scoring": true,
+    "groups": {
+      "boa-hierarchical-evaluation-cancellation": {
+        "medium": {
+          "mean_quality_score": 1.6666666666666667,
+          "score_counts": {
+            "0": 1,
+            "1": 0,
+            "2": 1,
+            "3": 1,
+            "4": 0
+          },
+          "strong_scout_evidence_use": 3,
+          "mixed_or_scout_attribution": 1
+        },
+        "high": {
+          "mean_quality_score": 2.6666666666666665,
+          "score_counts": {
+            "0": 0,
+            "1": 0,
+            "2": 2,
+            "3": 0,
+            "4": 1
+          },
+          "strong_scout_evidence_use": 0,
+          "mixed_or_scout_attribution": 0
+        }
+      },
+      "claude-code-by-agents-recursive-delegation": {
+        "medium": {
+          "mean_quality_score": 2.6666666666666665,
+          "score_counts": {
+            "0": 0,
+            "1": 0,
+            "2": 1,
+            "3": 2,
+            "4": 0
+          },
+          "strong_scout_evidence_use": 3,
+          "mixed_or_scout_attribution": 2
+        },
+        "high": {
+          "mean_quality_score": 3.6666666666666665,
+          "score_counts": {
+            "0": 0,
+            "1": 0,
+            "2": 0,
+            "3": 1,
+            "4": 2
+          },
+          "strong_scout_evidence_use": 3,
+          "mixed_or_scout_attribution": 3
+        }
+      }
+    },
+    "cases": [
+      {
+        "case_id": "case-01",
+        "quality_score": 0,
+        "functional_reward": 0,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "parent_execution",
+        "note": "The Scout identified the correct Context, VM, module, and job seams, but the broad patch failed all 17 feature and all 7 regression checks, so it is not a valid runnable solution.",
+        "trial_id": "boa-hierarchical-evaluation-cancellation-r2-medium",
+        "task_id": "boa-hierarchical-evaluation-cancellation",
+        "arm": "medium",
+        "repeat": 2
+      },
+      {
+        "case_id": "case-02",
+        "quality_score": 2,
+        "functional_reward": 0,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "parent_execution",
+        "note": "The patch preserves all 31 regression checks but passes only 2 of 7 feature checks; it recursively reinvokes agents but never emits the constructed tool_result on the stream, leaving the delegation protocol materially incomplete despite the Scout's precise handler guidance.",
+        "trial_id": "claude-code-by-agents-recursive-delegation-r2-medium",
+        "task_id": "claude-code-by-agents-recursive-delegation",
+        "arm": "medium",
+        "repeat": 2
+      },
+      {
+        "case_id": "case-03",
+        "quality_score": 4,
+        "functional_reward": 1,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "mixed",
+        "note": "All 7 feature and 31 regression checks pass, and the patch cleanly isolates child sessions and working directories while preserving tool IDs, accumulating output, resuming parents, and covering error and cycle paths.",
+        "trial_id": "claude-code-by-agents-recursive-delegation-r1-high",
+        "task_id": "claude-code-by-agents-recursive-delegation",
+        "arm": "high",
+        "repeat": 1
+      },
+      {
+        "case_id": "case-04",
+        "quality_score": 4,
+        "functional_reward": 1,
+        "scout_evidence_use": "none",
+        "outcome_attribution": "parent_execution",
+        "note": "The Scout timed out without a handoff, yet the parent implementation passes all 17 feature and 7 regression checks and coherently handles lineage, VM unwinding, exact job association, phase checkpoints, and pending module-promise rejection.",
+        "trial_id": "boa-hierarchical-evaluation-cancellation-r0-high",
+        "task_id": "boa-hierarchical-evaluation-cancellation",
+        "arm": "high",
+        "repeat": 0
+      },
+      {
+        "case_id": "case-05",
+        "quality_score": 3,
+        "functional_reward": 1,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "mixed",
+        "note": "All 17 feature and 7 regression checks pass and the patch closely follows the Scout's execution and queue map, but module cancellation has no observer or reject hook for an indefinitely pending top-level await, so that promise can remain pending after external cancellation.",
+        "trial_id": "boa-hierarchical-evaluation-cancellation-r1-medium",
+        "task_id": "boa-hierarchical-evaluation-cancellation",
+        "arm": "medium",
+        "repeat": 1
+      },
+      {
+        "case_id": "case-06",
+        "quality_score": 3,
+        "functional_reward": 1,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "mixed",
+        "note": "All 7 feature and 31 regression checks pass, but delegated runs reuse the root sessionId and prefer the root workingDirectory, which can resume the parent's Claude session and execute a child in the wrong workspace despite the Scout flagging those provider semantics.",
+        "trial_id": "claude-code-by-agents-recursive-delegation-r0-medium",
+        "task_id": "claude-code-by-agents-recursive-delegation",
+        "arm": "medium",
+        "repeat": 0
+      },
+      {
+        "case_id": "case-07",
+        "quality_score": 3,
+        "functional_reward": 1,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "mixed",
+        "note": "All 7 feature and 31 regression checks passed, and the patch implements correlated recursive tool results and edge-case handling; however, delegated runs reuse the parent request session ID, creating a material cross-agent session-contamination risk. The Scout accurately identified the handler, registry, provider-ID, and test surfaces used by the implementation.",
+        "trial_id": "claude-code-by-agents-recursive-delegation-r1-medium",
+        "task_id": "claude-code-by-agents-recursive-delegation",
+        "arm": "medium",
+        "repeat": 1
+      },
+      {
+        "case_id": "case-08",
+        "quality_score": 2,
+        "functional_reward": 0,
+        "scout_evidence_use": "none",
+        "outcome_attribution": "parent_execution",
+        "note": "The patch attempts the complete cancellation surface, but official verification passed 0/17 feature and 0/7 regression checks; compilation never ran, leaving invasive VM frame unwinding, job association, and pending-rejection machinery unproved. Repo Scout timed out without a handoff, so the failed result came from the parent's fallback design and execution.",
+        "trial_id": "boa-hierarchical-evaluation-cancellation-r1-high",
+        "task_id": "boa-hierarchical-evaluation-cancellation",
+        "arm": "high",
+        "repeat": 1
+      },
+      {
+        "case_id": "case-09",
+        "quality_score": 4,
+        "functional_reward": 1,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "mixed",
+        "note": "All 7 feature and 31 regression checks passed; the patch cleanly preserves parent session continuation, starts child sessions independently, accumulates child text, and implements every specified error/cycle case with focused tests. The Scout's handler/provider/session map materially guided the successful implementation.",
+        "trial_id": "claude-code-by-agents-recursive-delegation-r0-high",
+        "task_id": "claude-code-by-agents-recursive-delegation",
+        "arm": "high",
+        "repeat": 0
+      },
+      {
+        "case_id": "case-10",
+        "quality_score": 3,
+        "functional_reward": 1,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "mixed",
+        "note": "All 7 feature and 31 regression checks passed, with broader Anthropic/OpenAI tool-call support and comprehensive recursive tests; however, the runner never updates the parent session from provider responses, so a fresh Claude Code run can be re-invoked without its original tool-use conversation. The Scout directly informed the handler, provider, type, and test changes.",
+        "trial_id": "claude-code-by-agents-recursive-delegation-r2-high",
+        "task_id": "claude-code-by-agents-recursive-delegation",
+        "arm": "high",
+        "repeat": 2
+      },
+      {
+        "case_id": "case-11",
+        "quality_score": 2,
+        "functional_reward": 0,
+        "scout_evidence_use": "none",
+        "outcome_attribution": "parent_execution",
+        "note": "The implementation covers the requested APIs and many behaviors in code, but official verification passed 0/17 feature and 0/7 regression checks and Cargo never reached compilation; the added EngineError variant, observer side channel, and job/VM cancellation flow therefore remain a brittle, unvalidated partial solution. Scout timed out, and the parent proceeded from direct inspection.",
+        "trial_id": "boa-hierarchical-evaluation-cancellation-r2-high",
+        "task_id": "boa-hierarchical-evaluation-cancellation",
+        "arm": "high",
+        "repeat": 2
+      },
+      {
+        "case_id": "case-12",
+        "quality_score": 2,
+        "functional_reward": 0,
+        "scout_evidence_use": "strong",
+        "outcome_attribution": "parent_execution",
+        "note": "Despite broad handling of module loading, promise reactions, VM checkpoints, and every job variant, official verification passed 0/17 feature and 0/7 regression checks, while compilation was blocked; changes such as async-job return-type replacement and cancellation callbacks across promise internals carry major unresolved integration risk. The Scout supplied a strong and relevant cross-component map, but the unsuccessful outcome lies in the unverified parent implementation.",
+        "trial_id": "boa-hierarchical-evaluation-cancellation-r0-medium",
+        "task_id": "boa-hierarchical-evaluation-cancellation",
+        "arm": "medium",
+        "repeat": 0
+      }
+    ]
+  },
+  "economics": {
+    "solver_cost_usd": 59.7415468,
+    "scout": {
+      "source": "codex-lb request logs for Luna inside the parent trial request envelope",
+      "window": {
+        "parent_start": "2026-08-29 19:02:11.244451",
+        "parent_end": "2026-08-29 20:12:24.923967",
+        "query_start": "2026-08-29 18:57:11",
+        "query_end": "2026-08-29 20:17:24"
+      },
+      "by_reasoning_effort": {
+        "high": {
+          "requests": 251,
+          "input_tokens": 15419450,
+          "cached_input_tokens": 14136832,
+          "output_tokens": 161312,
+          "reasoning_tokens": 100714,
+          "cost_usd": 0.73283464
+        },
+        "medium": {
+          "requests": 79,
+          "input_tokens": 2960143,
+          "cached_input_tokens": 2434816,
+          "output_tokens": 27314,
+          "reasoning_tokens": 7272,
+          "cost_usd": 0.18653852
+        }
+      },
+      "assignment_limit": "Concurrent Scout requests can be assigned to reasoning arm, not reliably to one task or trial."
+    },
+    "complete_study_cost_usd": 60.66091996
+  },
+  "limitations": [
+    "Two repositories and three repeats per arm; enough to apply the preregistered gate, not to estimate general pass rates.",
+    "One reviewer per blinded case; case sets used the same rubric but no overlapping inter-rater sample.",
+    "Concurrent Scout requests are assigned to reasoning arm by model effort and benchmark time window, not to an individual task or trial.",
+    "The complete-task solver cost includes every session retained under the isolated trial home; Scout cost comes separately from Luna request logs."
+  ]
+}

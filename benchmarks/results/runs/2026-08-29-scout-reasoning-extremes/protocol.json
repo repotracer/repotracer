@@ -1,0 +1,42 @@
+{
+  "study_id": "2026-08-29-scout-reasoning-extremes",
+  "status": "running",
+  "question": "Do Luna xhigh or max improve Scout evidence on the exact six task-repeat cases where low reasoning previously received a non-perfect blind grade?",
+  "subscription_only": true,
+  "parent_model": null,
+  "scout_model": "gpt-5.6-luna",
+  "arms": ["xhigh", "max"],
+  "source_study": "2026-08-28-scout-reasoning",
+  "source_cases": [
+    "r0-direct-tool-dispatch-flow-low",
+    "r1-direct-tool-dispatch-flow-low",
+    "r0-self-update-flow-low",
+    "r0-setup-integration-flow-low",
+    "r1-setup-integration-flow-low",
+    "r0-subscription-app-server-flow-low"
+  ],
+  "execution": {
+    "binary": "target/debug/repotracer built from the inactivity-timeout candidate",
+    "repository_snapshots": "matching prior repeat snapshots from the high arm; all prior arms used the same source commit",
+    "prompt": "retained adaptive evidence-stop prompt",
+    "tools": ["Read", "Glob", "Grep"],
+    "codegraph": false,
+    "max_turns": 6,
+    "max_tool_calls": 40,
+    "tool_timeout_seconds": 30,
+    "inactivity_timeout_ms": 180000,
+    "temperature": 0.0,
+    "concurrency_per_arm": 3,
+    "arm_execution": "parallel",
+    "auth": "real Codex subscription through codex app-server; credentials not retained"
+  },
+  "quality": {
+    "method": "arm-hidden review against the existing 0-4 rubric, with citation validity and expected-path recall recomputed",
+    "baseline": "the matching low, medium, and high task-repeat outputs from the source study",
+    "decision_rule": "Do not expose xhigh or max as a recommended Scout setting unless blind review finds a material correctness gain over the already-perfect medium/high baseline that justifies added latency and usage."
+  },
+  "limitations": [
+    "Targeted only at six prior low-reasoning defects; this is not a new repository-wide quality estimate.",
+    "No Sol task execution; the result measures Scout evidence, citations, latency, and usage only."
+  ]
+}

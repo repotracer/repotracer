@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f8fbff" />
+  <meta name="description" content="Blind three-arm benchmark of Luna low, medium, and high reasoning for RepoTracer Scout." />
+  <title>RepoTracer Scout reasoning decision</title>
+  <style>
+    @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Regular.otf?v=1776492806") format("opentype"); }
+    @font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 600; font-display: swap; src: url("https://gwern.net/static/font/ssf4/SourceSerif4-Text-BASIC-Semibold.otf?v=1776492806") format("opentype"); }
+    @font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ss3/SourceSans3-BASIC-Regular.otf?v=1747251196") format("opentype"); }
+    @font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 600; font-display: swap; src: url("https://gwern.net/static/font/ss3/SourceSans3-BASIC-Semibold.otf?v=1747251196") format("opentype"); }
+    @font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("https://gwern.net/static/font/ibm-plex-mono/IBMPlexMono-Regular.otf?v=1606177027") format("opentype"); }
+    :root {
+      --paper: #f8fbff; --ink: #17213d; --body: #39415b; --muted: #66708b;
+      --rule: #d5dceb; --rule-dark: #a3aec6; --accent: #5544c4; --soft: #eee9ff;
+      --good: #26705e; --warn: #9a4c28; --sans: "Source Sans 3", Arial, sans-serif;
+      --serif: "Source Serif 4", Georgia, serif; --mono: "IBM Plex Mono", monospace;
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--paper); color: var(--body); font: 18px/1.68 var(--serif); -webkit-font-smoothing: antialiased; }
+    body.dark { --paper:#111827; --ink:#f7f5ff; --body:#d8dbea; --muted:#a6acc2; --rule:#303950; --rule-dark:#55617d; --accent:#9caeff; --soft:#1b2440; --good:#82d7b0; --warn:#f4a77f; color-scheme:dark; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    .skip { position:absolute; left:-999px; top:8px; padding:8px 12px; background:var(--soft); color:var(--ink); }
+    .skip:focus { left:12px; z-index:10; }
+    header { width:min(100% - 40px, 1180px); min-height:54px; margin:auto; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--rule); color:var(--muted); font:12px var(--mono); }
+    header button { border:0; padding:0; background:none; color:inherit; font:inherit; cursor:pointer; }
+    .layout { width:min(100% - 40px, 1180px); margin:auto; display:grid; grid-template-columns:150px minmax(0, 850px); gap:clamp(30px,6vw,90px); }
+    nav { padding-top:86px; }
+    nav div { position:sticky; top:28px; }
+    nav strong { display:block; margin-bottom:14px; color:var(--muted); font:11px var(--mono); text-transform:uppercase; }
+    nav a { display:block; margin:10px 0; padding-left:10px; border-left:1px solid var(--rule); color:var(--muted); font:14px/1.4 var(--sans); text-decoration:none; }
+    nav a:hover { color:var(--ink); border-color:var(--accent); }
+    main { min-width:0; padding:80px 0 100px; }
+    .kicker { margin-bottom:14px; color:var(--accent); font:600 13px var(--sans); text-transform:uppercase; letter-spacing:.04em; }
+    h1 { max-width:780px; margin:0 0 16px; color:var(--ink); font:600 clamp(44px,6vw,76px)/1.02 var(--serif); letter-spacing:-.04em; }
+    .dek { max-width:780px; margin:0 0 24px; font-size:22px; line-height:1.55; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px 22px; padding:12px 0; border-top:1px solid var(--rule-dark); border-bottom:1px solid var(--rule); color:var(--muted); font:12px/1.5 var(--mono); }
+    .meta b { color:var(--ink); font-weight:400; }
+    .decision { margin:38px 0 54px; padding:22px 24px; border-left:4px solid var(--accent); background:var(--soft); }
+    .decision strong { display:block; margin-bottom:7px; color:var(--accent); font:600 12px var(--sans); text-transform:uppercase; letter-spacing:.05em; }
+    .decision p { margin:0; color:var(--ink); font-size:21px; line-height:1.55; }
+    .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:0 0 52px; background:var(--rule); border:1px solid var(--rule); }
+    .metric { padding:20px 16px; background:var(--paper); }
+    .metric b { display:block; color:var(--ink); font:600 28px/1.1 var(--sans); }
+    .metric span { display:block; margin-top:8px; color:var(--muted); font:12px/1.35 var(--mono); }
+    section { scroll-margin-top:24px; margin-top:58px; }
+    h2 { margin:0 0 18px; padding:0 0 12px; border-bottom:1px solid var(--rule-dark); color:var(--ink); font:600 30px/1.2 var(--sans); }
+    h2 small { margin-right:9px; color:var(--accent); font:12px var(--mono); }
+    h3 { margin:28px 0 9px; color:var(--ink); font:600 19px/1.3 var(--sans); }
+    p { margin:0 0 16px; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; min-width:700px; border-collapse:collapse; margin:18px 0 12px; font:16px/1.45 var(--sans); }
+    th { padding:11px 10px; border-top:1px solid var(--ink); border-bottom:1px solid var(--rule-dark); color:var(--muted); font:11px/1.25 var(--mono); text-align:left; text-transform:uppercase; }
+    td { padding:14px 10px; border-bottom:1px solid var(--rule); vertical-align:top; }
+    td:first-child { color:var(--ink); font-weight:600; }
+    tr.selected td { background:var(--soft); }
+    .good { color:var(--good); font-weight:600; }
+    .warn { color:var(--warn); }
+    ul { margin:12px 0 20px; padding-left:22px; }
+    li { margin:8px 0; }
+    .finding { display:grid; grid-template-columns:28px 1fr; gap:10px; padding:14px 0; border-top:1px solid var(--rule); }
+    .finding:last-child { border-bottom:1px solid var(--rule); }
+    .finding > span { color:var(--accent); font:11px var(--mono); }
+    .finding b { color:var(--ink); font-family:var(--sans); }
+    code { padding:2px 5px; border-radius:3px; background:var(--soft); color:var(--ink); font:14px var(--mono); }
+    .note { color:var(--muted); font-size:15px; }
+    footer { margin-top:58px; padding-top:14px; border-top:1px solid var(--rule-dark); color:var(--muted); font:12px/1.6 var(--mono); }
+    @media (max-width:800px) { .layout{display:block}.layout nav{padding-top:24px}.layout nav div{position:static;display:flex;flex-wrap:wrap;gap:8px 16px}.layout nav strong{width:100%;margin:0}.layout nav a{margin:0;padding:0;border:0}main{padding-top:46px}.metrics{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:500px) { body{font-size:17px}.metrics{grid-template-columns:1fr}.dek{font-size:19px} }
+    @media print { header, nav { display:none; } .layout{display:block;width:100%} main{padding:20px 0} body{background:#fff;color:#222} section{break-inside:avoid} }
+    @media (prefers-reduced-motion:reduce) { html{scroll-behavior:auto} }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#report">skip to report</a>
+  <header><span>RepoTracer / benchmark decision</span><button id="theme" type="button">dark mode</button></header>
+  <div class="layout">
+    <nav aria-label="Report contents"><div><strong>Contents</strong><a href="#decision">Decision</a><a href="#comparison">Comparison</a><a href="#quality">Quality</a><a href="#interaction">Task interaction</a><a href="#limits">Limits</a><a href="#artifacts">Artifacts</a></div></nav>
+    <main id="report">
+      <div class="kicker">Scout reasoning / final native-tool study</div>
+      <h1>Use medium reasoning.</h1>
+      <p class="dek">Low was faster but brittle on cross-file explanations. High matched medium’s quality at more than twice the median latency. The current default is already right.</p>
+      <div class="meta"><span>model <b>gpt-5.6-luna</b></span><span>path <b>Codex subscription app-server</b></span><span>matrix <b>8 tasks × 3 repeats × 3 arms</b></span><span>completed <b>72/72</b></span><span>confidence <b>moderate</b></span></div>
+
+      <section class="decision" id="decision">
+        <strong>Decision</strong>
+        <p>Retain <b>medium</b> globally. Do not adopt high. Do not route exact lookups to low yet; that pattern came from the evaluation set and needs a separate held-out classifier study.</p>
+      </section>
+
+      <div class="metrics" aria-label="Headline results">
+        <div class="metric"><b>24/24</b><span>medium answers scored 4/4</span></div>
+        <div class="metric"><b>0</b><span>high quality wins over medium</span></div>
+        <div class="metric"><b>58.15s</b><span>medium median Scout wall time</span></div>
+        <div class="metric"><b>$0.064867</b><span>medium equivalent usage cost</span></div>
+      </div>
+
+      <section id="comparison">
+        <h2><small>01</small>Three-arm result</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Reasoning</th><th>Blind quality</th><th>Median wall</th><th>P95 wall</th><th>Reasoning tokens</th><th>Equivalent cost</th><th>Read</th></tr></thead>
+          <tbody>
+            <tr><td>Low</td><td>3.75/4<br><span class="warn">6 minor defects</span></td><td class="good">34.59s</td><td>49.12s</td><td>1,149</td><td class="good">$0.042642</td><td>Fast, not reliable enough</td></tr>
+            <tr class="selected"><td>Medium</td><td class="good">4.00/4<br>24/24 perfect</td><td>58.15s</td><td>72.75s</td><td>11,812</td><td>$0.064867</td><td><b>Retain</b></td></tr>
+            <tr><td>High</td><td class="good">4.00/4<br>24/24 perfect</td><td class="warn">138.65s</td><td>185.78s</td><td>74,793</td><td class="warn">$0.128335</td><td>No quality gain</td></tr>
+          </tbody>
+        </table></div>
+        <p>Medium beat low on six paired grades, tied on 18, and never lost. Its mean-score advantage over low was 0.25 points; the 95% task-cluster bootstrap interval was +0.083 to +0.458. Medium was slower in all 24 pairs, with a median paired penalty of 20.01 seconds.</p>
+        <p>High tied medium on all 24 grades. It took 2.38× the arm-level median wall time, used 6.33× the reasoning-output tokens, and cost 1.98× as much on the benchmark’s equivalent usage rates. It was slower in 21 of 24 pairs; the median paired penalty was 76.22 seconds.</p>
+        <p class="note">Equivalent cost uses the repository benchmark rates: $0.20/M uncached input, $0.02/M cached input, and $1.20/M output including reasoning. It is a usage comparison, not a provider invoice.</p>
+      </section>
+
+      <section id="quality">
+        <h2><small>02</small>Blind quality review</h2>
+        <p>The reviewer saw opaque labels, task text, answer text, and citations. Arm, reasoning effort, repeat, latency, and usage stayed hidden until all 72 scores were written. The rubric ran from 0 to 4; no answer scored below 3.</p>
+        <div class="finding"><span>01</span><div><b>Low truncated two cross-file answers.</b> One direct-tool answer stopped mid-citation. One subscription answer stopped during process-tree cleanup.</div></div>
+        <div class="finding"><span>02</span><div><b>Low produced four weak citation claims.</b> One nonexistent arm-relative path, two setup ranges that did not support the claimed behavior, and one single-line self-update citation presented as the whole lifecycle.</div></div>
+        <div class="finding"><span>03</span><div><b>Medium and high had no manual defects.</b> Both arms scored 4/4 in every repeat. Automated citation validity was 100% in all arms, which shows why syntax-only citation checks cannot replace review of whether a range supports the claim.</div></div>
+      </section>
+
+      <section id="interaction">
+        <h2><small>03</small>Task-specific interaction</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Task class</th><th>Low</th><th>Medium</th><th>High</th><th>Decision</th></tr></thead>
+          <tbody>
+            <tr><td>Exact install/version lookup</td><td class="good">6/6 at 4/4</td><td class="good">6/6 at 4/4</td><td class="good">6/6 at 4/4</td><td>Low is sufficient in this set</td></tr>
+            <tr><td>Cross-file runtime/config flow</td><td class="warn">12/18 at 4/4<br>6/18 at 3/4</td><td class="good">18/18 at 4/4</td><td class="good">18/18 at 4/4</td><td>Medium reaches the quality ceiling</td></tr>
+          </tbody>
+        </table></div>
+        <p>The split is tempting: low for exact lookups, medium for cross-file work. Do not ship it from this study. The same eight tasks revealed and measured the split, so a classifier could simply overfit their wording. Keep medium until a preregistered held-out study proves a stable routing rule.</p>
+      </section>
+
+      <section id="limits">
+        <h2><small>04</small>What could overturn this</h2>
+        <ul>
+          <li><b>One repository.</b> Eight tasks and three repeats make the within-study result stable, not universally general.</li>
+          <li><b>One blind reviewer.</b> The scoring has no inter-rater calibration. The six low-arm deductions are concrete, but the exact size of the quality gap remains reviewer-dependent.</li>
+          <li><b>One provider path.</b> This selects reasoning for Luna through the production Codex subscription app-server, not every Luna host or future model revision.</li>
+          <li><b>Equivalent cost.</b> Usage was complete, but the dollar figures apply benchmark rates rather than an invoice. Cost was secondary by protocol.</li>
+        </ul>
+        <p><b>Confidence: moderate.</b> High is clearly wasteful within this matrix. Medium is the safer production setting than low. Cross-repository and hybrid-routing claims need new data.</p>
+      </section>
+
+      <section id="artifacts">
+        <h2><small>05</small>Method and artifacts</h2>
+        <p>Every arm used the same preserved source snapshot, retained adaptive Scout prompt, model, authentication path, and native Read/Glob/Grep tools. Only <code>reasoning_effort</code> changed. Runs were randomized and executed with four workers.</p>
+        <ul>
+          <li>Machine summary: <a href="runs/2026-08-28-scout-reasoning/summary.json"><code>benchmarks/results/runs/2026-08-28-scout-reasoning/summary.json</code></a></li>
+          <li>Preregistered protocol: <a href="runs/2026-08-28-scout-reasoning/protocol.json"><code>protocol.json</code></a></li>
+          <li>Ignored raw trials: <code>private/main/trials/</code></li>
+          <li>Blind review and locked scores: <code>private/main/blind-review.json</code> and <code>private/main/blind-grades.json</code></li>
+          <li>Unblinded task and arm analysis: <code>private/main/scored-analysis.json</code></li>
+        </ul>
+      </section>
+
+      <footer>RepoTracer Scout reasoning decision · completed 28 Aug 2026 · current code default: medium</footer>
+    </main>
+  </div>
+  <script>
+    (() => {
+      const button = document.getElementById('theme');
+      const meta = document.querySelector('meta[name="theme-color"]');
+      button.addEventListener('click', () => {
+        const dark = document.body.classList.toggle('dark');
+        button.textContent = dark ? 'light mode' : 'dark mode';
+        meta.setAttribute('content', dark ? '#111827' : '#f8fbff');
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "study_id": "2026-08-30-scout-fast-tier",
+  "status": "preregistered",
+  "objective": "Decide whether Luna medium fast/priority service can replace default service for the final RepoTracer evaluation without a material Scout quality loss.",
+  "priority": ["blind_quality", "citation_correctness", "wall_time", "provider_cost"],
+  "execution": {
+    "provider": "real Codex subscription through codex app-server",
+    "model": "gpt-5.6-luna",
+    "reasoning_effort": "medium",
+    "arms": ["default", "fast"],
+    "service_tiers": {"default": "default", "fast": "priority"},
+    "tasks": 8,
+    "repeats_per_arm": 3,
+    "planned_trials": 48,
+    "randomization_seed": 20260844,
+    "concurrency": 4,
+    "idle_timeout_ms": 180000,
+    "total_runtime_cap": null,
+    "native_tools": ["Read", "Glob", "Grep"],
+    "source": "one identical tracked snapshot of the current RepoTracer worktree per repeat and arm",
+    "prompt_policy": "Byte-identical query and retained adaptive-evidence Scout prompt across tiers. Only service tier differs.",
+    "raw_artifacts": "private/"
+  },
+  "tasks": [
+    {"id": "mcp-scout-request-flow", "group": "cross_file", "query": "Trace one repo_scout MCP request from JSON-RPC dispatch through the Scout backend to the structured response. Include cancellation and citation validation boundaries.", "expected_paths": ["crates/mcp/src/lib.rs", "crates/core/src/types.rs", "crates/core/src/citations.rs"]},
+    {"id": "subscription-app-server-flow", "group": "cross_file", "query": "Trace a subscription Scout app-server session from process spawn through dynamic repository tool calls, stream activity tracking, token accounting, and process-tree cleanup.", "expected_paths": ["crates/cli/src/subscription.rs", "crates/core/src/config.rs"]},
+    {"id": "direct-tool-dispatch-flow", "group": "cross_file", "query": "Trace a direct Scout model tool request through tool schema construction, bounded concurrent execution, returned evidence, and final citation validation.", "expected_paths": ["crates/core/src/engine.rs", "crates/repo-tools/src/lib.rs", "crates/repo-tools/src/exec.rs", "crates/core/src/citations.rs"]},
+    {"id": "setup-integration-flow", "group": "cross_file", "query": "Trace repotracer setup from CLI dispatch through integration selection, generated configuration, dry-run behavior, and uninstall cleanup.", "expected_paths": ["crates/cli/src/main.rs", "crates/cli/src/setup.rs", "crates/cli/src/agents.rs"]},
+    {"id": "self-update-flow", "group": "cross_file", "query": "Trace the self-update lifecycle from the MCP startup check through release selection, checksum verification, binary replacement, and integration refresh.", "expected_paths": ["crates/cli/src/main.rs", "crates/cli/src/selfupdate.rs", "crates/cli/src/agents.rs"]},
+    {"id": "subscription-idle-timeout-flow", "group": "cross_file", "query": "Trace the subscription inactivity timeout from configuration through stream activity refresh and complete process-tree termination. Distinguish inactivity from total runtime.", "expected_paths": ["crates/core/src/config.rs", "crates/cli/src/subscription.rs"]},
+    {"id": "exact-package-version", "group": "exact", "query": "Find the exact current workspace and npm package version declarations. Cite only the files that directly declare those values.", "expected_paths": ["Cargo.toml", "packages/npm/package.json"]},
+    {"id": "exact-install-command", "group": "exact", "query": "Find the exact documented one-command installation and dry-run commands. Cite the smallest relevant README locations.", "expected_paths": ["README.md"]}
+  ],
+  "quality": {
+    "rubric": "Blind 0-4: 4 complete and accurate with material boundaries; 3 one minor omission; 2 a required stage missing; 1 fragments; 0 wrong or unusable.",
+    "citation_checks": ["valid source range", "expected path recall"],
+    "blinding": "Opaque IDs hide arm and repeat until every score is locked."
+  },
+  "decision_rule": {
+    "quality_floor": "Fast mean blind quality may be at most 0.25/4 below default, with no new score-2-or-lower required-boundary failure.",
+    "citation_floor": "Fast valid citation rate must remain 100%; mean expected-path recall may fall by at most 0.10.",
+    "time_gate": "Fast must reduce paired median wall time by at least 10% and be faster in at least 16 of 24 matched pairs.",
+    "cost_read": "Report exact provider-log aggregate by requested/actual tier. Do not attribute stochastic token-volume differences to tier pricing.",
+    "tie": "Keep default service tier."
+  },
+  "failure_policy": {
+    "infrastructure": "Provider, harness, or source setup failure resamples the complete matched pair.",
+    "model": "Timeout, malformed output, missing evidence, or poor answer remains a scored outcome.",
+    "retention": "Keep losing and invalidated attempts under private artifacts."
+  }
+}

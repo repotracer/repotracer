@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0 — 2026-08-30
+
+### Changed
+- GPT-5.6 Luna scouts use the fast service tier by default
+- Routing classifies the requested ownership surface before planning searches and uses contrasting local and Scout examples: localized changes start with one targeted lookup even when paths are unknown, while exhaustive inventories and cross-owner propagation call Scout first
+
+### Fixed
+- Subscription scouts treat `model.timeout_ms` as a silence limit: valid app-server stream activity resets it, while a silent child and its descendants are terminated
+- Subscription scouts accept every reasoning level exposed by Luna: low, medium, high, xhigh, and max
+
 ## 0.1.9 - 2026-08-26
 
 ### Fixed

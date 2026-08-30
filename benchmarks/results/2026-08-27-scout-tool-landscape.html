@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f8fbff" />
+  <meta name="description" content="RepoTracer Scout repository-search tool landscape, ranking, and first experiment decision." />
+  <title>RepoTracer Scout tool landscape</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fbff;
+      --paper: #ffffff;
+      --ink: #17202a;
+      --muted: #647184;
+      --line: #dbe4ef;
+      --blue: #315bff;
+      --blue-soft: #edf1ff;
+      --green: #157a55;
+      --green-soft: #eaf7f1;
+      --amber: #985d00;
+      --amber-soft: #fff4db;
+      --red: #a23535;
+      --red-soft: #fff0f0;
+      --violet: #6845b8;
+      --violet-soft: #f3efff;
+      --shadow: 0 18px 50px rgba(40, 67, 112, .08);
+      --serif: Georgia, "Times New Roman", serif;
+      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+    a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { text-decoration-thickness: 2px; }
+    code { font-family: var(--mono); font-size: .92em; }
+    .shell { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+    aside {
+      border-right: 1px solid var(--line);
+      background: rgba(255, 255, 255, .84);
+      padding: 30px 24px;
+    }
+    .sticky { position: sticky; top: 24px; }
+    .brand { font: 700 13px/1 var(--sans); letter-spacing: .13em; text-transform: uppercase; }
+    .brand span { color: var(--blue); }
+    nav { display: grid; gap: 5px; margin: 28px 0; }
+    nav a { color: var(--muted); text-decoration: none; padding: 8px 10px; border-radius: 7px; font-size: 14px; }
+    nav a:hover, nav a.active { color: var(--ink); background: var(--blue-soft); }
+    .margin-note { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 18px; color: var(--muted); font-size: 12px; }
+    .margin-note strong { display: block; color: var(--ink); margin-bottom: 4px; }
+    main { min-width: 0; }
+    article { max-width: 1180px; margin: 0 auto; padding: 72px 56px 100px; }
+    .kicker { color: var(--blue); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    h1, h2, h3 { margin: 0; }
+    h1 { max-width: 850px; margin-top: 14px; font: 700 clamp(42px, 6vw, 76px)/.98 var(--serif); letter-spacing: -.035em; }
+    .dek { max-width: 780px; margin: 24px 0 0; color: var(--muted); font: 400 21px/1.45 var(--serif); }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+    .pill { border: 1px solid var(--line); border-radius: 999px; background: var(--paper); padding: 7px 11px; color: var(--muted); font-size: 12px; }
+    .pill strong { color: var(--ink); }
+    section { scroll-margin-top: 24px; margin-top: 70px; }
+    section > h2 { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; font: 700 32px/1.1 var(--serif); }
+    section > h2 span { color: var(--blue); font: 800 12px/1 var(--sans); letter-spacing: .12em; }
+    .lead { max-width: 820px; color: var(--muted); font-size: 16px; }
+    .decision {
+      margin-top: 42px;
+      border: 1px solid #bdcaff;
+      border-left: 5px solid var(--blue);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      padding: 28px 30px;
+    }
+    .decision-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 28px; }
+    .decision h2 { font: 700 32px/1.08 var(--serif); }
+    .decision p { color: var(--muted); margin: 12px 0 0; }
+    .decision .label { color: var(--blue); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .decision ol { margin: 0; padding-left: 20px; }
+    .decision li + li { margin-top: 10px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; }
+    .stat { border: 1px solid var(--line); background: var(--paper); padding: 18px; }
+    .stat strong { display: block; font: 700 27px/1 var(--serif); }
+    .stat small { color: var(--muted); }
+    .callout { border: 1px solid #ebd59f; background: var(--amber-soft); padding: 18px 20px; margin-top: 18px; }
+    .callout strong { color: var(--amber); }
+    .good { border-color: #b9dfcf; background: var(--green-soft); }
+    .good strong { color: var(--green); }
+    .risk { border-color: #efcaca; background: var(--red-soft); }
+    .risk strong { color: var(--red); }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 22px 0 14px; }
+    .filter-button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: 700 12px/1 var(--sans);
+      cursor: pointer;
+    }
+    .filter-button[aria-pressed="true"] { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
+    .search { margin-left: auto; min-width: 240px; border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; font: 14px var(--sans); }
+    .count { min-width: 84px; color: var(--muted); font-size: 12px; text-align: right; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--paper); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { position: sticky; top: 0; z-index: 1; background: #eef3f9; color: #435164; text-align: left; padding: 11px 12px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+    td { padding: 12px; border-top: 1px solid var(--line); vertical-align: top; }
+    tbody tr:hover { background: #fbfdff; }
+    td.rank { width: 48px; color: var(--muted); font-family: var(--mono); }
+    td.project { width: 190px; }
+    td.project a { color: var(--ink); font-weight: 800; }
+    td.mode { width: 125px; color: var(--muted); }
+    td.stage { width: 120px; }
+    .tag { display: inline-block; border-radius: 999px; padding: 4px 8px; font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+    .tag-trial { background: var(--blue-soft); color: var(--blue); }
+    .tag-next { background: var(--green-soft); color: var(--green); }
+    .tag-conditional { background: var(--amber-soft); color: var(--amber); }
+    .tag-outside { background: #edf1f5; color: #596675; }
+    .tag-reject { background: var(--red-soft); color: var(--red); }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { border: 1px solid var(--line); background: var(--paper); padding: 20px; }
+    .card .num { color: var(--blue); font: 800 11px/1 var(--sans); letter-spacing: .12em; }
+    .card h3 { margin-top: 10px; font-size: 16px; }
+    .card p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .arm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .arm { border: 1px solid var(--line); background: var(--paper); padding: 22px; }
+    .arm.candidate { border-top: 4px solid var(--blue); }
+    .arm.control { border-top: 4px solid #8a97a8; }
+    .arm h3 { font: 700 22px/1.1 var(--serif); }
+    .arm ul { color: var(--muted); padding-left: 20px; }
+    .steps { counter-reset: step; display: grid; gap: 0; border: 1px solid var(--line); background: var(--paper); }
+    .step { counter-increment: step; display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 18px; border-top: 1px solid var(--line); }
+    .step:first-child { border-top: 0; }
+    .step::before { content: counter(step, decimal-leading-zero); color: var(--blue); font: 800 12px/1.5 var(--mono); }
+    .step strong { display: block; }
+    .step p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .refs { padding-left: 22px; }
+    .refs li + li { margin-top: 10px; }
+    .refs small { display: block; color: var(--muted); }
+    .foot { margin-top: 70px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 920px) {
+      .shell { grid-template-columns: 1fr; }
+      aside { display: none; }
+      article { padding: 48px 22px 80px; }
+      .decision-grid, .arm-grid { grid-template-columns: 1fr; }
+      .stats, .cards { grid-template-columns: repeat(2, 1fr); }
+      .search { width: 100%; margin-left: 0; }
+    }
+    @media (max-width: 560px) {
+      h1 { font-size: 43px; }
+      .stats, .cards { grid-template-columns: 1fr; }
+      .decision { padding: 22px; }
+    }
+    @media print {
+      aside, .filters { display: none; }
+      .shell { display: block; }
+      article { max-width: none; padding: 20px; }
+      .decision, .stat, .card, .arm, .table-wrap { box-shadow: none; break-inside: avoid; }
+      tbody tr[hidden] { display: table-row !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="sticky">
+        <div class="brand"><span>RepoTracer</span> / Scout</div>
+        <nav aria-label="Report sections">
+          <a href="#decision">decision</a>
+          <a href="#ranking">ranked landscape</a>
+          <a href="#routing">use by context</a>
+          <a href="#experiment">first experiment</a>
+          <a href="#gate">decision gates</a>
+          <a href="#evidence">evidence</a>
+        </nav>
+        <div class="margin-note"><strong>Read first</strong>The rank is expected RepoTracer value, not a popularity table.</div>
+        <div class="margin-note"><strong>One variable</strong>No tool bundle. Each candidate earns the next experiment alone.</div>
+        <div class="margin-note"><strong>Raw decision</strong><a href="2026-08-27-scout-tool-first-test.md">Markdown record</a></div>
+      </div>
+    </aside>
+
+    <main>
+      <article>
+        <header>
+          <div class="kicker">Tool landscape / 27 August 2026</div>
+          <h1>Search broadly. Test one thing.</h1>
+          <p class="dek">Forty-plus GitHub projects collapse to one useful next move: test the smallest CodeGraph surface against Scout's current file tools, then keep only measured gains.</p>
+          <div class="meta">
+            <span class="pill">scope <strong>local read-only retrieval</strong></span>
+            <span class="pill">ranking <strong>RepoTracer fit</strong></span>
+            <span class="pill">first test <strong>Colby CodeGraph</strong></span>
+            <span class="pill">index policy <strong>existing only</strong></span>
+          </div>
+        </header>
+
+        <section id="decision" class="decision" aria-labelledby="decision-title">
+          <div class="decision-grid">
+            <div>
+              <div class="label">Decision 001 / diagnostic only</div>
+              <h2 id="decision-title">Add one <code>codegraph_explore</code> tool to the candidate arm.</h2>
+              <p>Keep <code>Read</code>, <code>Glob</code>, and <code>Grep</code> unchanged. Do not expose index maintenance, lower-level graph commands, or prompt recipes. If no compatible index exists, the tool is unavailable; RepoTracer never creates one.</p>
+            </div>
+            <ol>
+              <li>Highest upside on cross-file flow and impact questions.</li>
+              <li>One composite tool fits Scout's small surface.</li>
+              <li>Strong source-level evidence and explicit output bounds.</li>
+              <li>Known negative evidence makes the test worth running.</li>
+            </ol>
+          </div>
+          <div class="callout risk"><strong>Important contradiction.</strong> CodeGraph's own multi-turn study reports 82% more retrieval context resident than file access across seven repositories, even while it reports fewer processed tokens, lower average cost, less time, and fewer tool calls. Throughput and context occupancy can move in opposite directions. This experiment measures both.</div>
+        </section>
+
+        <div class="stats" aria-label="Landscape summary">
+          <div class="stat"><strong>40+</strong><small>GitHub projects and primary docs screened</small></div>
+          <div class="stat"><strong>1</strong><small>new model-facing tool in the first arm</small></div>
+          <div class="stat"><strong>48</strong><small>paired diagnostic trials: 8 × 3 × 2</small></div>
+          <div class="stat"><strong>0</strong><small>automatic index, network, or setup actions</small></div>
+        </div>
+
+        <section id="ranking">
+          <h2><span>01</span>Ranked landscape</h2>
+          <p class="lead">Ranking answers one question: how likely is this project to improve RepoTracer's cheap, isolated, citation-bearing Scout? Stars did not affect order. Source facts, source-published claims, and our fit inference stay separate.</p>
+          <div class="filters" aria-label="Candidate filters">
+            <button class="filter-button" type="button" data-filter="all" aria-pressed="true">All</button>
+            <button class="filter-button" type="button" data-filter="trial" aria-pressed="false">Test now</button>
+            <button class="filter-button" type="button" data-filter="next" aria-pressed="false">Next lane</button>
+            <button class="filter-button" type="button" data-filter="conditional" aria-pressed="false">Context only</button>
+            <button class="filter-button" type="button" data-filter="outside" aria-pressed="false">Outside Scout</button>
+            <button class="filter-button" type="button" data-filter="reject" aria-pressed="false">Reject</button>
+            <input id="candidate-search" class="search" type="search" aria-label="Search candidates" placeholder="Search name, mode, or reason" autocomplete="off" />
+            <span id="candidate-count" class="count" aria-live="polite"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Rank</th><th>Project</th><th>Mode</th><th>Why it could help</th><th>Why not now</th><th>Lane</th></tr></thead>
+              <tbody id="candidate-body">
+                <tr data-stage="trial"><td class="rank">01</td><td class="project"><a href="https://github.com/colbymchenry/codegraph">Colby CodeGraph</a></td><td class="mode">SQLite graph + source</td><td>One default <code>explore</code> tool returns relevant symbols, verbatim numbered source, and call paths. Existing-index fallback rules match Scout.</td><td>Persistent index; published multi-turn run shows much higher residual context. This is the question to test.</td><td class="stage"><span class="tag tag-trial">test now</span></td></tr>
+                <tr data-stage="next"><td class="rank">02</td><td class="project"><a href="https://github.com/probelabs/probe">Probe</a></td><td class="mode">zero-index hybrid</td><td>Local semantic-like ranking, tree-sitter structure, exact grep, line-grounded extraction, and a small read-only surface.</td><td>Overlaps current Grep; inspected MCP fields and implementation disagree in places. Validate the release contract before integration.</td><td class="stage"><span class="tag tag-next">next lane</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">03</td><td class="project"><a href="https://github.com/ast-grep/ast-grep">ast-grep</a></td><td class="mode">structural AST</td><td>Exact syntax-shape retrieval across many languages, no embeddings or persistent index.</td><td>Not natural-language repository understanding. Expose only for tasks with a clear structural predicate.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">04</td><td class="project"><a href="https://github.com/sourcegraph/scip">SCIP / LSP</a></td><td class="mode">semantic symbols</td><td>Precise definitions, references, and implementations where a project already has an index or running language server.</td><td>Language-specific setup and incomplete coverage. It answers symbol questions, not broad natural-language flow.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="next"><td class="rank">05</td><td class="project"><a href="https://github.com/cocoindex-io/cocoindex-code">CocoIndex Code</a></td><td class="mode">AST + embedding index</td><td>Small one-search interface, incremental indexing, local code chunks, and an agent-oriented CLI/MCP shape.</td><td>New and fast-moving; embedding model, index build, freshness, disk, and output quality all need local measurement.</td><td class="stage"><span class="tag tag-next">next lane</span></td></tr>
+                <tr data-stage="next"><td class="rank">06</td><td class="project"><a href="https://github.com/yoanbernabeu/grepai">grepai</a></td><td class="mode">semantic + call graph</td><td>Path/range/score results, compact output, semantic search, callers/callees, references, and workspace support.</td><td>Fourteen tools are exposed unconditionally; embeddings and persistent indexes expand cost and failure surface.</td><td class="stage"><span class="tag tag-next">next lane</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">07</td><td class="project"><a href="https://github.com/sourcegraph/zoekt">Zoekt</a></td><td class="mode">trigram index</td><td>Very fast literal/regex search with symbol-aware ranking across large repositories or many repositories.</td><td>Does not add semantic call paths; requires index lifecycle. Useful only when current Grep becomes a measured bottleneck.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">08</td><td class="project"><a href="https://github.com/Aider-AI/aider">Aider repo-map</a></td><td class="mode">ranked repository map</td><td>Strong design pattern: syntax tags plus graph ranking produce compact orientation before focused reads.</td><td>Borrow the pattern, not the whole coding agent. Static maps can consume context even when irrelevant.</td><td class="stage"><span class="tag tag-conditional">borrow pattern</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">09</td><td class="project"><a href="https://github.com/oraios/serena">Serena</a></td><td class="mode">LSP agent toolkit</td><td>Rich symbol navigation, references, edits, memories, and multiple language backends.</td><td>Far broader than read-only Scout; operational and editing tools create avoidable prompt surface.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">10</td><td class="project"><a href="https://github.com/codegraph-ai/CodeGraph">codegraph-ai CodeGraph</a></td><td class="mode">multi-language graph</td><td>Graph traversal, impact, context, and broad language coverage with CLI/MCP interfaces.</td><td>Different project from rank 1. Default graph build and broad tool surface conflict with existing-index-only Scout.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="next"><td class="rank">11</td><td class="project"><a href="https://github.com/MinishLab/semble">Semble</a></td><td class="mode">local semantic index</td><td>Small local vector-search design, line-aware chunks, repository watching, and MCP access.</td><td>Embedding/index cost for a capability that may not beat Probe's zero-index ranking.</td><td class="stage"><span class="tag tag-next">later lane</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">12</td><td class="project"><a href="https://github.com/DeusData/codebase-memory-mcp">codebase-memory-mcp</a></td><td class="mode">persistent code graph</td><td>Cross-file relationships and persistent architectural memory could improve repeated repository work.</td><td>Large graph and MCP surface; lifecycle state is the product, not a narrow Scout affordance.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">13</td><td class="project"><a href="https://github.com/Lum1104/Understand-Anything">Understand Anything</a></td><td class="mode">graph + embeddings</td><td>Combines structure, documentation, graph links, and semantic retrieval.</td><td>Broad indexing application with more state, models, and setup than the first Scout test needs.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">14</td><td class="project"><a href="https://github.com/johnhuang316/code-index-mcp">code-index-mcp</a></td><td class="mode">text + symbols</td><td>Paginated path/line matches and useful symbol-body responses.</td><td>Mixes retrieval with index builds, watchers, settings, and cleanup across fourteen tools. Needs a strict wrapper.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">15</td><td class="project"><a href="https://github.com/zilliztech/claude-context">claude-context</a></td><td class="mode">vector retrieval</td><td>Semantic local-code retrieval with MCP integration and configurable embeddings/vector stores.</td><td>Service and embedding stack; designed around a different host and broader setup contract.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">16</td><td class="project"><a href="https://github.com/semgrep/semgrep">Semgrep CE</a></td><td class="mode">structural/dataflow</td><td>Excellent on security rules, taint flows, and syntax-aware patterns.</td><td>Wrong default for ordinary repository exploration; reserve for tasks whose question is already a Semgrep query.</td><td class="stage"><span class="tag tag-conditional">specialist</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">17</td><td class="project"><a href="https://github.com/github/codeql">CodeQL</a></td><td class="mode">database + queries</td><td>Deep semantic and dataflow analysis for security or correctness investigations.</td><td>Database build and query expertise are too expensive for routine Scout use.</td><td class="stage"><span class="tag tag-conditional">specialist</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">18</td><td class="project"><a href="https://github.com/universal-ctags/ctags">Universal Ctags</a></td><td class="mode">symbol index</td><td>Cheap, mature definitions and symbol discovery across many languages.</td><td>No references, flow, or natural-language ranking; useful as a component rather than a model-facing tool.</td><td class="stage"><span class="tag tag-conditional">component</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">19</td><td class="project"><a href="https://github.com/isaacphi/mcp-language-server">mcp-language-server</a></td><td class="mode">LSP bridge</td><td>Reuses existing language-server semantics instead of inventing an index.</td><td>Broad MCP surface and per-language readiness; Scout needs a much smaller read-only adapter.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">20</td><td class="project"><a href="https://github.com/jahales/mcp-zoekt">mcp-zoekt</a></td><td class="mode">Zoekt MCP</td><td>Strong cursor pagination, bounded search, classified errors, symbol search, and reference helpers.</td><td>Seven tools plus a Zoekt service; full-file output is unbounded. A wrapper would still be required.</td><td class="stage"><span class="tag tag-conditional">context only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">21</td><td class="project"><a href="https://github.com/livegrep/livegrep">livegrep</a></td><td class="mode">indexed regex</td><td>Fast regex search across very large corpora.</td><td>Server/index overhead with little semantic gain over current Grep for a single local repository.</td><td class="stage"><span class="tag tag-conditional">scale only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">22</td><td class="project"><a href="https://github.com/hound-search/hound">Hound</a></td><td class="mode">multi-repo regex</td><td>Simple cross-repository code search service.</td><td>Maintenance and service cost exceed its incremental value over current search.</td><td class="stage"><span class="tag tag-conditional">scale only</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">23</td><td class="project"><a href="https://github.com/oracle/opengrok">OpenGrok</a></td><td class="mode">indexed browse/search</td><td>Mature definitions, references, history, and cross-reference browsing.</td><td>Heavy service, Java stack, and UI-oriented output. Poor fit for an ephemeral child agent.</td><td class="stage"><span class="tag tag-conditional">scale only</span></td></tr>
+                <tr data-stage="outside"><td class="rank">24</td><td class="project"><a href="https://github.com/sourcegraph/sourcegraph-public-snapshot">Sourcegraph / Cody</a></td><td class="mode">platform context</td><td>Industrial code search, semantic navigation, and multi-repository context.</td><td>Remote/platform boundary and operational weight violate Scout's current local isolated contract.</td><td class="stage"><span class="tag tag-outside">outside Scout</span></td></tr>
+                <tr data-stage="outside"><td class="rank">25</td><td class="project"><a href="https://github.com/bgauryy/octocode-mcp">Octocode MCP</a></td><td class="mode">GitHub remote search</td><td>Repository research without a local checkout, with GitHub-aware search and retrieval.</td><td>Network and authentication are central; Scout is deliberately local and must not use the network.</td><td class="stage"><span class="tag tag-outside">outside Scout</span></td></tr>
+                <tr data-stage="outside"><td class="rank">26</td><td class="project"><a href="https://github.com/potpie-ai/potpie">Potpie</a></td><td class="mode">codebase agent/RAG</td><td>Graph-backed codebase understanding and reusable agents.</td><td>Application stack, database, model calls, and agent runtime duplicate RepoTracer rather than sharpen Scout.</td><td class="stage"><span class="tag tag-outside">outside Scout</span></td></tr>
+                <tr data-stage="reject"><td class="rank">27</td><td class="project"><a href="https://github.com/abhigyanpatwari/GitNexus">GitNexus</a></td><td class="mode">browser knowledge graph</td><td>Excellent graph queries, impact tools, bounded output, read-only filtering, and explicit epistemic state.</td><td>PolyForm Noncommercial license is a shipping blocker; thirteen read-only tools are still too many.</td><td class="stage"><span class="tag tag-reject">license block</span></td></tr>
+                <tr data-stage="reject"><td class="rank">28</td><td class="project"><a href="https://github.com/g0h4n/semcode">semcode</a></td><td class="mode">graph RAG stack</td><td>Combines AST, graph, vector, and keyword retrieval.</td><td>Qdrant/embedding/parser stack and copyleft obligations are disproportionate to Scout's job.</td><td class="stage"><span class="tag tag-reject">too heavy</span></td></tr>
+                <tr data-stage="reject"><td class="rank">29</td><td class="project"><a href="https://github.com/vitali87/code-graph-rag">code-graph-rag</a></td><td class="mode">Neo4j graph RAG</td><td>Rich dependency graph and semantic context.</td><td>Neo4j, vector infrastructure, and many operational dependencies fail the minimal local boundary.</td><td class="stage"><span class="tag tag-reject">too heavy</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">30</td><td class="project"><a href="https://github.com/google/kythe">Kythe</a></td><td class="mode">semantic indexing infra</td><td>Robust cross-language code facts and references.</td><td>Infrastructure foundation, not a small retrieval tool; language extraction and serving are the work.</td><td class="stage"><span class="tag tag-conditional">component</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">31</td><td class="project"><a href="https://github.com/github/stack-graphs">stack-graphs</a></td><td class="mode">name-resolution library</td><td>Incremental cross-file name resolution without running a compiler.</td><td>Library primitive, limited language packages, and no ready natural-language retrieval surface.</td><td class="stage"><span class="tag tag-conditional">component</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">32</td><td class="project"><a href="https://github.com/scalacenter/bloop">Bloop</a></td><td class="mode">Scala build server</td><td>Precise semantic state inside its language ecosystem.</td><td>Scala-specific build infrastructure, not a general repository search candidate.</td><td class="stage"><span class="tag tag-conditional">niche</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">33</td><td class="project"><a href="https://github.com/tree-sitter/tree-sitter">Tree-sitter</a></td><td class="mode">parser library</td><td>Fast incremental syntax trees; useful substrate for maps, chunks, and structural search.</td><td>Not retrieval by itself. Probe, ast-grep, Repomix, and others already package it.</td><td class="stage"><span class="tag tag-conditional">component</span></td></tr>
+                <tr data-stage="conditional"><td class="rank">34</td><td class="project"><a href="https://github.com/comby-tools/comby">Comby</a></td><td class="mode">structural text match</td><td>Language-aware templates without full AST grammars.</td><td>Narrower and less active than ast-grep; strongest use is rewrite, which Scout does not need.</td><td class="stage"><span class="tag tag-conditional">niche</span></td></tr>
+                <tr data-stage="outside"><td class="rank">35</td><td class="project"><a href="https://github.com/BurntSushi/ripgrep">ripgrep / git grep</a></td><td class="mode">exact text</td><td>Fast, fresh, deterministic, zero-index repository search.</td><td>Scout already has this capability through its native Grep. Rewrapping it adds no retrieval class.</td><td class="stage"><span class="tag tag-outside">already covered</span></td></tr>
+                <tr data-stage="outside"><td class="rank">36</td><td class="project"><a href="https://github.com/yamadashy/repomix">Repomix</a></td><td class="mode">repository packer</td><td>Good ignore handling, token accounting, tree-sitter compression, and reproducible repository bundles.</td><td>Still front-loads a broad snapshot before relevance is known; wrong direction for bounded Scout evidence.</td><td class="stage"><span class="tag tag-outside">outside Scout</span></td></tr>
+                <tr data-stage="outside"><td class="rank">37</td><td class="project"><a href="https://github.com/simonw/files-to-prompt">files-to-prompt</a></td><td class="mode">file packer</td><td>Small, transparent context assembly from chosen files.</td><td>Selection must already be solved; it does not improve retrieval or ranking.</td><td class="stage"><span class="tag tag-outside">outside Scout</span></td></tr>
+                <tr data-stage="outside"><td class="rank">38</td><td class="project"><a href="https://github.com/mufeedvh/code2prompt">code2prompt</a></td><td class="mode">repository packer</td><td>Flexible templates, filtering, token counts, and tree output.</td><td>Bulk prompt construction duplicates the context-pressure problem Scout exists to avoid.</td><td class="stage"><span class="tag tag-outside">outside Scout</span></td></tr>
+                <tr data-stage="outside"><td class="rank">39</td><td class="project"><a href="https://github.com/coderamp-labs/gitingest">Gitingest</a></td><td class="mode">repository digest</td><td>Convenient local or remote repository summaries and text bundles.</td><td>Digest generation is broad context packaging, not evidence-first retrieval.</td><td class="stage"><span class="tag tag-outside">outside Scout</span></td></tr>
+                <tr data-stage="outside"><td class="rank">40</td><td class="project"><a href="https://github.com/ClarkOhlenbusch/PromptPacker">PromptPacker</a></td><td class="mode">desktop context packer</td><td>Clear Full, Skeleton, and Omit tiers with local tree-sitter processing and file watching.</td><td>GUI/runtime weight and skeletonized bodies are poor defaults for exact, citation-bearing Scout evidence.</td><td class="stage"><span class="tag tag-outside">design reference</span></td></tr>
+                <tr data-stage="outside"><td class="rank">41</td><td class="project"><a href="https://github.com/rtk-ai/rtk">RTK</a></td><td class="mode">CLI output reducer</td><td>Careful command-specific filtering and honest separation of output savings from bill savings.</td><td>Scout has no Bash tool and already bounds Read/Grep/Glob. RTK cannot improve the missing cross-file retrieval class.</td><td class="stage"><span class="tag tag-outside">design reference</span></td></tr>
+                <tr data-stage="outside"><td class="rank">42</td><td class="project"><a href="https://github.com/headroomlabs-ai/headroom">Headroom</a> / <a href="https://github.com/microsoft/LLMLingua">LLMLingua</a> / <a href="https://github.com/liyucheng09/Selective_Context">Selective Context</a> / <a href="https://github.com/3DAgentWorld/Toolkit-for-Prompt-Compression">PCToolkit</a></td><td class="mode">generic compression</td><td>Can reduce prompts or tool output after context has already been selected; some preserve originals for later retrieval.</td><td>Lossy or model-dependent post-processing can corrupt code and provenance or force another call. Better retrieval is safer and simpler.</td><td class="stage"><span class="tag tag-outside">outside Scout</span></td></tr>
+                <tr data-stage="reject"><td class="rank">43</td><td class="project"><a href="https://github.com/Usama01234/CodeGraphContext">CodeGraphContext</a> / <a href="https://github.com/yvexeldev/repo-context">repo-context</a></td><td class="mode">small graph/context tools</td><td>Potentially narrow repository context helpers.</td><td>Source maturity, maintenance, and measurable advantage were weaker than the ranked graph candidates.</td><td class="stage"><span class="tag tag-reject">defer</span></td></tr>
+                <tr data-stage="reject"><td class="rank">44</td><td class="project"><a href="https://github.com/search?q=semantic+code+search+mcp&type=repositories">Greb / Wizi / long tail</a></td><td class="mode">assorted code search</td><td>Some promising interfaces appeared in GitHub search.</td><td>Current source, license, reproducibility, or local integration could not all be verified. Do not benchmark a name.</td><td class="stage"><span class="tag tag-reject">insufficient proof</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="lead" style="margin-top:12px;font-size:13px">Grouped rows share a job and the same disposition; order inside a grouped row is not a hidden ranking. Commercial remote context engines such as Augment and Greptile remain outside the local Scout contract even if their retrieval quality is strong.</p>
+        </section>
+
+        <section id="routing">
+          <h2><span>02</span>Use tools by context, not as a bundle</h2>
+          <div class="cards">
+            <div class="card"><div class="num">A / FLOW</div><h3>Cross-file architecture or impact</h3><p>Try CodeGraph first. Measure source sufficiency and residual context before adding any second graph or semantic index.</p></div>
+            <div class="card"><div class="num">B / UNKNOWN WORDING</div><h3>Concept known, symbol unknown</h3><p>Probe is the zero-index fallback candidate. CocoIndex or grepai come later only if embeddings beat it enough to pay for state.</p></div>
+            <div class="card"><div class="num">C / KNOWN SHAPE</div><h3>Syntax or API pattern</h3><p>ast-grep. It should appear only when the request can be expressed structurally; otherwise current Grep is clearer.</p></div>
+            <div class="card"><div class="num">D / KNOWN SYMBOL</div><h3>Definition, references, implementation</h3><p>Use an existing LSP or SCIP index. Do not build semantic state inside RepoTracer just to answer one query.</p></div>
+            <div class="card"><div class="num">E / HUGE CORPUS</div><h3>Very large or multi-repository exact search</h3><p>Zoekt earns a test only after native Grep latency fails a measured threshold. It is scale infrastructure, not free semantics.</p></div>
+            <div class="card"><div class="num">F / SECURITY</div><h3>Taint, policy, or vulnerability flow</h3><p>Semgrep or CodeQL as explicit specialists. Their setup and schemas should never tax ordinary Scout requests.</p></div>
+          </div>
+          <div class="callout"><strong>Rejected architecture:</strong> expose CodeGraph, Probe, ast-grep, semantic search, symbol search, and a reducer together. The model would spend turns choosing tools, every schema would consume context, and an A/B could not identify the cause of a win or loss.</div>
+        </section>
+
+        <section id="experiment">
+          <h2><span>03</span>First experiment</h2>
+          <p class="lead">A small paired diagnostic answers whether graph retrieval changes Scout's mechanism. It does not approve a release.</p>
+          <div class="arm-grid">
+            <div class="arm control"><h3>Control</h3><ul><li>Current <code>Read</code>, <code>Glob</code>, <code>Grep</code></li><li>Same repository snapshot and hidden index directory</li><li>No shell or CodeGraph route</li><li>Same Codex subscription model, effort, prompts, and task order</li></ul></div>
+            <div class="arm candidate"><h3>Candidate</h3><ul><li>Everything in control</li><li>Plus <code>codegraph_explore(query)</code></li><li>Existing compatible index only</li><li>No init, watch, update, network, or lower-level graph tools</li></ul></div>
+          </div>
+          <div class="steps" style="margin-top:14px">
+            <div class="step"><div><strong>Select eight preregistered tasks.</strong><p>Four cross-file flows, two change-impact or caller questions, and two exact-text/config negative controls. Use known required paths without exposing them to the model.</p></div></div>
+            <div class="step"><div><strong>Run three randomized repeats per arm.</strong><p>48 complete trials. Infrastructure failure resamples both sides; agent timeout, bad evidence, or wrong answer stays a model failure.</p></div></div>
+            <div class="step"><div><strong>Measure cold and warm separately.</strong><p>Cold includes process attach. Warm pre-starts CodeGraph so retrieval is not confused with daemon startup. Index build, disk, memory, and refresh stay separate adoption metrics.</p></div></div>
+            <div class="step"><div><strong>Capture complete economics and context.</strong><p>Provider USD, complete wall time, tool calls, output bytes, truncation, citations, final Scout input tokens, and retrieval context still resident at synthesis.</p></div></div>
+            <div class="step"><div><strong>Grade blind, then unblind.</strong><p>Quality and required behavior first. Only then inspect arm, cost, time, tool choice, and the mechanism behind each paired delta.</p></div></div>
+          </div>
+          <div class="callout good"><strong>Contamination rule.</strong> The model gets no Bash tool, so the adapter is the only valid CodeGraph path. Keep the same index on disk in both arms and verify that no uncounted CLI or network output entered either trajectory.</div>
+        </section>
+
+        <section id="gate">
+          <h2><span>04</span>Decision gates</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Gate</th><th>Diagnostic requirement</th><th>Release requirement</th></tr></thead>
+              <tbody>
+                <tr><td><strong>Quality</strong></td><td>No new required-behavior, security, data-loss, or citation failure. Negative controls do not regress. At least four of six graph-suitable tasks tie or improve quality while reducing median file calls or complete cost.</td><td>95% lower bound of paired quality delta at least -5 points; no new required-behavior failure.</td></tr>
+                <tr><td><strong>Cost</strong></td><td>Report complete Codex subscription usage for solver, children, and Scout. Directional only; eight tasks cannot establish a release claim.</td><td>Positive 95% lower-bound savings; 60% median target.</td></tr>
+                <tr><td><strong>Time</strong></td><td>Report cold attach and warm end-to-end medians with ranges. Do not hide index-build time; report it separately.</td><td>95% upper bound of paired regression no greater than +20%.</td></tr>
+                <tr><td><strong>Context</strong></td><td>Always report residual retrieval tokens and final Scout context. A throughput win cannot erase an occupancy loss.</td><td>Review as an explicit operational tradeoff alongside quality, cost, and time.</td></tr>
+                <tr><td><strong>Evidence</strong></td><td>8 tasks × 3 repeats × 2 arms selects the next experiment only.</td><td>At least 30 independent tasks × 3 repeats × 2 arms before promotion.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout"><strong>Next if CodeGraph loses:</strong> Probe, then ast-grep on syntax-shaped tasks, then an existing SCIP/LSP adapter, then CocoIndex Code. One candidate per decision record.</div>
+        </section>
+
+        <section id="evidence">
+          <h2><span>05</span>Evidence and limits</h2>
+          <ol class="refs">
+            <li><a href="https://github.com/colbymchenry/codegraph">Colby CodeGraph source and README</a><small>Composite explore interface, SQLite graph, source extraction, freshness behavior, and installation.</small></li>
+            <li><a href="https://github.com/colbymchenry/codegraph/blob/main/docs/benchmarks/residual-context-occupancy.md">CodeGraph residual context study</a><small>Vendor-run seven-repository, three-turn Sonnet campaign; contamination discovery; higher residual occupancy and simultaneous throughput savings.</small></li>
+            <li><a href="https://github.com/colbymchenry/codegraph/blob/main/docs/benchmarks/agent-eval-feedback-metrics.md">CodeGraph feedback metrics</a><small>Separates occupancy, sufficiency, and allocation efficiency; documents pre-warming and CLI contamination controls.</small></li>
+            <li><a href="https://github.com/probelabs/probe">Probe source</a><small>Zero-index search, extraction, grep, tree-sitter parsing, and MCP implementation. Source inspection found schema/handler mismatches worth testing.</small></li>
+            <li><a href="https://ast-grep.github.io/guide/introduction.html">ast-grep documentation</a><small>Structural AST search and rewrite across languages.</small></li>
+            <li><a href="https://github.com/sourcegraph/scip">SCIP source and protocol</a><small>Definitions, references, implementations, bindings, and language indexers.</small></li>
+            <li><a href="https://github.com/sourcegraph/zoekt">Zoekt source</a><small>Trigram indexing, symbol-aware ranking, APIs, and local/service deployment.</small></li>
+            <li><a href="https://github.com/rtk-ai/rtk/blob/master/docs/guide/resources/savings-explained.md">RTK savings methodology</a><small>Separates bytes filtered, estimated tokens, and actual bill impact; useful measurement discipline, not a Scout retrieval solution.</small></li>
+            <li><a href="2026-08-27-mah-swe-architecture.html">RepoTracer benchmark architecture</a><small>Quality-cost-time order, blind review, paired task-cluster analysis, release thresholds, and the 30-task floor.</small></li>
+            <li><a href="2026-08-27-scout-tool-first-test.md">Decision record 001</a><small>Machine-readable-in-repository experiment contract and follow-on order.</small></li>
+          </ol>
+          <div class="callout risk"><strong>Limits.</strong> GitHub is not enumerable in a useful sense. This was a broad current screen, not a claim that every repository containing “code search” was inspected. Long-tail projects rank low when current source, license, local operation, or a reproducible interface could not be verified. Vendor performance numbers remain claims until RepoTracer reproduces them.</div>
+        </section>
+
+        <div class="foot">RepoTracer / Scout search-tool landscape / uncommitted worktree artifact. No package, provider, production code, or benchmark result changed by this report.</div>
+      </article>
+    </main>
+  </div>
+
+  <script>
+    const rows = [...document.querySelectorAll('#candidate-body tr')];
+    const buttons = [...document.querySelectorAll('.filter-button')];
+    const search = document.querySelector('#candidate-search');
+    const count = document.querySelector('#candidate-count');
+    let stage = 'all';
+
+    function applyFilters() {
+      const query = search.value.trim().toLowerCase();
+      let visible = 0;
+      for (const row of rows) {
+        const stageMatch = stage === 'all' || row.dataset.stage === stage;
+        const queryMatch = !query || row.textContent.toLowerCase().includes(query);
+        row.hidden = !(stageMatch && queryMatch);
+        if (!row.hidden) visible += 1;
+      }
+      count.textContent = `${visible} of ${rows.length}`;
+    }
+
+    for (const button of buttons) {
+      button.addEventListener('click', () => {
+        stage = button.dataset.filter;
+        for (const item of buttons) item.setAttribute('aria-pressed', String(item === button));
+        applyFilters();
+      });
+    }
+    search.addEventListener('input', applyFilters);
+    applyFilters();
+
+    const sections = [...document.querySelectorAll('section[id]')];
+    const links = [...document.querySelectorAll('nav a')];
+    const observer = new IntersectionObserver(entries => {
+      const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (!visible) return;
+      for (const link of links) link.classList.toggle('active', link.hash === `#${visible.target.id}`);
+    }, { rootMargin: '-20% 0px -65% 0px', threshold: [0, .2, .6] });
+    for (const section of sections) observer.observe(section);
+  </script>
+</body>
+</html>
