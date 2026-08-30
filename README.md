@@ -138,14 +138,14 @@ Tested on DeepSWE (industry-standard multi-language coding tasks) and MAH-SWE (a
 
 Complete task cost, RepoTracer's usage included.
 
-| Task | Source | Cost | Budget stretch | Quality |
+| Task | Source | Cost saved | Same budget gets you | Quality |
 |---|---|---:|---:|---|
-| Real bug fix, production repo | MAH-SWE | −62.68% | **2.68x** | Both arms worked |
-| SWE-bench Astropy 13453 | SWE-bench | −50.12% | **2.00x** | Regression passed |
-| Release benchmark (TS, Python, Go) | DeepSWE | −27.71% | **1.38x** | 147/151 features |
-| Median of 3 paired runs | DeepSWE | −39.20% | **1.64x** | 6/6 checks every arm |
+| Real bug fix, production repo | MAH-SWE | −62.68% | **2.68x the tasks** | Both arms worked |
+| SWE-bench Astropy 13453 | SWE-bench | −50.12% | **2x the tasks** | Regression passed |
+| Release benchmark (TS, Python, Go) | DeepSWE | −27.71% | **1.38x the tasks** | 147/151 features |
+| Median of 3 paired runs | DeepSWE | −39.20% | **1.64x the tasks** | 6/6 checks every arm |
 
-Budget stretch means how many times you can run the same task on a fixed budget. A task that costs 62.68% less fits 1 / 0.3732 = 2.68 times. That's not the same number as the cost reduction.
+If a task costs 62.68% less, a fixed budget covers 2.68 of them instead of 1. That's where the 2.7x headline comes from.
 
 Paired runs hold everything constant: same model, same prompt, same repo commit, same timeout. The only difference is whether RepoTracer is installed.
 
