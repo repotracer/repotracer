@@ -83,9 +83,9 @@ repotracer update
 
 ## How it works
 
-1. The installed routing instructions tell Codex when an unfamiliar or cross-file task needs repository exploration.
+1. The installed routing instructions tell Codex when cross-file discovery should go to Scout before local repository search.
 2. Codex calls the MCP tool `repo_scout(query)`.
-3. RepoTracer starts an isolated ephemeral thread through `codex app-server` using GPT-5.6 Luna at medium reasoning. It carries over the active Codex model-provider settings, including compatible custom providers, without inheriting the rest of the Codex home.
+3. RepoTracer starts an isolated ephemeral thread through `codex app-server` using GPT-5.6 Luna at medium reasoning on the fast service tier. It carries over the active Codex model-provider settings, including compatible custom providers, without inheriting the rest of the Codex home.
 4. Luna can call only read-only repository tools. It receives bounded Read, Glob, and Grep results.
 5. RepoTracer validates every returned path and line range, then returns structured citations, source excerpts, and a handoff.
 6. Codex Sol reads the cited code and performs the edit.
@@ -117,7 +117,7 @@ Every run is published transparently.
 
 ## When Codex calls it
 
-Use `repo_scout` for cold-start exploration, unfamiliar cross-file behavior, or a failed targeted lookup. Skip it when the prompt already names the file, symbol, or exact change location.
+Start with one targeted lookup for a single command, function, symbol, file, or localized behavior, even when its source and test paths are unknown. Use `repo_scout` first when the request itself asks for an exhaustive relationship or inventory, or for behavior that propagates across ownership boundaries: callers, exported configuration and APIs, unfamiliar ownership maps, tests and fixtures across behaviors, dependencies, or implementation-owner comparisons.
 
 Small edits can cost more if a scout runs unnecessarily. Routing is part of the product, not an optional benchmark trick.
 
@@ -128,6 +128,7 @@ Small edits can cost more if a scout runs unnecessarily. Routing is part of the 
 | Coding agent | Codex |
 | Interface | MCP and CLI |
 | Default scout | `gpt-5.6-luna` |
+| Scout service tier | `fast` |
 | Scout reasoning | `medium` |
 | Scout tools | Read, Glob, Grep |
 | Repository writes | Disabled |
