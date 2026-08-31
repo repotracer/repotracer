@@ -13,6 +13,7 @@ benchmarks/results/private/
 benchmarks/results/runs/**/private/
 benchmarks/results/runs/**/trajectory.jsonl
 benchmarks/results/runs/**/{stdout,stderr}.log
+benchmarks/**/*.html
 .project/STATE.local.md
 third_party/
 
@@ -22,7 +23,16 @@ docs/benchmarks/*.log
 .design-playbooks/
 .claude/
 .agents/
+[Aa]gents.md
 .fastcontext/
+
+# Personal research notes, plans, and internal docs
+references/research/
+research/
+docs/.internal/
+RESEARCH*.md
+*PLAN*.md
+*.pdf
 
 # The marketing site lives in its own repository
 index.html
