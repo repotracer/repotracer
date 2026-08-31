@@ -9,10 +9,21 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/repotracer"><img src="https://img.shields.io/npm/v/repotracer?color=0E9488&label=npm" alt="npm version"></a>
+  <a href="https://github.com/repotracer/repotracer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-purple" alt="MCP Compatible"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="Platforms">
+</p>
+
+<p align="center">
   <a href="#install"><img src="assets/button-install.svg" alt="Install RepoTracer" height="38"></a>&nbsp;
   <a href="./BENCHMARKS.md"><img src="assets/button-benchmarks.svg" alt="Benchmarks" height="38"></a>&nbsp;
   <a href="https://repotracer.tech"><img src="assets/button-website.svg" alt="repotracer.tech" height="38"></a>
 </p>
+
+```bash
+npx repotracer@latest setup
+```
 
 <p align="center">
   <img src="assets/demo/scout.gif" alt="Asking RepoTracer a plain-English question about a codebase and getting back four verified file and line-range citations with a summary in 35 seconds" width="100%">
