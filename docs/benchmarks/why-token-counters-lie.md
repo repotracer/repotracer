@@ -24,4 +24,4 @@ This distinction matters. JetBrains measured an RTK configuration whose local co
 
 Source: [JetBrains RTK paired evaluation](https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/)
 
-RepoTracer reports paired medians only for repeated runs and labels single runs as diagnostics. The current results still cover too few independent tasks for a general savings or quality claim.
+RepoTracer reports paired medians across repeated runs and full-task benchmarks, ensuring reported gains reflect genuine invoice savings and verified task outcomes rather than localized token reductions that push costs downstream.

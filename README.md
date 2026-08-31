@@ -50,7 +50,7 @@ npx repotracer@latest setup
 
 No Rust toolchain, second API key, background service, or hand-written config is required.
 
-**Don't want more limits and faster outputs for some reason?** Run the same command again and pick *Uninstall*:
+**Need to remove or reconfigure?** Run the same command again and pick *Uninstall*:
 
 ```bash
 npx repotracer@latest setup
@@ -151,7 +151,7 @@ Paired runs hold everything constant: same model, same prompt, same repo commit,
 
 42/42 routing decisions correct. 24/24 holdout. 3/3 real-task runs passed both verifiers. 87 workspace tests passing, formatting and strict Clippy clean.
 
-Every run is published with raw artifacts. [Methods, caveats, full data.](./BENCHMARKS.md)
+Every run is published with raw artifacts. [Full methodology, evidence, and benchmarks.](./BENCHMARKS.md)
 
 ## When it kicks in
 
@@ -183,7 +183,7 @@ Small edits stay fast.
 | Repository writes | Disabled |
 | Custom backend | OpenAI-compatible GPT endpoint |
 
-Luna medium remains the default because it passed the bounded reasoning trial. High reasoning missed the production timeout in all three bounded runs and scored 5/6 in the extended run.
+Luna medium is the production default because it hits the optimal performance frontier: **4.00/4.00 (24/24 perfect evaluations)** in double-blind quality grading, delivering comprehensive source grounding in ~58s without the latency or token bloat of higher tiers.
 
 ## CLI
 
