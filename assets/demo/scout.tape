@@ -1,31 +1,28 @@
-# Real repo_scout run against this repository. Not mocked, not sped-up output —
-# only the playback is compressed. Re-record with: vhs assets/demo/scout.tape
-Output assets/demo/scout.gif
+# Real live execution of repotracer against this codebase
+# Generates authentic terminal recording for GitHub and Twitter/X
 
-Set Theme { "name": "RepoTracer", "background": "#0a2e33", "foreground": "#cfe0e2", "cursor": "#e4ee4f", "black": "#04252b", "red": "#e8b04b", "green": "#e4ee4f", "yellow": "#e4ee4f", "blue": "#7f9ea2", "magenta": "#cfe0e2", "cyan": "#e4ee4f", "white": "#f5f3eb", "brightBlack": "#5b7276", "brightGreen": "#e4ee4f", "brightWhite": "#f5f3eb" }
+Output assets/demo/scout.gif
+Output assets/demo/scout.mp4
+
+Set Theme { "name": "RepoTracer", "background": "#0a2e33", "foreground": "#cfe0e2", "cursor": "#e4ee4f", "black": "#04252b", "red": "#f87171", "green": "#4ade80", "yellow": "#e4ee4f", "blue": "#93c5fd", "magenta": "#cfe0e2", "cyan": "#2dd4bf", "white": "#f5f3eb", "brightBlack": "#5b7276", "brightGreen": "#4ade80", "brightWhite": "#f5f3eb" }
 Set Shell "bash"
 Set FontFamily "CommitMono"
-Set FontSize 18
+Set FontSize 17
 Set Width 1240
-Set Height 860
-Set Padding 42
+Set Height 780
+Set Padding 32
 Set BorderRadius 8
-Set TypingSpeed 45ms
-Set PlaybackSpeed 2.5
+Set TypingSpeed 40ms
+Set PlaybackSpeed 1.0
 
 Hide
-Type "export PATH=$PWD/target/debug:$PATH" Enter
 Type "export PS1='$ '" Enter
 Type "clear" Enter
 Show
 
 Sleep 500ms
-Type `repotracer 'how are citations validated before they reach Codex?'`
-Sleep 400ms
+Type "repotracer 'where is the scout system prompt configured?'"
+Sleep 300ms
 Enter
-Sleep 50s
-Sleep 3s
-
-# NOTE: after recording, the dead wait between the prompt and the result is
-# compressed ~10x and the result is held, via scripts/compress-demo.py.
-# The scout output itself is never edited.
+Sleep 38s
+Sleep 5s

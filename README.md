@@ -169,23 +169,15 @@ Paired runs hold everything constant: same model, same prompt, same repo commit,
 
 Every run is published with raw artifacts. [Full methodology, evidence, and benchmarks.](./BENCHMARKS.md)
 
-## When it kicks in
+## Automatic routing across all tasks (zero manual switching)
 
-Not every task needs a scout. The routing is tuned and benchmarked, 42/42 decisions correct.
+You never need to turn RepoTracer on or off. Leave it installed and keep prompting Codex normally for every task.
 
-Scout runs when Codex needs to:
-- Find code across multiple files
-- Trace callers, dependencies, or exported APIs
-- Navigate an unfamiliar repository
-- Locate tests and fixtures for a behavior
+The built-in router (42/42 verified decisions) automatically chooses the optimal route for every prompt:
+- **Broad exploration & cross-file tasks:** Delegates search to Luna via MCP, slashing complete task spend by up to 63%.
+- **Small or single-file edits:** Handles the task directly with Sol with zero scout calls, zero latency penalty, and zero overhead.
 
-Scout stays out of the way when:
-- The edit target is already known
-- The task is a single-file change
-- Codex already has the file open
-
-Small edits stay fast.
-
+You get massive savings on complex tasks with zero penalty on small edits.
 ## Current support
 
 | Item | Current value |
