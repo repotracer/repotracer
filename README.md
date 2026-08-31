@@ -2,10 +2,10 @@
   <img src="assets/logo-lockup-stacked.svg" alt="RepoTracer" width="260">
 </p>
 
-<h3 align="center">Make your Codex subscription last up to 2.7x longer.</h3>
+<h3 align="center">Search with Luna. Code with Sol. Never burn turns finding files.</h3>
 
 <p align="center">
-  RepoTracer searches your repository with a cheaper model through an MCP tool call, not a prompt instruction. Codex spends your budget writing code instead of finding it.
+  Make your Codex subscription last up to 2.7x longer. A cheaper model searches your repo via MCP so Codex spends its quota writing code, not finding it.
 </p>
 
 <p align="center">
@@ -24,9 +24,14 @@
 ```bash
 npx repotracer@latest setup
 ```
+<p align="center">
+  <b>~63% cheaper (2.68x quota stretch) · ~25% faster · 0 regressions · 0 hallucinated paths</b><br>
+  <sub>Measured on real paired runs (DeepSWE, SWE-bench Astropy, and production bug fixes) with complete scout costs counted. <a href="./BENCHMARKS.md">Full writeup</a> · <a href="./benchmarks/README.md">Reproduce it</a></sub>
+</p>
 
 <p align="center">
-  <img src="assets/demo/scout.gif" alt="Asking RepoTracer a plain-English question about a codebase and getting back four verified file and line-range citations with a summary in 35 seconds" width="100%">
+  <img src="assets/demo/scout.gif" alt="The scout engine finding four verified file and line-range citations in 35 seconds" width="100%"><br>
+  <sub>What the <code>repo_scout</code> MCP tool runs under the hood: plain query in, Luna searches with Read/Glob/Grep, disk-verified <code>file:line</code> citations out in ~35s.</sub>
 </p>
 
 ## The problem
