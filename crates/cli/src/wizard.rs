@@ -47,6 +47,19 @@ pub struct ModelSelection(pub Vec<ParentModelChoice>);
 const PARENTS: [&str; 2] = ["codex", "claude"];
 const LABELS: [&str; 2] = ["Codex", "Claude Code"];
 
+fn recommended_model(index: usize) -> ModelChoice {
+    let (provider, id, label) = match index {
+        0 => ("codex", "gpt-5.6-luna", "Codex — gpt-5.6-luna"),
+        1 => ("claude", "sonnet", "Claude Code — sonnet"),
+        _ => unreachable!("the parent list has two entries"),
+    };
+    ModelChoice {
+        provider: provider.into(),
+        id: id.into(),
+        label: label.into(),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Page {
     Install,
@@ -118,10 +131,15 @@ impl App {
             installed: enabled,
             enabled,
             choices: PARENTS.map(|parent| {
+                let index = PARENTS
+                    .iter()
+                    .position(|candidate| *candidate == parent)
+                    .expect("parent index");
                 current
                     .iter()
                     .find(|profile| profile.parent == parent)
                     .and_then(|profile| profile.choice.clone())
+                    .or_else(|| enabled[index].then(|| recommended_model(index)))
             }),
             custom,
             selected_efforts,
@@ -146,21 +164,8 @@ impl App {
     }
 
     fn set_catalog(&mut self, catalog: Catalog) {
-        // A missing recommendation is not permission to choose another model.
-        for (index, id) in ["gpt-5.6-luna", "sonnet"].iter().enumerate() {
-            if self.choices[index].is_none() {
-                self.choices[index] = catalog
-                    .models
-                    .iter()
-                    .find(|model| model.provider == PARENTS[index] && model.id == *id)
-                    .cloned();
-            }
-        }
         self.catalog = catalog;
         self.loading = false;
-        for index in 0..PARENTS.len() {
-            self.update_effort_for(index);
-        }
         self.picker.select(Some(0));
     }
 
@@ -224,24 +229,11 @@ impl App {
         self.picker = ListState::default().with_selected(Some(selected));
     }
 
-    fn update_effort_for(&mut self, index: usize) {
-        self.selected_efforts[index] = self.choices[index].as_ref().and_then(|model| {
-            self.catalog
-                .reasoning_efforts
-                .get(&model_catalog::model_key(&model.provider, &model.id))
-                .and_then(|levels| {
-                    let current = self.selected_efforts[index].as_deref();
-                    current
-                        .filter(|value| levels.iter().any(|level| level == value))
-                        .map(str::to_owned)
-                        .or_else(|| levels.iter().find(|level| *level != "low").cloned())
-                        .or_else(|| levels.first().cloned())
-                })
-        });
-    }
-
     fn choose_model(&mut self, model: ModelChoice) {
         let index = self.editing;
+        let changed = self.choices[index]
+            .as_ref()
+            .is_none_or(|current| !same_model(current, &model));
         if model.provider == "openai-compatible" {
             if self.custom[index].is_none() {
                 self.custom[index] = Some(CustomApiProfile {
@@ -254,7 +246,11 @@ impl App {
             self.custom[index] = None;
         }
         self.choices[index] = Some(model);
-        self.update_effort_for(index);
+        if changed {
+            // A model switch returns to the safe automatic baseline. An
+            // explicit effort for the same model survives catalog updates.
+            self.selected_efforts[index] = None;
+        }
     }
 
     fn effort_candidates(&self) -> Vec<String> {
@@ -269,27 +265,31 @@ impl App {
             .unwrap_or_default()
     }
 
-    fn effort_candidates_for(&self, index: usize) -> Vec<String> {
-        self.choices[index]
-            .as_ref()
-            .and_then(|model| {
-                self.catalog
-                    .reasoning_efforts
-                    .get(&model_catalog::model_key(&model.provider, &model.id))
-            })
-            .cloned()
-            .unwrap_or_default()
-    }
-
     fn open_effort(&mut self, index: usize) {
         self.editing = index;
-        let levels = self.effort_candidates();
+        let options = self.effort_options();
         let selected = self.selected_efforts[index]
             .as_ref()
-            .and_then(|current| levels.iter().position(|level| level == current))
-            .unwrap_or_else(|| levels.iter().position(|level| level != "low").unwrap_or(0));
+            .and_then(|current| {
+                options
+                    .iter()
+                    .position(|level| level.as_deref() == Some(current.as_str()))
+            })
+            .unwrap_or(0);
         self.picker = ListState::default().with_selected(Some(selected));
         self.page = Page::Effort;
+    }
+
+    fn effort_options(&self) -> Vec<Option<String>> {
+        let mut levels = self.effort_candidates();
+        if let Some(current) = &self.selected_efforts[self.editing] {
+            if !levels.contains(current) {
+                levels.push(current.clone());
+            }
+        }
+        std::iter::once(None)
+            .chain(levels.into_iter().map(Some))
+            .collect()
     }
 
     fn open_custom(&mut self) {
@@ -363,7 +363,10 @@ impl App {
                 KeyCode::Up | KeyCode::Left | KeyCode::BackTab => self.focus = (self.focus + 3) % 4,
                 KeyCode::Down | KeyCode::Right | KeyCode::Tab => self.focus = (self.focus + 1) % 4,
                 KeyCode::Char(' ') if self.focus < 2 => {
-                    self.enabled[self.focus] = !self.enabled[self.focus]
+                    self.enabled[self.focus] = !self.enabled[self.focus];
+                    if self.enabled[self.focus] && self.choices[self.focus].is_none() {
+                        self.choices[self.focus] = Some(recommended_model(self.focus));
+                    }
                 }
                 KeyCode::Enter if self.focus == 3 => return Outcome::Cancel,
                 KeyCode::Enter => {
@@ -396,12 +399,7 @@ impl App {
                     }
                     KeyCode::Char('e') if self.focus < count => {
                         let index = parents[self.focus];
-                        if !self.effort_candidates_for(index).is_empty() {
-                            self.open_effort(index);
-                        } else {
-                            self.message =
-                                "No effort capabilities were advertised for this model.".into();
-                        }
+                        self.open_effort(index);
                     }
                     KeyCode::Enter if self.focus < count => self.open_picker(parents[self.focus]),
                     KeyCode::Enter if self.focus == count => return self.save(),
@@ -429,11 +427,7 @@ impl App {
                     }
                     KeyCode::Enter if selected < candidates.len() => {
                         self.choose_model(candidates[selected].clone());
-                        if !self.effort_candidates_for(self.editing).is_empty() {
-                            self.open_effort(self.editing);
-                        } else {
-                            self.page = Page::Models;
-                        }
+                        self.page = Page::Models;
                     }
                     KeyCode::Enter => {
                         self.open_custom();
@@ -516,8 +510,8 @@ impl App {
                 _ => {}
             },
             Page::Effort => {
-                let levels = self.effort_candidates();
-                let count = levels.len();
+                let options = self.effort_options();
+                let count = options.len();
                 if count == 0 {
                     self.page = Page::Models;
                 } else {
@@ -531,7 +525,7 @@ impl App {
                             self.picker.select(Some((selected + 1) % count))
                         }
                         KeyCode::Enter => {
-                            self.selected_efforts[self.editing] = Some(levels[selected].clone());
+                            self.selected_efforts[self.editing] = options[selected].clone();
                             self.page = Page::Models;
                         }
                         _ => {}
@@ -557,14 +551,19 @@ impl App {
             .models
             .iter()
             .any(|candidate| same_model(candidate, model));
-        let suffix = if self.loading {
-            ""
-        } else if !known {
-            " [unverified]"
-        } else if matches!(
+        let recommended = matches!(
             (model.provider.as_str(), model.id.as_str()),
             ("codex", "gpt-5.6-luna") | ("claude", "sonnet")
-        ) {
+        );
+        let suffix = if self.loading {
+            if recommended {
+                " [recommended; availability pending]"
+            } else {
+                " [availability pending]"
+            }
+        } else if !known {
+            " [unverified]"
+        } else if recommended {
             " [recommended]"
         } else {
             ""
@@ -689,10 +688,8 @@ impl App {
                 let model = self.choices[*index]
                     .as_ref()
                     .map(|model| {
-                        let effort = self.selected_efforts[*index]
-                            .as_deref()
-                            .map(|effort| format!(" · effort {effort}"))
-                            .unwrap_or_default();
+                        let effort = self.selected_efforts[*index].as_deref().unwrap_or("Auto");
+                        let effort = format!(" · effort {effort}");
                         format!("{}{effort}", self.model_text(model))
                     })
                     .unwrap_or_else(|| "Choose a model".into());
@@ -734,14 +731,16 @@ impl App {
             frame.render_widget(Paragraph::new(note).wrap(Wrap { trim: false }), body[1]);
         } else if self.page == Page::Effort {
             let rows = self
-                .effort_candidates()
+                .effort_options()
                 .into_iter()
-                .map(ListItem::new)
+                .map(|effort| {
+                    ListItem::new(effort.unwrap_or_else(|| "Auto (agent-selected)".into()))
+                })
                 .collect::<Vec<_>>();
             let effort_body =
                 Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(body[1]);
             frame.render_widget(
-                Paragraph::new("Supported reasoning levels (discovered for this route):")
+                Paragraph::new("Auto lets the agent choose. Manual overrides are optional.")
                     .wrap(Wrap { trim: false }),
                 effort_body[0],
             );
@@ -994,15 +993,116 @@ mod tests {
     }
 
     #[test]
+    fn defaults_are_selected_and_saveable_before_discovery() {
+        let mut app = App::new(&["codex".into(), "claude".into()], &[]);
+        assert_eq!(app.choices[0].as_ref().unwrap().id, "gpt-5.6-luna");
+        assert_eq!(app.choices[1].as_ref().unwrap().id, "sonnet");
+        assert_eq!(app.selected_efforts, [None, None]);
+        key(&mut app, KeyCode::Enter);
+        assert!(screen(&mut app, 80, 24).contains("availability pending"));
+        let Outcome::Save(selection) = app.save() else {
+            panic!("the seeded defaults should be saveable while discovery is pending")
+        };
+        assert_eq!(selection.0.len(), 2);
+        assert!(selection
+            .0
+            .iter()
+            .all(|entry| entry.reasoning_effort.is_none()));
+    }
+
+    #[test]
+    fn auto_is_available_before_discovery_and_preserves_unknown_manual_effort() {
+        let mut app = App::new(&["codex".into()], &[]);
+        app.selected_efforts[0] = Some("max".into());
+        app.page = Page::Models;
+        app.focus = 0;
+        key(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.page, Page::Effort);
+        assert_eq!(app.effort_options(), vec![None, Some("max".into())]);
+        assert_eq!(app.picker.selected(), Some(1));
+        key(&mut app, KeyCode::Up);
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.selected_efforts[0], None);
+    }
+
+    #[test]
+    fn model_selection_does_not_force_effort_picker() {
+        let mut app = app();
+        app.catalog.reasoning_efforts.insert(
+            model_catalog::model_key("claude", "sonnet"),
+            vec!["medium".into(), "high".into()],
+        );
+        app.open_picker(0);
+        type_text(&mut app, "sonnet");
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.page, Page::Models);
+        assert_eq!(app.selected_efforts[0], None);
+    }
+
+    #[test]
+    fn late_discovery_preserves_saved_effort_override() {
+        let saved = model("codex", "gpt-5.6-luna");
+        let profile = CurrentProfile {
+            parent: "codex".into(),
+            choice: Some(saved.clone()),
+            custom: None,
+            reasoning_effort: Some("high".into()),
+        };
+        let mut app = App::new_with_profiles(&["codex".into()], &[profile]);
+        app.set_catalog(Catalog {
+            models: vec![saved],
+            reasoning_efforts: [(
+                model_catalog::model_key("codex", "gpt-5.6-luna"),
+                vec!["low".into(), "medium".into(), "high".into()],
+            )]
+            .into_iter()
+            .collect(),
+            ..Catalog::default()
+        });
+        assert_eq!(app.selected_efforts[0].as_deref(), Some("high"));
+    }
+
+    #[test]
+    fn effort_picker_defaults_to_auto_and_keeps_manual_levels_optional() {
+        let mut app = App::new(&["codex".into()], &[]);
+        app.set_catalog(Catalog {
+            models: vec![model("codex", "gpt-5.6-luna")],
+            reasoning_efforts: [(
+                model_catalog::model_key("codex", "gpt-5.6-luna"),
+                vec!["medium".into(), "high".into(), "xhigh".into(), "max".into()],
+            )]
+            .into_iter()
+            .collect(),
+            ..Catalog::default()
+        });
+        key(&mut app, KeyCode::Enter);
+        key(&mut app, KeyCode::Up);
+        key(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.page, Page::Effort);
+        assert!(screen(&mut app, 80, 24).contains("Auto (agent-selected)"));
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.selected_efforts[0], None);
+        key(&mut app, KeyCode::Char('e'));
+        key(&mut app, KeyCode::Down);
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.selected_efforts[0].as_deref(), Some("medium"));
+    }
+
+    #[test]
     fn missing_recommended_model_is_not_replaced_by_arbitrary_model() {
         let mut app = App::new(&["claude".into()], &[]);
         app.set_catalog(Catalog {
             models: vec![model("claude", "haiku")],
             ..Catalog::default()
         });
-        assert!(app.choices[1].is_none());
-        assert!(matches!(app.save(), Outcome::Continue));
-        assert!(app.message.contains("Claude Code"));
+        assert_eq!(app.choices[1].as_ref().unwrap().id, "sonnet");
+        let Outcome::Save(selection) = app.save() else {
+            panic!("the unverified recommendation should remain saveable")
+        };
+        assert_eq!(selection.0[0].model.id, "sonnet");
+        assert!(app
+            .model_text(app.choices[1].as_ref().unwrap())
+            .contains("unverified"));
     }
 
     #[test]

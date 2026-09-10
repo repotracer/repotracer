@@ -38,6 +38,28 @@ pub fn profile(base: &Path, parent: &str) -> PathBuf {
     ))
 }
 
+// Native CLIs require a concrete initial effort. Keep Auto in the wizard as
+// None, then use the config's existing conservative default at the boundary.
+const AUTOMATIC_NATIVE_EFFORT: &str = "medium";
+
+fn profile_reasoning_effort(cfg: &RepoTracerConfig) -> Option<String> {
+    let effort = cfg.model.reasoning_effort.trim();
+    // Older profiles had no Auto marker. Treat the native default medium plus
+    // adaptive reasoning as Auto; explicit medium remains visible when the
+    // adaptive flag is disabled.
+    let native = matches!(
+        cfg.model.backend.to_ascii_lowercase().as_str(),
+        "codex" | "codex-cli" | "claude" | "claude-cli"
+    );
+    if effort.is_empty()
+        || (native && cfg.model.adaptive_reasoning && effort == AUTOMATIC_NATIVE_EFFORT)
+    {
+        None
+    } else {
+        Some(effort.to_owned())
+    }
+}
+
 fn select_provider(cfg: &mut RepoTracerConfig, provider: &str) {
     if matches!(provider, "openai" | "openai-compatible") {
         if cfg.model.is_claude() || crate::subscription::is_subscription_backend(cfg) {
@@ -92,6 +114,10 @@ fn apply_model_choice(
         cfg.model.model = choice.model.id.clone();
         if let Some(effort) = &choice.reasoning_effort {
             cfg.model.reasoning_effort = effort.clone();
+            cfg.model.adaptive_reasoning = false;
+        } else {
+            cfg.model.reasoning_effort = AUTOMATIC_NATIVE_EFFORT.into();
+            cfg.model.adaptive_reasoning = true;
         }
     }
     Ok(())
@@ -169,8 +195,7 @@ pub fn run(
                         parent: parent.to_owned(),
                         choice: Some(choice),
                         custom,
-                        reasoning_effort: (!selected.model.reasoning_effort.is_empty())
-                            .then(|| selected.model.reasoning_effort.clone()),
+                        reasoning_effort: profile_reasoning_effort(&selected),
                     });
                 } else {
                     current_by_parent.push(crate::wizard::CurrentProfile {
@@ -517,5 +542,59 @@ mod tests {
         assert_eq!(cfg.model.base_url, "https://gateway.example/v1");
         assert_eq!(cfg.model.api_key.as_deref(), Some("secret"));
         assert!(cfg.model.reasoning_effort.is_empty());
+    }
+
+    #[test]
+    fn native_auto_uses_conservative_config_effort_and_keeps_explicit_override() {
+        let choice = |reasoning_effort| crate::wizard::ParentModelChoice {
+            parent: "codex".into(),
+            model: crate::model_catalog::ModelChoice {
+                provider: "codex".into(),
+                id: "gpt-5.6-luna".into(),
+                label: "Luna".into(),
+            },
+            custom: None,
+            reasoning_effort,
+        };
+        let mut cfg = RepoTracerConfig::default();
+        apply_model_choice(&mut cfg, &choice(None)).unwrap();
+        assert_eq!(cfg.model.reasoning_effort, "medium");
+        assert_ne!(cfg.model.reasoning_effort, "auto");
+        assert!(cfg.model.adaptive_reasoning);
+
+        apply_model_choice(&mut cfg, &choice(Some("max".into()))).unwrap();
+        assert_eq!(cfg.model.reasoning_effort, "max");
+        assert!(!cfg.model.adaptive_reasoning);
+    }
+
+    #[test]
+    fn profile_auto_round_trips_through_existing_adaptive_flag() {
+        let mut cfg = RepoTracerConfig::default();
+        cfg.model.backend = "codex-cli".into();
+        cfg.model.reasoning_effort = "medium".into();
+        cfg.model.adaptive_reasoning = true;
+        assert_eq!(profile_reasoning_effort(&cfg), None);
+
+        let mut manual_medium = cfg.clone();
+        manual_medium.model.adaptive_reasoning = false;
+        assert_eq!(
+            profile_reasoning_effort(&manual_medium).as_deref(),
+            Some("medium")
+        );
+
+        let mut manual_high = cfg;
+        manual_high.model.reasoning_effort = "high".into();
+        assert_eq!(
+            profile_reasoning_effort(&manual_high).as_deref(),
+            Some("high")
+        );
+    }
+
+    #[test]
+    fn custom_medium_is_not_mistaken_for_native_auto() {
+        let mut cfg = RepoTracerConfig::default();
+        cfg.model.backend = "openai-compatible".into();
+        cfg.model.reasoning_effort = "medium".into();
+        assert_eq!(profile_reasoning_effort(&cfg).as_deref(), Some("medium"));
     }
 }
