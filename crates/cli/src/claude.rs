@@ -20,6 +20,10 @@ use tokio::{
     process::{Child, ChildStdin, ChildStdout, Command},
 };
 
+#[cfg(all(test, windows))]
+#[path = "claude_windows_tests.rs"]
+mod windows_tests;
+
 async fn native_io<T>(
     idle_timeout: Option<Duration>,
     operation: impl Future<Output = std::io::Result<T>>,
@@ -135,6 +139,8 @@ struct Conversation {
     /// wrappers and helper processes Claude Code starts underneath itself.
     /// `None` only where the platform does not give us one.
     process_group: Option<u32>,
+    #[cfg(windows)]
+    job: Option<crate::windows_job::WindowsJob>,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
     stderr: StderrTail,
@@ -153,7 +159,9 @@ struct Conversation {
 impl Conversation {
     /// Kill the CLI and everything it started, then reap it.
     async fn kill_tree(&mut self) {
-        if let Some(process_group) = self.process_group {
+        #[cfg(windows)]
+        drop(self.job.take());
+        if let Some(process_group) = self.process_group.take() {
             crate::session::kill_process_group(process_group);
         }
         let _ = self.child.kill().await;
@@ -166,7 +174,9 @@ impl Drop for Conversation {
         // MCP cancellation drops the handler future mid-turn, so no `retire`
         // await is reachable on that path. Signal the group synchronously so
         // descendants cannot outlive the cancelled request.
-        if let Some(process_group) = self.process_group {
+        #[cfg(windows)]
+        drop(self.job.take());
+        if let Some(process_group) = self.process_group.take() {
             crate::session::kill_process_group(process_group);
         }
         let _ = self.child.start_kill();
@@ -298,7 +308,7 @@ impl ClaudeScout {
                         store.reap_expired(idle)
                     };
                     for mut old in expired {
-                        let _ = old.child.kill().await;
+                        old.kill_tree().await;
                     }
                 }
             });
@@ -376,15 +386,24 @@ impl ClaudeScout {
         id: String,
         reasoning_effort: &str,
     ) -> Result<Conversation> {
-        let mut child = self
-            .command(request, reasoning_effort)
+        let mut command = self.command(request, reasoning_effort);
+        #[cfg(windows)]
+        let (mut child, job) = crate::windows_job::WindowsJob::spawn(&mut command)
+            .context("start Claude Code in a process job")?;
+        #[cfg(not(windows))]
+        let mut child = command
             .spawn()
             .context("start Claude Code; install and log in with claude auth login first")?;
         Ok(Conversation {
             stdin: child.stdin.take().context("Claude stdin")?,
             stdout: BufReader::new(child.stdout.take().context("Claude stdout")?),
             stderr: StderrTail::drain(child.stderr.take()),
+            #[cfg(unix)]
             process_group: child.id(),
+            #[cfg(not(unix))]
+            process_group: None,
+            #[cfg(windows)]
+            job: Some(job),
             child,
             root,
             id,

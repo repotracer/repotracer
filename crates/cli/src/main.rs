@@ -10,6 +10,8 @@ mod session;
 mod settings;
 mod setup;
 mod subscription;
+#[cfg(windows)]
+mod windows_job;
 mod wizard;
 
 use anyhow::{bail, Context, Result};
