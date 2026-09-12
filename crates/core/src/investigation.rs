@@ -212,7 +212,11 @@ fn resolve_with_existing_parent(candidate: &Path, input: &str) -> anyhow::Result
 }
 
 fn repository_relative(root: &Path, path: &Path) -> anyhow::Result<String> {
-    let relative = path.strip_prefix(root).unwrap_or(path);
+    let Ok(relative) = path.strip_prefix(root) else {
+        // Keep native absolute prefixes intact, especially Windows verbatim
+        // paths. Focus becomes a PathBuf again and must round-trip exactly.
+        return Ok(path.to_string_lossy().into_owned());
+    };
     if relative.as_os_str().is_empty() {
         return Ok(".".into());
     }
@@ -602,17 +606,15 @@ mod tests {
         traversal.focus = Some(PathBuf::from("../secret.rs"));
         normalize_request_paths(&mut traversal).unwrap();
         assert_eq!(traversal.focus, Some(outside.canonicalize().unwrap()));
+        normalize_request_paths(&mut traversal).unwrap();
+        assert_eq!(traversal.focus, Some(outside.canonicalize().unwrap()));
 
         let mut absolute_outside = request(&root);
         absolute_outside.investigation.target_paths = vec![outside.display().to_string()];
         normalize_request_paths(&mut absolute_outside).unwrap();
         assert_eq!(
             absolute_outside.investigation.target_paths,
-            [outside
-                .canonicalize()
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/")]
+            [outside.canonicalize().unwrap().to_string_lossy()]
         );
     }
 
