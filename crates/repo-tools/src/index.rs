@@ -87,7 +87,7 @@ impl RepositoryIndex {
     pub fn schema(&self) -> ToolSchema {
         ToolSchema {
             name: "Symbols".into(),
-            description: "Query an on-demand, content-hash refreshed syntax index for Rust, Python, JavaScript, TypeScript/TSX, or Go. Modes: definitions, references, outline. References are same-name syntactic occurrences, NOT resolved callers. Use exact symbol names, optional repository-relative path, and next_offset for pagination. Read returned ranges to establish behavior; use Grep for unsupported languages, aliases, generated code, and dynamic dispatch. Output reports parse errors, exclusions, and truncation. No source is injected until this tool is called.".into(),
+            description: "Query an on-demand, content-hash refreshed syntax index for Rust, Python, JavaScript, TypeScript/TSX, or Go. Modes: definitions, references, outline. References are same-name syntactic occurrences, NOT resolved callers. Use exact symbol names, optional path relative to the current target or absolute for related evidence, and next_offset for pagination. Read returned ranges to establish behavior; use Grep for unsupported languages, aliases, generated code, and dynamic dispatch. Output reports parse errors, exclusions, and truncation. No source is injected until this tool is called.".into(),
             parameters: json!({"type":"object", "additionalProperties":false, "properties":{
                 "symbol":{"type":"string","description":"Exact symbol name; empty lists all symbols in the scope."},
                 "mode":{"type":"string","enum":["definitions","references","outline"]},

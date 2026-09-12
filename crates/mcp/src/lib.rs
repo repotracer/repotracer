@@ -954,7 +954,7 @@ mod tests {
     }
 
     #[test]
-    fn repo_scout_is_declared_read_only() {
+    fn repo_scout_declares_investigation_side_effects() {
         let annotations = &repo_scout_tool_def()["annotations"];
         assert_eq!(annotations["readOnlyHint"], false);
         assert_eq!(annotations["destructiveHint"], true);
