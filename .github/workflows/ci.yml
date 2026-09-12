@@ -75,6 +75,7 @@ jobs:
         run: cargo test --workspace
       - name: Real Codex app-server repository read
         run: |
+          python3 scripts/test_subscription_smoke.py
           cargo build -p repotracer
           python3 scripts/codex-app-server-smoke.py
           REPOTRACER_SMOKE_SYMBOLS=1 python3 scripts/codex-app-server-smoke.py
@@ -117,6 +118,7 @@ jobs:
         run: cargo test --workspace
       - name: Real Codex app-server repository read
         run: |
+          python scripts/test_subscription_smoke.py
           cargo build -p repotracer
           python scripts/codex-app-server-smoke.py
       - name: Test npx updates

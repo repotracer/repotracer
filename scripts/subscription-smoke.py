@@ -27,6 +27,23 @@ def referenced_text(result, reference):
     return content[start:end].decode("utf-8")
 
 
+def handoff_report(result):
+    """Read the supported report rendering without requiring legacy metadata."""
+    structured = result["structuredContent"]
+    version = structured.get("handoff_version", 1)
+    if version == 3:
+        report = structured["report"]
+    elif version == 2:
+        report = referenced_text(result, structured["report_ref"])
+    else:
+        report = " ".join(
+            finding["answer"]
+            for finding in structured.get("investigation", {}).get("findings", [])
+        )
+    assert isinstance(report, str) and report.strip(), "No investigation report returned"
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", required=True)
@@ -94,6 +111,10 @@ def main():
                 assert not response["result"].get("isError"), \
                     "Native scout reported a failure; inspect the saved response and usage."
                 result = response["result"]["structuredContent"]
+                report = handoff_report(response["result"])
+                # These fixture questions ask where source behavior lives. A
+                # different investigation may validly return experiment evidence
+                # in the report with no source citations.
                 assert result["citations"], "No source evidence returned"
                 source_spans = result.get("evidence", [])
                 source_texts = [span.get("text") if "text" in span else referenced_text(response["result"], span["text_ref"])
@@ -110,26 +131,8 @@ def main():
                 assert stats["warm_process"] == expected_warm, stats
                 assert result["conversation"]["status"] == ("resumed" if number == 3 else "fresh")
                 assert result["repository"] == str(root.resolve())
-                status = result["investigation"]["status"]
-                # A change-impact report can identify all consumers and still
-                # flag a product choice, such as whether to rename an env var.
-                # This smoke checks transport and evidence, not completeness.
-                if number == 4:
-                    assert status in {"complete", "partial"}, result["investigation"]
-                    if status == "partial":
-                        assert result["investigation"].get("unresolved") or result["investigation"].get("limitations")
-                else:
-                    assert status == "complete", result["investigation"]
-                confidence = result["investigation"]["confidence"]
-                assert confidence["level"] in {"high", "medium", "low", "unknown"}, confidence
-                if confidence["level"] != "unknown":
-                    assert confidence["basis"].strip(), "Confidence has no evidence basis"
-                findings = (result["report"] if result.get("handoff_version") == 3 else
-                            referenced_text(response["result"], result["report_ref"])
-                            if result.get("handoff_version") == 2 else
-                            " ".join(f["answer"] for f in result["investigation"]["findings"]))
                 if number == 3:
-                    assert "9" in findings, "Continuation did not report the changed default"
+                    assert "9" in report, "Continuation did not report the changed default"
                     assert any("request_timeout: float = 9.0" in text for text in source_texts), \
                         "Continuation did not supply the current dataclass default"
                     assert any('env.get("REQUEST_TIMEOUT", "9")' in text for text in source_texts), \
@@ -137,9 +140,9 @@ def main():
                 if number == 4:
                     cited = {c["path"] for c in result["citations"]}
                     assert {"config.py", "client.py", "test_client.py"} <= cited, cited
-                results.append({"intent":intent, "status":status, "requested_effort":investigation.get("reasoning_effort"),
-                                "confidence":confidence, "seconds":round(time.monotonic()-started, 2), "stats":stats})
-                print(f"PASS {intent}: status={status}, warm={stats['warm_process']}, thread_turn={stats['thread_turn']}", flush=True)
+                results.append({"intent":intent, "requested_effort":investigation.get("reasoning_effort"),
+                                "seconds":round(time.monotonic()-started, 2), "stats":stats})
+                print(f"PASS {intent}: warm={stats['warm_process']}, thread_turn={stats['thread_turn']}", flush=True)
             (run_output / "summary.json").write_text(json.dumps({"type":"functional smoke, not comparative evidence", "results":results}, indent=2))
             print(f"Artifacts: {run_output}", flush=True)
         finally:
