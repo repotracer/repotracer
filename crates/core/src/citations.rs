@@ -107,11 +107,7 @@ pub fn validate_citation(root: &Path, c: &Citation) -> Option<ValidatedCitation>
     }
     let end = c.end_line.min(line_count);
 
-    let rel = path_canon
-        .strip_prefix(&root_canon)
-        .unwrap_or(&path_canon)
-        .to_string_lossy()
-        .replace('\\', "/");
+    let rel = crate::investigation::repository_relative(&root_canon, &path_canon).ok()?;
 
     Some(ValidatedCitation {
         path: rel,
@@ -238,7 +234,34 @@ src/auth/refresh.ts:10-20
     }
 
     #[test]
-    fn rejects_escape() {
+    fn related_citations_preserve_native_paths() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("repo");
+        fs::create_dir(&root).unwrap();
+        // On Unix a backslash is part of a filename, not a separator. On
+        // Windows canonicalize supplies a native verbatim path prefix.
+        let name = if cfg!(unix) {
+            "related\\source.rs"
+        } else {
+            "source.rs"
+        };
+        let outside = dir.path().join(name);
+        fs::write(&outside, "external evidence\n").unwrap();
+        let c = Citation {
+            path: outside.to_string_lossy().into_owned(),
+            start_line: 1,
+            end_line: 1,
+            reason: None,
+        };
+        let v = validate_citation(&root, &c).unwrap();
+        assert_eq!(PathBuf::from(&v.path), outside.canonicalize().unwrap());
+        assert_eq!(fs::read_to_string(&v.path).unwrap(), "external evidence\n");
+        let repeated = Citation { path: v.path, ..c };
+        assert!(validate_citation(&root, &repeated).is_some());
+    }
+
+    #[test]
+    fn rejects_missing_related_source() {
         let dir = tempdir().unwrap();
         let c = Citation {
             path: "../secret".into(),

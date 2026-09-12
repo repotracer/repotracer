@@ -211,7 +211,7 @@ fn resolve_with_existing_parent(candidate: &Path, input: &str) -> anyhow::Result
     }
 }
 
-fn repository_relative(root: &Path, path: &Path) -> anyhow::Result<String> {
+pub(crate) fn repository_relative(root: &Path, path: &Path) -> anyhow::Result<String> {
     let Ok(relative) = path.strip_prefix(root) else {
         // Keep native absolute prefixes intact, especially Windows verbatim
         // paths. Focus becomes a PathBuf again and must round-trip exactly.
