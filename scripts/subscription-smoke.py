@@ -31,7 +31,7 @@ def handoff_report(result):
     """Read the supported report rendering without requiring legacy metadata."""
     structured = result["structuredContent"]
     version = structured.get("handoff_version", 1)
-    if version == 3:
+    if version in (3, 4):
         report = structured["report"]
     elif version == 2:
         report = referenced_text(result, structured["report_ref"])

@@ -146,41 +146,32 @@ RepoTracer does not edit repository files. The parent Codex process owns edits, 
 
 Citation validation proves locations exist, not that claims are true. The scout reports whether the objective is answered. Rust checks output integrity and citation locations; matching question labels or counting findings cannot establish semantic completeness. One finding may address several questions.
 
-The formatter preserves the explanation when it fits, then includes supporting source. Source omissions are separate from removed citation records and unresolved questions. Missing excerpts do not change the scout's completion status. Output limitations identify unavailable or omitted text without declaring the investigation unanswered. If the report itself must be shortened, its delivered status becomes partial. Oversized report text is shortened only at this shared transport boundary, not silently inside a subscription client.
-
-Handoff version 3 makes both supported renderings self-contained.
+Handoff version 4 keeps both supported renderings self-contained.
 `structuredContent.report` contains the explanation and `evidence[].text`
-contains line-numbered source. Status, confidence, unresolved questions,
-citation locations, omissions, and usage remain structured metadata.
+contains line-numbered source. Citation locations, source omissions, conversation
+metadata, continuation requests, and usage remain structured fields.
 `content[0].text` is a full readable fallback. Callers should forward either
 representation, not the entire envelope with both compatibility copies.
 
-Version 2's cross-field byte references were unsafe for clients that retain
-only one rendering. A real Codex 0.153.4 direct-call trace retained structured
-metadata but discarded the text containing the report and source. Version 3
-therefore has no references that depend on the discarded alternative.
-The smoke reader accepts versions 1, 2, and 3. The CLI's own `ScoutResult` JSON
-is unchanged.
+Version 4 removes the version-3 fields `investigation`, `next_action`,
+`handoff_limitations`, and `omitted_citations`. Consumers that need those fields
+must keep their version-3 parser separate from the version-4 parser. Failed
+investigations, including a configured total timeout, set the MCP envelope's
+`isError` to true while retaining the report, usage, and conversation metadata.
+Partial and not-found results are not tool errors. Source attachment failures
+also preserve the answer and carry explicit delivery warnings.
 
-Each representation has the existing 36 KiB ceiling; the combined wire reply
-may be up to approximately 72 KiB including compatibility copies. Native
-Codex keeps only the structured representation. This prevents fallback text
-from halving the source space available to that parent. The scout orders
-findings and citations by usefulness to the parent's next step, placing edit
-targets and relevant tests before peripheral background. If source still does
-not fit, the lowest-priority span is omitted first while its citation remains.
-Overlapping ranges inherit their earliest citation's priority. A span that
-cannot fit even by itself with the report is dropped before other spans, so
-one huge range cannot evict all usable context. This ranking is the scout's
-judgment, not a server-verified assessment of semantic importance.
-Omissions remain explicit, and a sole oversized span can be truncated on a
-UTF-8 boundary. No new per-intent, per-file, or citation-count cap is added.
+Version 2 used cross-field byte references, which were unsafe for clients that
+retain only one rendering. Versions 3 and 4 instead embed report and source text
+in each rendering. The smoke reader accepts versions 1 through 4. The CLI's own
+`ScoutResult` JSON and the package version are unchanged by this protocol bump.
 
+The formatter returns the selected source ranges without the former 36 KiB
+handoff ceiling or source eviction. Overlapping ranges share one source block.
 Each MCP citation adds `source_status`: `included`, `truncated`, or `omitted`.
-The text fallback names ranges not fully included. These describe delivery,
-not claim confidence, and let the parent request missing context directly.
-Older replies without the field remain usable. Existing citation fields and
-the two self-contained version-3 renderings are retained.
+Attachment failures add `source_error`, with details also available under
+`evidence_omissions.errors`; the text fallback names unavailable ranges. These
+fields describe source delivery, not claim confidence.
 
 The parent passes relevant task requirements in the existing query, separately
 from assumptions about current code. The scout does not inherit the parent

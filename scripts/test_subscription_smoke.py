@@ -13,11 +13,24 @@ SPEC.loader.exec_module(SUBSCRIPTION_SMOKE)
 
 
 class HandoffReportTests(unittest.TestCase):
-    def test_v3_experiment_report_needs_no_legacy_investigation_or_citations(self):
+    def test_legacy_reports_remain_readable(self):
+        for structured in [
+            {"investigation": {"findings": [{"answer": "legacy report"}]}},
+            {"handoff_version": 2, "report_ref": {
+                "content_index": 0, "start_byte": 0, "end_byte": 13}},
+            {"handoff_version": 3, "report": "legacy report",
+             "investigation": {"status": "complete"}},
+        ]:
+            with self.subTest(version=structured.get("handoff_version", 1)):
+                result = {"content": [{"type": "text", "text": "legacy report"}],
+                          "structuredContent": structured}
+                self.assertEqual(SUBSCRIPTION_SMOKE.handoff_report(result), "legacy report")
+
+    def test_v4_experiment_report_needs_no_legacy_investigation_or_citations(self):
         result = {
             "content": [{"type": "text", "text": "Command: exit 0\nObserved: success"}],
             "structuredContent": {
-                "handoff_version": 3,
+                "handoff_version": 4,
                 "report": "Command: exit 0\nObserved: success",
                 "citations": [],
                 "evidence": [],

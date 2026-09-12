@@ -336,7 +336,7 @@ fn build_handoff_response(
         ));
     }
     let structured = json!({
-        "handoff_version": 3,
+        "handoff_version": 4,
         "repository": root_from_stats(&result.stats),
         "conversation": result.stats.conversation,
         "report": report,
@@ -358,7 +358,7 @@ fn build_handoff_response(
     json!({
         "content": [{ "type": "text", "text": text }],
         "structuredContent": structured,
-        "isError": false
+        "isError": result.investigation.status == repotracer_core::InvestigationStatus::Failed
     })
 }
 
@@ -585,6 +585,22 @@ mod repository_tools_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_failed_investigations_are_tool_errors() {
+        use repotracer_core::InvestigationStatus;
+        for status in [
+            InvestigationStatus::Complete,
+            InvestigationStatus::Partial,
+            InvestigationStatus::NotFound,
+            InvestigationStatus::Failed,
+        ] {
+            let mut result = scout_result(0);
+            result.investigation.status = status;
+            let response = build_handoff_response(&result, &[], &HandoffOmissions::default());
+            assert_eq!(response["isError"], status == InvestigationStatus::Failed);
+        }
+    }
 
     #[cfg(unix)]
     #[tokio::test(flavor = "current_thread")]
@@ -1462,7 +1478,7 @@ mod tests {
         assert!(text.contains("The leaf function returns the value."));
         assert!(text.contains("Sources: lib.rs:1-1"));
         assert!(text.contains("1: fn answer() { return 42; }"));
-        assert_eq!(structured["handoff_version"], 3);
+        assert_eq!(structured["handoff_version"], 4);
         let report = embedded_text(&response, &structured["report"]);
         assert!(report.contains("The answer is returned"));
         assert!(report.contains("The leaf function returns the value."));

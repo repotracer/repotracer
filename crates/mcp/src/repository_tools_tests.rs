@@ -10,6 +10,51 @@ use std::sync::Arc;
 
 struct RepositoryModel;
 
+#[tokio::test]
+async fn generic_timeout_is_an_mcp_tool_error() {
+    struct PendingModel;
+
+    #[async_trait]
+    impl ModelBackend for PendingModel {
+        fn name(&self) -> &str {
+            "pending-fixture"
+        }
+
+        async fn complete(&self, _: ModelRequest) -> Result<ModelResponse, ModelError> {
+            std::future::pending().await
+        }
+    }
+
+    let root = tempfile::tempdir().unwrap();
+    let engine = ScoutEngine::new(
+        Arc::new(PendingModel),
+        RepoTools::new(root.path()),
+        ExplorerBudget {
+            timeout_seconds: 1,
+            ..Default::default()
+        },
+    );
+    let server = McpServer::new(Arc::new(engine), root.path().to_owned());
+    let response = server
+        .tools_call(json!({"name":"repo_scout", "arguments":{"query":"find implementation"}}))
+        .await
+        .unwrap();
+    assert_eq!(response["isError"], true);
+    assert!(response["structuredContent"]["report"]
+        .as_str()
+        .unwrap()
+        .contains("timed out"));
+    assert!(response["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("timed out"));
+    assert_eq!(
+        response["structuredContent"]["stats"]["model"],
+        "pending-fixture"
+    );
+    assert!(response["structuredContent"]["conversation"]["id"].is_string());
+}
+
 #[async_trait]
 impl ModelBackend for RepositoryModel {
     fn name(&self) -> &str {
