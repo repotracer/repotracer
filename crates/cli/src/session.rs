@@ -26,7 +26,6 @@ use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::{Duration, Instant};
 use tokio::io::{
@@ -39,7 +38,6 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant as TokioInstant;
 
 const MAX_CAPTURE_BYTES: usize = 1_048_576;
-static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 static SCRATCH_BASE: OnceLock<PathBuf> = OnceLock::new();
 
 /// Report received bytes, not only complete JSON lines. Large native events
@@ -111,47 +109,37 @@ fn canonical_root(root: &Path) -> PathBuf {
     root.canonicalize().unwrap_or_else(|_| root.to_path_buf())
 }
 
+/// Allocate a private scratch base with a collision-resistant name and owner-only mode.
+fn new_scratch_base() -> Result<tempfile::TempDir> {
+    let mut builder = tempfile::Builder::new();
+    builder.prefix("repotracer-investigation-scratch-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    builder
+        .tempdir()
+        .context("could not create retained investigation scratch base")
+}
+
 /// Create (or return) the private process-scoped base for retained scratch.
-/// `create_dir` is atomic and rejects a pre-existing symlink; unlike
-/// `create_dir_all`, it cannot follow an attacker-controlled entry in shared
-/// `/tmp`. The base name includes a process-local counter, and its mode is
-/// tightened before the path is ever handed to a provider.
+/// The winning `TempDir` is explicitly kept so conversation artifacts survive
+/// session eviction and future replies. A concurrent loser remains temporary
+/// and is dropped while still empty.
 fn retained_scratch_base() -> Result<PathBuf> {
     if let Some(path) = SCRATCH_BASE.get() {
         return Ok(path.clone());
     }
-    for _ in 0..10 {
-        let id = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "repotracer-investigation-scratch-{}-{id}",
-            std::process::id()
-        ));
-        match std::fs::create_dir(&path) {
-            Ok(()) => {
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    if let Err(error) =
-                        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))
-                    {
-                        let _ = std::fs::remove_dir(&path);
-                        return Err(error.into());
-                    }
-                }
-                if SCRATCH_BASE.set(path.clone()).is_ok() {
-                    return Ok(path);
-                }
-                let _ = std::fs::remove_dir(&path);
-                return Ok(SCRATCH_BASE
-                    .get()
-                    .expect("scratch base set by competing initializer")
-                    .clone());
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error.into()),
-        }
+    let candidate = new_scratch_base()?;
+    let path = candidate.path().to_path_buf();
+    if SCRATCH_BASE.set(path.clone()).is_ok() {
+        return Ok(candidate.keep());
     }
-    bail!("could not create retained investigation scratch base")
+    Ok(SCRATCH_BASE
+        .get()
+        .expect("scratch base set by competing initializer")
+        .clone())
 }
 
 /// Return the retained scratch directory for one parent-visible conversation.
@@ -1546,6 +1534,30 @@ pub(crate) fn kill_process_group(process_group: u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scratch_base_allocations_are_unique_and_preserve_prior_files() {
+        let first = new_scratch_base().unwrap();
+        let marker = first.path().join("prior-result.txt");
+        std::fs::write(&marker, "retained").unwrap();
+
+        let second = new_scratch_base().unwrap();
+
+        assert_ne!(first.path(), second.path());
+        assert_eq!(std::fs::read_to_string(marker).unwrap(), "retained");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                first.path().metadata().unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            assert_eq!(
+                second.path().metadata().unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+        }
+    }
 
     #[test]
     fn conversation_scratch_is_stable_and_retained() {
