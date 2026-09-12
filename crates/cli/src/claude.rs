@@ -261,6 +261,9 @@ impl Conversation {
         }
         let _ = self.child.kill().await;
         let _ = self.child.wait().await;
+        // Reaping frees the leader's PID for reuse. Drop must not signal an
+        // unrelated group that later receives that number.
+        self.process_group = None;
     }
 }
 
@@ -915,6 +918,47 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use crate::model_catalog::write_executable_fixture;
+
+    /// Reaping the group leader frees its PID for reuse. Drop must not signal
+    /// that group number again after explicit cleanup has finished.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn killed_conversation_does_not_signal_a_reusable_pid_from_drop() {
+        let mut child = Command::new("sleep")
+            .arg("120")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .process_group(0)
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let process_group = child.id().unwrap();
+        let mut session = Conversation {
+            stdin: child.stdin.take().unwrap(),
+            stdout: BufReader::new(child.stdout.take().unwrap()),
+            stderr: StderrTail::drain(child.stderr.take()),
+            process_group: Some(process_group),
+            child,
+            root: PathBuf::from("/"),
+            provider_identity: 0,
+            id: "drop-signal".into(),
+            reasoning_effort: "medium".into(),
+            turns: 0,
+            input_tokens: None,
+            turn_limit: 1,
+            touched: Instant::now(),
+            last_cost_usd: Some(0.0),
+        };
+        session.kill_tree().await;
+        assert!(session.child.try_wait().unwrap().is_some());
+        assert!(
+            session.process_group.is_none(),
+            "Drop would signal process group {process_group} after its PID became reusable"
+        );
+        session.kill_tree().await;
+        assert!(session.process_group.is_none());
+    }
 
     #[test]
     fn missing_structured_result_preserves_paid_usage() {
