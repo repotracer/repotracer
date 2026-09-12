@@ -67,7 +67,7 @@ impl<R: AsyncRead + Unpin> AsyncRead for ActivityReader<R> {
 #[derive(Clone)]
 pub struct SessionSpec {
     pub conversation_id: Option<String>,
-    pub provider_identity: u64,
+    pub provider: ProviderLaunchSnapshot,
     pub executable: PathBuf,
     pub args: Vec<OsString>,
     pub root: PathBuf,
@@ -93,7 +93,7 @@ impl SessionSpec {
         (
             &self.executable,
             &self.args,
-            self.provider_identity,
+            &self.provider,
             self.thread_params.to_string(),
             &self.developer_instructions,
         )
@@ -126,25 +126,50 @@ impl SessionKey {
     }
 }
 
-/// Detect source account/configuration changes without logging or retaining their contents.
-pub fn provider_identity() -> Result<u64> {
-    let home = std::env::var_os("CODEX_HOME")
-        .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")));
-    let mut hash = std::collections::hash_map::DefaultHasher::new();
-    home.hash(&mut hash);
-    if let Some(home) = home {
-        for name in ["config.toml", "auth.json"] {
-            match std::fs::read(home.join(name)) {
-                Ok(bytes) => bytes.hash(&mut hash),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => name.hash(&mut hash),
-                Err(error) => {
-                    return Err(error).context("could not check Codex source configuration")
-                }
-            }
-        }
+/// The pool key and child home must describe the same bytes, even if the source
+/// files change while a request waits for a session. Never format credentials.
+#[derive(Clone, Hash)]
+pub struct ProviderLaunchSnapshot {
+    source_home: Option<PathBuf>,
+    config: Option<String>,
+    auth: Option<Vec<u8>>,
+}
+
+impl ProviderLaunchSnapshot {
+    pub fn capture() -> Result<Self> {
+        let home = std::env::var_os("CODEX_HOME")
+            .map(PathBuf::from)
+            .or_else(|| dirs::home_dir().map(|home| home.join(".codex")));
+        Self::from_home(home.as_deref())
     }
-    Ok(hash.finish())
+
+    fn from_home(home: Option<&Path>) -> Result<Self> {
+        let mut snapshot = Self {
+            source_home: home.map(canonical_root),
+            config: None,
+            auth: None,
+        };
+        if let Some(home) = home {
+            snapshot.config = read_optional(&home.join("config.toml"))?
+                .map(|bytes| {
+                    let text = std::str::from_utf8(&bytes)
+                        .context("Codex source configuration is not UTF-8")?;
+                    filtered_provider_config(text)
+                })
+                .transpose()?
+                .flatten();
+            snapshot.auth = read_optional(&home.join("auth.json"))?;
+        }
+        Ok(snapshot)
+    }
+}
+
+fn read_optional(path: &Path) -> Result<Option<Vec<u8>>> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).context("could not read Codex source configuration"),
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -533,7 +558,7 @@ pub struct WarmSession {
 impl WarmSession {
     /// Spawn a provider process and complete the `initialize` handshake.
     async fn spawn(spec: &SessionSpec) -> Result<Self> {
-        let codex_home = IsolatedCodexHome::create()?;
+        let codex_home = IsolatedCodexHome::create(&spec.provider)?;
         let mut command = Command::new(&spec.executable);
         command
             .args(&spec.args)
@@ -1373,32 +1398,29 @@ pub struct IsolatedCodexHome {
 }
 
 impl IsolatedCodexHome {
-    pub fn create() -> Result<Self> {
+    pub fn create(snapshot: &ProviderLaunchSnapshot) -> Result<Self> {
         for _ in 0..10 {
             let id = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
             let path = std::env::temp_dir()
                 .join(format!("repotracer-codex-home-{}-{id}", std::process::id()));
             match std::fs::create_dir(&path) {
                 Ok(()) => {
+                    let home = Self { path };
                     #[cfg(unix)]
                     {
                         use std::os::unix::fs::PermissionsExt;
-                        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))?;
-                    }
-                    let source_home = std::env::var_os("CODEX_HOME")
-                        .map(PathBuf::from)
-                        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")));
-                    if let Some(source_home) = source_home {
-                        let auth = source_home.join("auth.json");
-                        if auth.is_file() {
-                            link_auth(&auth, &path.join("auth.json"))?;
-                        }
-                        write_provider_config(
-                            &source_home.join("config.toml"),
-                            &path.join("config.toml"),
+                        std::fs::set_permissions(
+                            &home.path,
+                            std::fs::Permissions::from_mode(0o700),
                         )?;
                     }
-                    return Ok(Self { path });
+                    if let Some(auth) = &snapshot.auth {
+                        write_private(&home.path.join("auth.json"), auth)?;
+                    }
+                    if let Some(config) = &snapshot.config {
+                        write_private(&home.path.join("config.toml"), config.as_bytes())?;
+                    }
+                    return Ok(home);
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(error) => return Err(error.into()),
@@ -1418,32 +1440,11 @@ impl Drop for IsolatedCodexHome {
     }
 }
 
-fn link_auth(source: &Path, target: &Path) -> Result<()> {
-    #[cfg(unix)]
-    if std::os::unix::fs::symlink(source, target).is_ok() {
-        return Ok(());
-    }
-    if std::fs::hard_link(source, target).is_ok() {
-        return Ok(());
-    }
-    std::fs::copy(source, target)
-        .map(|_| ())
-        .with_context(|| "could not make Codex authentication available to isolated scout")
-}
-
 /// Keep the active Codex provider while excluding user MCPs, hooks, plugins,
 /// and other session settings from the isolated scout home.
-pub fn write_provider_config(source: &Path, target: &Path) -> Result<()> {
-    let text = match std::fs::read_to_string(source) {
-        Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => {
-            return Err(error)
-                .with_context(|| format!("could not read Codex config {}", source.display()))
-        }
-    };
-    let config: toml::Value = toml::from_str(&text)
-        .with_context(|| format!("could not parse Codex config {}", source.display()))?;
+fn filtered_provider_config(text: &str) -> Result<Option<String>> {
+    let config: toml::Value = toml::from_str(text)
+        .map_err(|_| anyhow::anyhow!("could not parse Codex source configuration"))?;
     let config = config
         .as_table()
         .context("Codex config root must be a TOML table")?;
@@ -1473,9 +1474,13 @@ pub fn write_provider_config(source: &Path, target: &Path) -> Result<()> {
     }
 
     if child.is_empty() {
-        return Ok(());
+        return Ok(None);
     }
-    std::fs::write(target, toml::to_string(&toml::Value::Table(child))?)?;
+    Ok(Some(toml::to_string(&toml::Value::Table(child))?))
+}
+
+fn write_private(target: &Path, bytes: &[u8]) -> Result<()> {
+    std::fs::write(target, bytes)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -1536,6 +1541,177 @@ pub(crate) fn kill_process_group(process_group: u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn snapshot_spec(root: &Path, provider: ProviderLaunchSnapshot) -> SessionSpec {
+        SessionSpec {
+            conversation_id: Some("snapshot-test".into()),
+            provider,
+            executable: "codex".into(),
+            args: vec![],
+            root: root.into(),
+            thread_params: json!({}),
+            developer_instructions: String::new(),
+            startup_timeout: Some(Duration::from_secs(10)),
+        }
+    }
+
+    #[test]
+    fn provider_snapshot_matches_materialized_home_across_a_b_a_changes() {
+        let source = tempfile::tempdir().unwrap();
+        let config = source.path().join("config.toml");
+        let auth = source.path().join("auth.json");
+        let config_a =
+            "model_provider = 'a'\n[model_providers.a]\nbase_url = 'https://a.example/v1'\n";
+        let config_b =
+            "model_provider = 'b'\n[model_providers.b]\nbase_url = 'https://b.example/v1'\n";
+        std::fs::write(&config, config_a).unwrap();
+        std::fs::write(&auth, b"auth-a").unwrap();
+        let spec_a = snapshot_spec(
+            source.path(),
+            ProviderLaunchSnapshot::from_home(Some(source.path())).unwrap(),
+        );
+        // Change both inputs after computing A's pool key but before launch.
+        let key_a = SessionKey::from_spec(&spec_a);
+        std::fs::write(&config, config_b).unwrap();
+        std::fs::write(&auth, b"auth-b").unwrap();
+        let spec_b = snapshot_spec(
+            source.path(),
+            ProviderLaunchSnapshot::from_home(Some(source.path())).unwrap(),
+        );
+        assert_ne!(key_a, SessionKey::from_spec(&spec_b));
+        let home_a = IsolatedCodexHome::create(&spec_a.provider).unwrap();
+        let home_b = IsolatedCodexHome::create(&spec_b.provider).unwrap();
+        for (home, expected_provider, expected_auth) in
+            [(&home_a, "a", "auth-a"), (&home_b, "b", "auth-b")]
+        {
+            let parsed: toml::Value =
+                toml::from_str(&std::fs::read_to_string(home.path().join("config.toml")).unwrap())
+                    .unwrap();
+            assert_eq!(parsed["model_provider"].as_str(), Some(expected_provider));
+            assert_eq!(
+                std::fs::read_to_string(home.path().join("auth.json")).unwrap(),
+                expected_auth
+            );
+        }
+        std::fs::write(&config, config_a).unwrap();
+        std::fs::write(&auth, b"auth-a").unwrap();
+        let again = snapshot_spec(
+            source.path(),
+            ProviderLaunchSnapshot::from_home(Some(source.path())).unwrap(),
+        );
+        assert_eq!(key_a, SessionKey::from_spec(&again));
+        // Auth changes in either home cannot mutate the other through a link.
+        std::fs::write(home_a.path().join("auth.json"), "refreshed-child").unwrap();
+        assert_eq!(std::fs::read_to_string(&auth).unwrap(), "auth-a");
+        std::fs::write(&auth, "new-source").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(home_a.path().join("auth.json")).unwrap(),
+            "refreshed-child"
+        );
+        let private_path = home_a.path().to_path_buf();
+        drop(home_a);
+        assert!(!private_path.exists());
+    }
+
+    #[test]
+    fn absent_and_empty_auth_have_distinct_identities_and_bad_config_is_redacted() {
+        let source = tempfile::tempdir().unwrap();
+        let absent = snapshot_spec(
+            source.path(),
+            ProviderLaunchSnapshot::from_home(Some(source.path())).unwrap(),
+        );
+        let home = IsolatedCodexHome::create(&absent.provider).unwrap();
+        assert!(!home.path().join("auth.json").exists());
+        std::fs::write(source.path().join("auth.json"), []).unwrap();
+        let empty = snapshot_spec(
+            source.path(),
+            ProviderLaunchSnapshot::from_home(Some(source.path())).unwrap(),
+        );
+        assert_ne!(
+            SessionKey::from_spec(&absent),
+            SessionKey::from_spec(&empty)
+        );
+        std::fs::write(source.path().join("config.toml"), "secret-not-valid-toml").unwrap();
+        let error = ProviderLaunchSnapshot::from_home(Some(source.path()))
+            .err()
+            .unwrap();
+        assert!(!format!("{error:#}").contains("secret-not-valid-toml"));
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn pooled_child_uses_the_captured_provider_and_only_reuses_matching_identity() {
+        let source = tempfile::tempdir().unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let script = root.path().join("provider.ps1");
+        std::fs::write(&script, r#"
+$ErrorActionPreference = 'Stop'
+$record = @{ config = [IO.File]::ReadAllText((Join-Path $env:CODEX_HOME 'config.toml')); auth = [IO.File]::ReadAllText((Join-Path $env:CODEX_HOME 'auth.json')) }
+[IO.File]::AppendAllText((Join-Path (Get-Location) 'observed.jsonl'), (($record | ConvertTo-Json -Compress) + "`n"))
+while ($line = [Console]::ReadLine()) {
+    $request = $line | ConvertFrom-Json
+    if ($request.method -eq 'initialize') {
+        [Console]::WriteLine((@{ id = $request.id; result = @{} } | ConvertTo-Json -Compress))
+    } elseif ($request.method -eq 'thread/start') {
+        [Console]::WriteLine((@{ id = $request.id; result = @{ thread = @{ id = 'thread' } } } | ConvertTo-Json -Compress -Depth 5))
+    }
+}
+"#).unwrap();
+        let capture = |provider: &str| {
+            std::fs::write(
+                source.path().join("config.toml"),
+                format!("model_provider = '{provider}'\n"),
+            )
+            .unwrap();
+            std::fs::write(source.path().join("auth.json"), provider).unwrap();
+            let mut spec = snapshot_spec(
+                root.path(),
+                ProviderLaunchSnapshot::from_home(Some(source.path())).unwrap(),
+            );
+            spec.executable = "powershell.exe".into();
+            spec.args = [
+                "-NoProfile",
+                "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+            ]
+            .map(OsString::from)
+            .to_vec();
+            spec.args.push(script.as_os_str().to_owned());
+            spec
+        };
+        let a = capture("a");
+        let b = capture("b");
+        let pool = SessionPool::new(SessionSettings::default());
+        let first = pool.acquire(&a).await.unwrap();
+        let first_pid = first.child.id();
+        pool.release(first);
+        let warm = pool.acquire(&a).await.unwrap();
+        assert_eq!(warm.child.id(), first_pid);
+        assert!(warm.was_warm);
+        pool.release(warm);
+        let changed = pool.acquire(&b).await.unwrap();
+        assert!(!changed.was_warm);
+        pool.release(changed);
+        let again = capture("a");
+        let restored = pool.acquire(&again).await.unwrap();
+        assert!(!restored.was_warm);
+        restored.shutdown().await;
+        let records: Vec<Value> = std::fs::read_to_string(root.path().join("observed.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(records.len(), 3);
+        for (record, expected) in records.iter().zip(["a", "b", "a"]) {
+            assert_eq!(record["auth"].as_str(), Some(expected));
+            let config: toml::Value = toml::from_str(record["config"].as_str().unwrap()).unwrap();
+            assert_eq!(config["model_provider"].as_str(), Some(expected));
+        }
+    }
 
     #[tokio::test]
     async fn incomplete_json_line_reports_stream_activity() {
@@ -1911,7 +2087,8 @@ mod tests {
     #[test]
     fn isolated_codex_home_is_private() {
         use std::os::unix::fs::PermissionsExt;
-        let home = IsolatedCodexHome::create().unwrap();
+        let snapshot = ProviderLaunchSnapshot::from_home(None).unwrap();
+        let home = IsolatedCodexHome::create(&snapshot).unwrap();
         let mode = std::fs::metadata(home.path()).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o700);
     }
@@ -1958,7 +2135,8 @@ hooks = []
         )
         .unwrap();
 
-        write_provider_config(&source, &target).unwrap();
+        let snapshot = ProviderLaunchSnapshot::from_home(Some(dir.path())).unwrap();
+        write_private(&target, snapshot.config.as_ref().unwrap().as_bytes()).unwrap();
         let child: toml::Value = toml::from_str(&std::fs::read_to_string(target).unwrap()).unwrap();
         assert_eq!(child["model"].as_str(), Some("gpt-5.6-luna"));
         assert_eq!(child["model_provider"].as_str(), Some("codex-lb"));
@@ -1981,7 +2159,8 @@ hooks = []
         let target = dir.path().join("child-config.toml");
         std::fs::write(&source, "openai_base_url = \"https://proxy.example/v1\"\n").unwrap();
 
-        write_provider_config(&source, &target).unwrap();
+        let snapshot = ProviderLaunchSnapshot::from_home(Some(dir.path())).unwrap();
+        write_private(&target, snapshot.config.as_ref().unwrap().as_bytes()).unwrap();
         let child: toml::Value = toml::from_str(&std::fs::read_to_string(target).unwrap()).unwrap();
         assert_eq!(
             child["openai_base_url"].as_str(),

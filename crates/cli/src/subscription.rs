@@ -224,7 +224,7 @@ impl CliScout {
             // thread; unnamed calls may still share a process with fresh
             // threads.
             conversation_id,
-            provider_identity: crate::session::provider_identity()?,
+            provider: crate::session::ProviderLaunchSnapshot::capture()?,
         })
     }
 
