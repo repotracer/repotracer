@@ -305,6 +305,7 @@ struct ModelFinding {
 
 #[derive(Deserialize)]
 struct ModelReport {
+    #[serde(alias = "summary")]
     answer: String,
     #[serde(default)]
     citations: Vec<Citation>,
@@ -841,6 +842,32 @@ mod tests {
     }
 
     #[test]
+    fn legacy_summary_report_preserves_findings_and_uncertainty() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("lib.rs"), "fn start() {}\n").unwrap();
+        let raw = json!({
+            "summary": "The entry point is start.",
+            "status": "partial",
+            "findings": [{
+                "question": "Where does execution start?",
+                "answer": "The caller has not been traced.",
+                "citations": [{"path": "lib.rs", "start_line": 1, "end_line": 1}]
+            }],
+            "unresolved": ["Which caller selects the entry point?"],
+            "searched_scope": ["lib.rs"],
+            "limitations": ["No execution test was run."]
+        });
+        let (answer, citations, report) = assess_output(&request(root.path()), &raw.to_string());
+        assert_eq!(answer, "The entry point is start.");
+        assert_eq!(report.status, InvestigationStatus::Partial);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(report.findings[0].answer, "The caller has not been traced.");
+        assert_eq!(report.unresolved, ["Which caller selects the entry point?"]);
+        assert_eq!(report.searched_scope, ["lib.rs"]);
+        assert_eq!(report.limitations, ["No execution test was run."]);
+    }
+
+    #[test]
     fn minimal_schema_does_not_require_operational_or_repeated_report_fields() {
         let schema = investigation_output_schema();
         assert_eq!(
@@ -868,11 +895,12 @@ mod tests {
         let raw = json!({"answer": "The dependency exports external.", "citations": [{"path": path, "start_line": 1, "end_line": 1}], "continuation": null});
         let (_, citations, _) = assess_output(&request(root.path()), &raw.to_string());
         assert_eq!(
-            citations[0].path,
-            path.canonicalize()
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/")
+            PathBuf::from(&citations[0].path),
+            path.canonicalize().unwrap()
+        );
+        assert_eq!(
+            std::fs::read_to_string(&citations[0].path).unwrap(),
+            "fn external() {}\n"
         );
     }
 }
