@@ -66,22 +66,15 @@ impl Conversations {
         Ok(gate.lock_owned().await)
     }
 
-    /// Bind validated repository metadata while holding the conversation guard.
+    /// Record the current repository while holding the conversation guard.
+    /// A conversation may move between related checkouts; the current target
+    /// is refreshed for each turn while the gate still preserves ordering.
     pub fn bind(&self, id: &str, root: &Path) -> Result<()> {
         let mut entries = self.entries.lock().unwrap_or_else(|e| e.into_inner());
         let entry = entries
             .get_mut(id)
             .context("conversation was not reserved")?;
-        if let Some(previous) = &entry.root {
-            if previous != root {
-                bail!(
-                    "conversation belongs to {}; omit conversation_id for a different repository",
-                    previous.display()
-                );
-            }
-        } else {
-            entry.root = Some(root.to_owned());
-        }
+        entry.root = Some(root.to_owned());
         Ok(())
     }
 }
