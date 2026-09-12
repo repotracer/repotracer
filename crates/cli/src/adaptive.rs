@@ -1,7 +1,7 @@
 //! One bounded, evidence-driven higher-effort follow-up.
 //!
 //! The wrapper is deliberately transport-agnostic. Native backends retain
-//! ownership of authentication, read-only permissions, and their own budgets;
+//! ownership of authentication, native tools, and their own budgets;
 //! this layer only decides whether the first structured report explicitly asks
 //! for one targeted continuation and then replays the request with its prior
 //! findings as context.
@@ -220,13 +220,13 @@ impl ScoutBackend for AdaptiveScout {
                 first.stats.reasoning_effort = Some(first_effort.clone());
                 second.stats.reasoning_effort = Some(second_effort.clone());
                 if second.investigation.status == InvestigationStatus::Complete
-                    && (second.citations.is_empty()
+                    && (second.summary.trim().is_empty()
                         || !second.investigation.unresolved.is_empty()
                         || second.investigation.continuation.is_some())
                 {
                     second.investigation.status = InvestigationStatus::Partial;
                     second.investigation.limitations.push(
-                        "The continuation did not provide enough validated evidence to certify completion.".into(),
+                        "The continuation left a material question unresolved or returned no answer.".into(),
                     );
                 }
                 let next_question = second
@@ -922,7 +922,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn second_report_without_validated_evidence_cannot_claim_completion() {
+    async fn second_report_with_an_unresolved_question_remains_partial() {
         let mut second = result(InvestigationStatus::Complete, None);
         second.citations.clear();
         second.investigation.findings.clear();
@@ -946,7 +946,7 @@ mod tests {
             .investigation
             .limitations
             .iter()
-            .any(|limitation| limitation.contains("enough validated evidence")));
+            .any(|limitation| limitation.contains("material question unresolved")));
         assert!(output.investigation.findings.is_empty());
         assert!(!output.citations.is_empty());
         assert!(output.citations.iter().all(|citation| citation
@@ -957,6 +957,35 @@ mod tests {
             .summary
             .contains("Previous-pass context, not revalidated by the continuation"));
         assert_eq!(output.stats.attempts.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn complete_experiment_continuation_does_not_require_source_citations() {
+        let mut second = result(InvestigationStatus::Complete, None);
+        second.summary =
+            "Ran a focused reproduction with an empty field; the parser returned an empty string."
+                .into();
+        second.citations.clear();
+        second.investigation.findings.clear();
+        second.investigation.unresolved.clear();
+        let backend = Arc::new(ScriptedBackend::new(vec![
+            Ok(result(
+                InvestigationStatus::Partial,
+                Some(continuation("max")),
+            )),
+            Ok(second),
+        ]));
+        let output = wrapper(backend, Some(vec!["high", "max"]))
+            .scout(request())
+            .await
+            .unwrap();
+        assert_eq!(output.investigation.status, InvestigationStatus::Complete);
+        assert!(output.summary.contains("focused reproduction"));
+        assert!(!output
+            .investigation
+            .limitations
+            .iter()
+            .any(|line| line.contains("returned no answer")));
     }
 
     #[tokio::test]

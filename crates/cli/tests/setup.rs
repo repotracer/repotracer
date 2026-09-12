@@ -131,7 +131,7 @@ fn setup_does_not_require_an_existing_codex_login() {
         .contains("mcp_servers.repotracer"));
     assert!(std::fs::read_to_string(codex_home.join("AGENTS.md"))
         .unwrap()
-        .contains("query alone is enough"));
+        .contains("Query alone is enough"));
 }
 
 #[test]

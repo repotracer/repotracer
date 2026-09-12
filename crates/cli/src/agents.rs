@@ -9,14 +9,13 @@ const MANAGED_START: &str = "<!-- repotracer:start -->";
 const MANAGED_END: &str = "<!-- repotracer:end -->";
 
 pub(crate) const ROUTING_INSTRUCTIONS: &str = concat!(
-    "RepoTracer provides a cheaper read-only colleague for repository investigation. Delegate a question to repo_scout when finding and reading the relevant code would otherwise take your time; query alone is enough, even without file names or search terms. A known, small lookup may be simpler locally. ",
-    "Give the scout the question you need answered and the relevant task requirements; it does not receive your conversation automatically. For a change, include settled behavior and compatibility constraints in the query, separately from assumptions about existing code. Example: 'Find the change points for layered config. Requirements: later files win, preserve the old API, reject multi-file writes. Check existing interpolation and CLI behavior.' No need to forward unrelated conversation. Optional intent, questions, known_context, and target_paths are hints, not a form you need to fill out. ",
-    "Choose investigation.reasoning_effort when useful: medium for a straightforward lookup or explanation, high for diagnosis, indirect call paths, conflicting evidence, or change impact across components. For example, locating a config definition suits medium; tracing which overrides reach an export command suits high. Omit it to use the user's configured effort. Higher effort is available where the selected model supports it, but is not needed for every search. ",
-    "The scout follows connected code, callers, tests, configuration, and other useful leads. It returns explanation and code context: source blocks are read from repository files by RepoTracer, while conclusions are written by the scout. You can reason from those source blocks just as from your own file reads. ",
-    "After a handoff, continue the user's task from that evidence. citations[].source_status identifies included, truncated, or omitted source; older replies may omit this field. Read or ask a follow-up for the specific missing code, conflict, source change, or risk that matters to the next action. For example, use an included config loader to plan the edit; if its caller was omitted and affects precedence, read that caller rather than reopening the whole module. Reviewing your changed code and running relevant tests remain appropriate. ",
-    "The scout reports confidence with its evidence basis and names inferred or untested parts. Use that assessment together with the source and unresolved questions to decide what still needs checking. High confidence alone is not proof, but a well-supported finding need not be rediscovered. Keep tests and checks appropriate to the change you make. For implementation, use concrete failure cases from the handoff to choose regression tests. For example, a precedence change needs conflicting values tested, not only default configuration. Existing passing tests may not cover new behavior. ",
-    "You decide whether to delegate, read or verify locally, or continue. Set repository to the task's checkout when it differs from the server startup directory; the reply identifies the actual repository. For a related follow-up, pass the returned conversation.id as investigation.conversation_id. For example: 'Now check whether export uses the loader you found and include that caller.' conversation.status says whether native history resumed or the call started fresh; include the current question and necessary context. Omit the ID for an independent investigation. Independent calls can run in parallel; questions on the same conversation run in order. Scout retains its read-only path, budget, and authentication boundaries. ",
-    "Prefer the native RepoTracer repo_scout tool when it is exposed directly. Its structured result contains the full report and source text; content[].text provides a readable fallback. Use either representation, not both. If direct exposure is unavailable, discover the tool and use the host's supported wait settings and poll if needed. Investigation can take a minute or more."
+    "RepoTracer investigates repository tasks using a separately configured model. Delegate when finding, understanding or checking relevant behavior would otherwise take your time; a known small lookup may be simpler locally. ",
+    "Give repo_scout the objective, requirements, corrections and relevant context you already know. Do not investigate first to prepare a delegation. Query alone is enough; search terms and file names are optional. Example: 'We are adding layered configuration. Find the loader and investigate what affects precedence. Requirements: later files win; preserve the old API.' ",
+    "The investigator can follow useful related leads and use available scripts, tests and other tools. It returns an explanation with selected source and experiment evidence. Source attachments come from files; conclusions are model judgments. Use the answer to continue the task. Check a specific missing fact, conflicting evidence or changed source when it matters, rather than repeating the investigation. Review your own edits and run relevant checks as usual. ",
+    "You may select investigation.reasoning_effort when the assignment already makes the need clear: medium for straightforward questions, high for difficult diagnosis or interacting behavior. Supported higher levels remain available. Omit it to use configured effort and native adaptive behavior. Do not search merely to decide effort. ",
+    "Set repository to the current target when different from the server startup directory. It is a starting location, not a restriction on useful related evidence. Reuse conversation.id in investigation.conversation_id whenever its existing context helps, including a related assignment in another repository; supply the new target explicitly. Start fresh when relevance is unclear. No extra investigation or elapsed-time rule is needed to decide. ",
+    "The response identifies actual source locations and whether native history resumed, started fresh or is unknown. Give necessary current context when history is unavailable. Independent calls can run in parallel; calls on the same conversation run in order. ",
+    "Prefer directly exposed repo_scout when available. structuredContent contains the answer and evidence; content[].text is a readable alternative. Use either representation, not both. If direct exposure is unavailable, use the host's supported tool discovery and wait mechanism."
 );
 
 const REPOTRACER_NAMESPACE: &str = "mcp__repotracer";
@@ -912,18 +911,16 @@ mcp_servers = { repotracer = { command = "old" }, other = { command = "keep" } }
     }
 
     #[test]
-    fn codex_routing_leaves_investigation_to_the_parent() {
-        assert!(ROUTING_INSTRUCTIONS.contains("does not receive your conversation automatically"));
+    fn parent_delegates_existing_context_without_preliminary_investigation() {
+        assert!(ROUTING_INSTRUCTIONS.contains("context you already know"));
         assert!(ROUTING_INSTRUCTIONS.contains("Requirements: later files win"));
-        assert!(ROUTING_INSTRUCTIONS.contains("separately from assumptions"));
         for capability in [
-            "repository investigation",
-            "query alone is enough",
-            "connected code, callers, tests, configuration",
-            "explanation and code context",
-            "delegate, read or verify locally, or continue",
-            "read-only",
-            "path, budget",
+            "Do not investigate first",
+            "Query alone is enough",
+            "scripts, tests and other tools",
+            "selected source and experiment evidence",
+            "including a related assignment in another repository",
+            "not a restriction on useful related evidence",
         ] {
             assert!(
                 ROUTING_INSTRUCTIONS.contains(capability),
