@@ -406,6 +406,13 @@ fn source_delivery_citations(
 
 fn handoff_explanation(result: &ScoutResult) -> String {
     let mut out = result.summary.clone();
+    // Older provider reports can put unique caveats in this field. Preserve
+    // the explanation without adding a confidence score or a fixed section
+    // to current-format answers, which already express uncertainty in prose.
+    let basis = result.investigation.confidence.basis.trim();
+    if !basis.is_empty() {
+        out.push_str(&format!("\n\nScout evidence assessment: {basis}"));
+    }
     if !result.investigation.findings.is_empty() {
         out.push_str("\n\nFindings:\n");
         for finding in &result.investigation.findings {
@@ -899,6 +906,29 @@ mod tests {
             .unwrap()
             .starts_with(report));
         assert_eq!(response["isError"], false);
+    }
+
+    #[test]
+    fn legacy_evidence_caveats_survive_in_both_response_formats() {
+        let root = tempfile::tempdir().unwrap();
+        let mut result = scout_result(0);
+        result.summary = "The loader applies the override.".into();
+        result.investigation.confidence.basis =
+            "Traced the normal caller; the generated caller was unavailable.".into();
+        let response = handoff_response(root.path(), result);
+        for text in [
+            &response["structuredContent"]["report"],
+            &response["content"][0]["text"],
+        ] {
+            let text = text.as_str().unwrap();
+            assert!(text.starts_with("The loader applies the override."));
+            assert!(text.contains("the generated caller was unavailable"));
+        }
+        let response = handoff_response(root.path(), scout_result(0));
+        assert!(!response["structuredContent"]["report"]
+            .as_str()
+            .unwrap()
+            .contains("Scout evidence assessment:"));
     }
 
     #[test]
