@@ -19,4 +19,5 @@ uuid.workspace = true
 
 [dev-dependencies]
 async-trait.workspace = true
+repotracer-model.workspace = true
 tempfile = "3"

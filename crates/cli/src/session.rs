@@ -300,6 +300,8 @@ struct UsageTracker {
     latest_last: Option<TokenUsage>,
     cumulative: Option<TokenUsage>,
     regression: bool,
+    // Keep tool work outside the driver future so watchdog cancellation retains it.
+    tool_calls: u32,
 }
 
 impl UsageTracker {
@@ -343,6 +345,7 @@ impl UsageTracker {
         TurnMetrics {
             usage,
             cumulative_usage,
+            tool_calls: self.tool_calls,
             usage_status: if failed {
                 match status {
                     UsageStatus::Unknown => UsageStatus::Unknown,
@@ -1018,7 +1021,7 @@ where
         let message = next_message(lines, activity).await?;
         if message.get("id").is_some() && message.get("method").is_some() {
             if message["method"] == "item/tool/call" && message["params"]["tool"] == "Symbols" {
-                metrics.tool_calls += 1;
+                usage.tool_calls = usage.tool_calls.saturating_add(1);
                 index_usage.calls = index_usage.calls.saturating_add(1);
                 let result = index
                     .call_with_metrics(&message["params"]["arguments"].to_string())
@@ -1070,7 +1073,7 @@ where
                         }
                     }
                     Some("commandExecution" | "mcpToolCall" | "webSearch") => {
-                        metrics.tool_calls += 1;
+                        usage.tool_calls = usage.tool_calls.saturating_add(1);
                     }
                     _ => {}
                 }
@@ -1118,6 +1121,7 @@ where
                         .map(str::to_string);
                 }
                 let usage_metrics = usage.snapshot(false);
+                metrics.tool_calls = usage_metrics.tool_calls;
                 metrics.usage = usage_metrics.usage;
                 metrics.cumulative_usage = usage_metrics.cumulative_usage;
                 metrics.usage_status = usage_metrics.usage_status;
@@ -1798,6 +1802,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn terminal_paths_preserve_completed_tools() {
+        for tool in ["commandExecution", "mcpToolCall", "webSearch", "Symbols"] {
+            for ending in [
+                json!({"method":"turn/completed","params":{"turn":{"status":"completed","items":[{"type":"agentMessage","text":"{}"}]}}}).to_string(),
+                json!({"method":"turn/completed","params":{"turn":{"status":"failed","error":{"message":"fixture failure"}}}}).to_string(),
+                json!({"method":"error","params":{"willRetry":false,"error":{"message":"fixture failure"}}}).to_string(),
+                String::new(),
+                "invalid json".into(),
+            ] {
+                let root = tempfile::tempdir().unwrap();
+                std::fs::write(root.path().join("source.rs"), "fn alpha() {}\n").unwrap();
+                let index = RepositoryIndex::new(root.path().to_owned());
+                let mut input = "{\"id\":1,\"result\":{}}\n".to_owned();
+                for id in [2, 3] {
+                    let event = if tool == "Symbols" {
+                        json!({"id":id,"method":"item/tool/call","params":{"tool":"Symbols","arguments":{"symbol":"alpha"}}})
+                    } else {
+                        json!({"method":"item/completed","params":{"item":{"id":id.to_string(),"type":tool}}})
+                    };
+                    input.push_str(&format!("{event}\n"));
+                }
+                input.push_str("{\"method\":\"thread/tokenUsage/updated\",\"params\":{\"tokenUsage\":{\"total\":{\"inputTokens\":40}}}}\n");
+                input.push_str(&ending);
+                input.push('\n');
+                let mut lines = BufReader::new(input.as_bytes()).lines();
+                let mut stdin = tokio::io::sink();
+                let (activity, _) = mpsc::channel(1);
+                let mut tracker = UsageTracker::new(None);
+                let mut index_usage = IndexUsage { available: true, ..Default::default() };
+                let outcome = drive_turn(&mut stdin, &mut lines, 1, &activity, &index, &mut tracker, &mut index_usage).await;
+                assert_eq!(outcome.is_ok(), ending.contains("agentMessage"), "{tool}: {ending}");
+                let metrics = match outcome {
+                    Ok(output) => output.metrics,
+                    Err(error) => failure_metrics(&error).expect("typed failure metrics"),
+                };
+                assert_eq!(metrics.tool_calls, 2, "{tool}: {ending}");
+                assert_eq!(metrics.usage.unwrap().input_tokens, Some(40));
+                assert_eq!(metrics.index_usage.unwrap().calls, if tool == "Symbols" { 2 } else { 0 });
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn eof_preserves_observed_usage() {
         let root = tempfile::tempdir().unwrap();
         let index = RepositoryIndex::new(root.path().to_path_buf());
@@ -1840,6 +1887,8 @@ mod tests {
         let (mut writer, reader) = tokio::io::duplex(1024);
         writer.write_all(concat!(
             "{\"id\":1,\"result\":{}}\n",
+            "{\"method\":\"item/completed\",\"params\":{\"item\":{\"type\":\"commandExecution\"}}}\n",
+            "{\"method\":\"item/completed\",\"params\":{\"item\":{\"type\":\"webSearch\"}}}\n",
             "{\"method\":\"thread/tokenUsage/updated\",\"params\":{\"tokenUsage\":{\"total\":{\"inputTokens\":40}}}}\n",
         ).as_bytes()).await.unwrap();
         let mut lines = BufReader::new(reader).lines();
@@ -1865,6 +1914,7 @@ mod tests {
         .await;
         assert!(result.is_err());
         let metrics = tracker.snapshot(true);
+        assert_eq!(metrics.tool_calls, 2);
         assert_eq!(metrics.usage.unwrap().input_tokens, Some(40));
         assert_eq!(metrics.usage_status, UsageStatus::Partial);
         drop(writer);

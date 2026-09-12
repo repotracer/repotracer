@@ -774,7 +774,8 @@ fn supported_reasoning_efforts(entry: &Value) -> Option<Vec<String>> {
             efforts.push(effort);
         }
     }
-    (!efforts.is_empty()).then_some(efforts)
+    // An explicitly empty list is authoritative; unrecognized values are not.
+    (candidate.is_empty() || !efforts.is_empty()).then_some(efforts)
 }
 
 async fn write_json(
@@ -1377,6 +1378,22 @@ mod tests {
         assert_eq!(
             supported_reasoning_efforts(&entry).unwrap(),
             vec!["medium".to_string(), "max".to_string()]
+        );
+    }
+
+    #[test]
+    fn reasoning_metadata_distinguishes_unknown_from_explicitly_unsupported() {
+        for entry in [
+            json!({}),
+            json!({"reasoning_efforts": null}),
+            json!({"reasoning_efforts": "high"}),
+            json!({"reasoning_efforts": ["future", 42]}),
+        ] {
+            assert_eq!(supported_reasoning_efforts(&entry), None);
+        }
+        assert_eq!(
+            supported_reasoning_efforts(&json!({"reasoning_efforts": []})),
+            Some(vec![])
         );
     }
 

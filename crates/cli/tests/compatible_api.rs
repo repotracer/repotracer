@@ -5,6 +5,15 @@ use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
 fn check_request(profile: &str, override_url: bool, expected_effort: Option<&str>) {
+    check_request_for(profile, override_url, expected_effort, false);
+}
+
+fn check_request_for(
+    profile: &str,
+    override_url: bool,
+    expected_effort: Option<&str>,
+    doctor: bool,
+) {
     let root = tempfile::tempdir().unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
@@ -48,7 +57,8 @@ fn check_request(profile: &str, override_url: bool, expected_effort: Option<&str
         let mut body = vec![0; length];
         reader.read_exact(&mut body).unwrap();
         let request: Value = serde_json::from_slice(&body).unwrap();
-        let rejected = !accepts_effort && request.get("reasoning_effort").is_some();
+        let rejected = (!accepts_effort && request.get("reasoning_effort").is_some())
+            || (accepts_effort && request.get("max_tokens").is_some());
         let (status, response) = if rejected {
             (
                 "400 Bad Request",
@@ -77,10 +87,12 @@ fn check_request(profile: &str, override_url: bool, expected_effort: Option<&str
     if override_url {
         command.args(["--base-url", &url]);
     }
-    let output = command
-        .args(["scout", "where is the implementation?"])
-        .output()
-        .unwrap();
+    if doctor {
+        command.arg("doctor");
+    } else {
+        command.args(["scout", "where is the implementation?"]);
+    }
+    let output = command.output().unwrap();
     let request = server.join().unwrap();
     assert!(
         output.status.success(),
@@ -96,7 +108,32 @@ fn check_request(profile: &str, override_url: bool, expected_effort: Option<&str
     if expected_effort.is_some() {
         assert!(request.get("temperature").is_none());
     } else {
-        assert_eq!(request["temperature"], 0.5);
+        assert_eq!(request["temperature"], if doctor { 0.0 } else { 0.5 });
+    }
+    let (limit_field, absent_field) = if expected_effort.is_some() {
+        ("max_completion_tokens", "max_tokens")
+    } else {
+        ("max_tokens", "max_completion_tokens")
+    };
+    assert!(request.get(absent_field).is_none());
+    if doctor {
+        assert_eq!(request[limit_field], 8);
+        assert!(request.get("tools").is_none());
+        assert!(request.get("tool_choice").is_none());
+    } else {
+        assert!(request.get(limit_field).is_none());
+        assert!(!request["tools"].as_array().unwrap().is_empty());
+    }
+}
+
+#[test]
+fn doctor_uses_the_token_limit_field_for_the_selected_contract() {
+    for effort in [None, Some("medium")] {
+        let mut profile = "[model]\nbackend = 'openai-compatible'\nmodel = 'custom-model'\nbase_url = 'ENDPOINT'\ntemperature = 0.5\n".to_owned();
+        if let Some(effort) = effort {
+            profile.push_str(&format!("reasoning_effort = '{effort}'\n"));
+        }
+        check_request_for(&profile, false, effort, true);
     }
 }
 

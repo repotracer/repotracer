@@ -19,9 +19,13 @@ pub use types::{
     ToolCall, ToolDefinition, ToolError, ToolName, ToolResult, ToolSchema, TOOL_DESCRIPTIONS,
 };
 
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+const MAX_REPOSITORY_INDEXES: usize = 8;
+type IndexCache = Arc<Mutex<VecDeque<(PathBuf, RepositoryIndex)>>>;
 
 /// Repository-scoped tool host.
 #[derive(Clone)]
@@ -31,6 +35,7 @@ pub struct RepoTools {
     glob: Arc<GlobTool>,
     grep: Arc<GrepTool>,
     index: RepositoryIndex,
+    indexes: IndexCache,
     concurrency: usize,
     timeout: Duration,
 }
@@ -38,11 +43,15 @@ pub struct RepoTools {
 impl RepoTools {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root = root.into();
+        let index = RepositoryIndex::new(root.clone());
+        let cache_key = root.canonicalize().unwrap_or_else(|_| root.clone());
+        let indexes = Arc::new(Mutex::new(VecDeque::from([(cache_key, index.clone())])));
         Self {
             read: Arc::new(ReadTool::new(root.clone())),
             glob: Arc::new(GlobTool::new(root.clone())),
             grep: Arc::new(GrepTool::new(root.clone())),
-            index: RepositoryIndex::new(root.clone()),
+            index,
+            indexes,
             root,
             concurrency: DEFAULT_CONCURRENCY,
             timeout: DEFAULT_TOOL_TIMEOUT,
@@ -61,6 +70,41 @@ impl RepoTools {
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// Bind tools to the request root while sharing its content-refreshed index.
+    pub fn for_root(&self, root: impl Into<PathBuf>) -> Self {
+        let root = root.into();
+        let root = root.canonicalize().unwrap_or(root);
+        let index = {
+            let mut indexes = self
+                .indexes
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            let index = indexes
+                .iter()
+                .position(|(key, _)| key == &root)
+                .and_then(|position| indexes.remove(position))
+                .map(|(_, index)| index)
+                .unwrap_or_else(|| RepositoryIndex::new(root.clone()));
+            // Bound retained repositories; active hosts keep their own index
+            // alive even if their cache entry is evicted by a newer root.
+            while indexes.len() >= MAX_REPOSITORY_INDEXES {
+                indexes.pop_front();
+            }
+            indexes.push_back((root.clone(), index.clone()));
+            index
+        };
+        Self {
+            read: Arc::new(ReadTool::new(root.clone())),
+            glob: Arc::new(GlobTool::new(root.clone())),
+            grep: Arc::new(GrepTool::new(root.clone())),
+            root,
+            index,
+            indexes: self.indexes.clone(),
+            concurrency: self.concurrency,
+            timeout: self.timeout,
+        }
     }
 
     pub fn schemas(&self) -> Vec<ToolSchema> {
@@ -172,5 +216,63 @@ mod investigation_scope_tests {
                 output.output
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn request_hosts_reuse_indexes_by_canonical_root_and_refresh_changed_content() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        std::fs::write(a.path().join("source.rs"), "fn alpha() {}\n").unwrap();
+        std::fs::write(b.path().join("source.rs"), "fn beta() {}\n").unwrap();
+        let tools = RepoTools::new(a.path())
+            .with_concurrency(3)
+            .with_timeout(Duration::from_secs(7));
+        let first = tools
+            .for_root(a.path())
+            .index
+            .call_with_metrics("{}")
+            .await
+            .unwrap();
+        assert_eq!((first.1, first.2), (1, 0));
+        let alias = tools.for_root(a.path().join("."));
+        let next = alias.index.call_with_metrics("{}").await.unwrap();
+        assert_eq!((next.1, next.2), (0, 1));
+        assert_eq!(alias.concurrency, 3);
+        assert_eq!(alias.timeout, Duration::from_secs(7));
+
+        let left = tools.for_root(b.path());
+        let right = tools.for_root(b.path());
+        let (left, right) = tokio::join!(
+            left.index.call_with_metrics("{}"),
+            right.index.call_with_metrics("{}")
+        );
+        let (left, right) = (left.unwrap(), right.unwrap());
+        assert_eq!(left.1 + right.1, 1);
+        assert_eq!(left.2 + right.2, 1);
+        assert!(left.0.contains("beta"));
+        assert!(!left.0.contains("alpha"));
+        std::fs::write(b.path().join("source.rs"), "fn changed() {}\n").unwrap();
+        let refreshed = tools
+            .for_root(b.path())
+            .index
+            .call_with_metrics("{}")
+            .await
+            .unwrap();
+        assert_eq!(refreshed.1, 1);
+        assert!(refreshed.0.contains("changed"));
+        assert!(!refreshed.0.contains("beta"));
+        let still_a = tools
+            .for_root(a.path())
+            .index
+            .call_with_metrics("{}")
+            .await
+            .unwrap();
+        assert_eq!((still_a.1, still_a.2), (0, 1));
+        assert!(still_a.0.contains("alpha"));
     }
 }

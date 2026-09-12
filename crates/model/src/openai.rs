@@ -92,9 +92,14 @@ impl ModelBackend for OpenAiCompatBackend {
             body.as_object_mut().unwrap().remove("tool_choice");
         }
         if let Some(max) = request.max_tokens.or(self.config.max_tokens) {
+            let field = if body.get("reasoning_effort").is_some() {
+                "max_completion_tokens"
+            } else {
+                "max_tokens"
+            };
             body.as_object_mut()
                 .unwrap()
-                .insert("max_tokens".into(), json!(max));
+                .insert(field.into(), json!(max));
         }
 
         let mut req = self.client.post(&url).json(&body);
