@@ -1,4 +1,4 @@
-use crate::pathutil::{looks_binary, resolve_in_root};
+use crate::pathutil::{looks_binary, resolve_path};
 use crate::types::{ToolError, ToolSchema};
 use serde::Deserialize;
 use serde_json::json;
@@ -76,7 +76,7 @@ impl ReadTool {
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Repository-relative path of the file to read. Never use an absolute path."
+                        "description": "File to read, relative to the current target or absolute for related evidence."
                     },
                     "offset": {
                         "type": "integer",
@@ -104,7 +104,7 @@ impl ReadTool {
             return Ok("<system-reminder>Error: file path is required</system-reminder>".into());
         }
 
-        let path = match resolve_in_root(&self.root, &args.path) {
+        let path = match resolve_path(&self.root, &args.path) {
             Ok(p) => p,
             Err(e) => {
                 return Ok(format!(
@@ -284,10 +284,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_escape() {
+    async fn reports_missing_file() {
         let dir = tempdir().unwrap();
         let tool = ReadTool::new(dir.path());
-        let out = tool.call(r#"{"path":"../../etc/passwd"}"#).await.unwrap();
+        let out = tool.call(r#"{"path":"missing-file.txt"}"#).await.unwrap();
         assert!(out.contains("Permission error") || out.contains("does not exist"));
     }
 }

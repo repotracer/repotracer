@@ -1,6 +1,6 @@
 //! On-demand syntax index using maintained Tree-sitter tag queries.
 //! References are name occurrences, never resolved call edges.
-use crate::{resolve_in_root, ToolError, ToolSchema};
+use crate::{resolve_path, ToolError, ToolSchema};
 use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -34,6 +34,7 @@ pub struct SymbolOccurrence {
 
 #[derive(Clone)]
 struct FileRecord {
+    native_path: PathBuf,
     fingerprint: String,
     occurrences: Vec<SymbolOccurrence>,
     parse_errors: bool,
@@ -87,11 +88,11 @@ impl RepositoryIndex {
     pub fn schema(&self) -> ToolSchema {
         ToolSchema {
             name: "Symbols".into(),
-            description: "Query an on-demand, content-hash refreshed syntax index for Rust, Python, JavaScript, TypeScript/TSX, or Go. Modes: definitions, references, outline. References are same-name syntactic occurrences, NOT resolved callers. Use exact symbol names, optional repository-relative path, and next_offset for pagination. Read returned ranges to establish behavior; use Grep for unsupported languages, aliases, generated code, and dynamic dispatch. Output reports parse errors, exclusions, and truncation. No source is injected until this tool is called.".into(),
+            description: "Query an on-demand, content-hash refreshed syntax index for Rust, Python, JavaScript, TypeScript/TSX, or Go. Modes: definitions, references, outline. References are same-name syntactic occurrences, NOT resolved callers. Use exact symbol names, optional path relative to the current target or absolute for related evidence, and next_offset for pagination. Read returned ranges to establish behavior; use Grep for unsupported languages, aliases, generated code, and dynamic dispatch. Output reports parse errors, exclusions, and truncation. No source is injected until this tool is called.".into(),
             parameters: json!({"type":"object", "additionalProperties":false, "properties":{
                 "symbol":{"type":"string","description":"Exact symbol name; empty lists all symbols in the scope."},
                 "mode":{"type":"string","enum":["definitions","references","outline"]},
-                "path":{"type":"string","description":"Repository-relative file or directory, default ."},
+                "path":{"type":"string","description":"File or directory relative to the current target, or absolute for related evidence; default ."},
                 "offset":{"type":"integer","minimum":0},
                 "limit":{"type":"integer","minimum":1,"maximum":100}
             }})
@@ -128,8 +129,7 @@ impl RepositoryIndex {
     fn query(&self, args: IndexArgs) -> Result<(String, u64, u64, bool, u64, u64), ToolError> {
         let started = std::time::Instant::now();
         let root = self.root.canonicalize()?;
-        let scope =
-            resolve_in_root(&root, &args.path).map_err(|e| ToolError::Path(e.to_string()))?;
+        let scope = resolve_path(&root, &args.path).map_err(|e| ToolError::Path(e.to_string()))?;
         let mut state = self
             .state
             .lock()
@@ -184,7 +184,7 @@ impl RepositoryIndex {
             let path = entry.path();
             let rel = path
                 .strip_prefix(&root)
-                .map_err(|e| ToolError::Path(e.to_string()))?
+                .unwrap_or(path)
                 .to_string_lossy()
                 .replace('\\', "/");
             if seen.len() >= MAX_FILES {
@@ -203,8 +203,8 @@ impl RepositoryIndex {
                 continue;
             };
             let canonical =
-                resolve_in_root(&root, &rel).map_err(|e| ToolError::Path(e.to_string()))?;
-            let file = std::fs::File::open(canonical)?;
+                resolve_path(&root, &rel).map_err(|e| ToolError::Path(e.to_string()))?;
+            let file = std::fs::File::open(&canonical)?;
             if file.metadata()?.len() > MAX_FILE_BYTES {
                 incomplete = true;
                 state.files.remove(&rel);
@@ -280,6 +280,7 @@ impl RepositoryIndex {
             state.files.insert(
                 rel,
                 FileRecord {
+                    native_path: canonical,
                     fingerprint,
                     occurrences,
                     parse_errors,
@@ -290,9 +291,9 @@ impl RepositoryIndex {
         }
         // Only remove records within a fully traversed scope; queries outside it remain cached.
         if !incomplete {
-            state
-                .files
-                .retain(|path, _| !root.join(path).starts_with(&scope) || seen.contains(path));
+            state.files.retain(|path, record| {
+                !record.native_path.starts_with(&scope) || seen.contains(path)
+            });
         }
         state.generation = state.generation.saturating_add(1);
         let mut cached_occurrences = 0;
@@ -309,7 +310,10 @@ impl RepositoryIndex {
         let records: Vec<_> = state
             .files
             .iter()
-            .filter(|(path, _)| verified.contains(*path) && root.join(path).starts_with(&scope))
+            // `verified` contains only files inspected in this query. Do not
+            // reconstruct native paths from slash-normalized display keys;
+            // Windows verbatim prefixes differ after that conversion.
+            .filter(|(path, _)| verified.contains(*path))
             .collect();
         let parse_error_files: Vec<_> = records
             .iter()

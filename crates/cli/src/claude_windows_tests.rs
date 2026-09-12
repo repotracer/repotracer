@@ -131,12 +131,16 @@ async fn windows_cleanup_reaches_descendants_after_parent_exit_and_without_runti
     for mode in ["exit", "explicit", "drop-without-runtime", "eviction"] {
         let (dir, cfg, request) = fixture(mode);
         let scout = ClaudeScout::new(&cfg).unwrap();
+        let provider_identity =
+            claude_provider_identity(cfg.model.executable.as_deref().map(std::path::Path::new))
+                .unwrap();
         let mut conversation = scout
             .spawn(
                 &request,
                 dir.path().canonicalize().unwrap(),
                 "windows".into(),
                 "medium",
+                provider_identity,
             )
             .await
             .unwrap();
@@ -162,7 +166,7 @@ async fn windows_cleanup_reaches_descendants_after_parent_exit_and_without_runti
                 let mut store = SessionStore::new();
                 let evicted = store.insert(
                     SessionKey {
-                        root: dir.path().into(),
+                        provider_identity,
                         id: "windows".into(),
                     },
                     conversation,
@@ -197,6 +201,9 @@ async fn windows_cancelled_and_failed_turns_kill_descendants() {
             request.timeout = Some(Duration::from_secs(3));
         }
         let scout = ClaudeScout::new(&cfg).unwrap();
+        let provider_identity =
+            claude_provider_identity(cfg.model.executable.as_deref().map(std::path::Path::new))
+                .unwrap();
         // Spawn first to observe the descendants before a fast error retires them.
         let conversation = scout
             .spawn(
@@ -204,13 +211,14 @@ async fn windows_cancelled_and_failed_turns_kill_descendants() {
                 dir.path().canonicalize().unwrap(),
                 "windows".into(),
                 "medium",
+                provider_identity,
             )
             .await
             .unwrap();
         let handles = descendants(dir.path()).await;
         scout.lock_sessions().sessions.insert(
             SessionKey {
-                root: dir.path().canonicalize().unwrap(),
+                provider_identity,
                 id: "windows".into(),
             },
             conversation,

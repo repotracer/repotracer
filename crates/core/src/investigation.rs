@@ -64,14 +64,8 @@ pub struct InvestigationSpec {
     pub continuation_efforts: Option<Vec<String>>,
 }
 
-/// Normalize MCP-facing investigation paths to repository-relative paths.
-///
-/// Relative paths may name a file or directory that does not exist yet. In
-/// that case the nearest existing parent must still resolve inside the
-/// canonical repository. Existing paths are canonicalized, so symlink aliases
-/// inside the repository become stable relative paths and symlink escapes are
-/// rejected. Absolute paths are accepted only when canonicalization proves
-/// that they are inside the repository.
+/// Normalize paths relative to the current target. Evidence elsewhere keeps
+/// its absolute location so related checkouts cannot be confused.
 fn normalize_request_paths(request: &mut ScoutRequest) -> anyhow::Result<()> {
     let root = canonical_repo_root(&request.root)?;
 
@@ -131,8 +125,7 @@ pub fn validate_request(request: &ScoutRequest) -> anyhow::Result<()> {
     // through MCP. The MCP boundary also stores the normalized values before
     // it invokes this function.
     let mut normalized = request.clone();
-    normalize_request_paths(&mut normalized)
-        .context("target paths and focus must resolve inside the repository")?;
+    normalize_request_paths(&mut normalized).context("cannot resolve target paths or focus")?;
     Ok(())
 }
 
@@ -158,13 +151,6 @@ fn normalize_repository_path(root: &Path, input: &str) -> anyhow::Result<String>
         return Ok(".".into());
     }
 
-    anyhow::ensure!(
-        !path
-            .components()
-            .any(|component| matches!(component, Component::ParentDir)),
-        "path traversal is not allowed: {input}"
-    );
-
     // On Unix, Path does not recognize a Windows drive or rooted path. Reject
     // those spellings rather than accidentally treating them as repository
     // filenames. On Windows, the normal Component checks below handle them.
@@ -178,10 +164,6 @@ fn normalize_repository_path(root: &Path, input: &str) -> anyhow::Result<String>
         let canonical = path
             .canonicalize()
             .with_context(|| format!("absolute path does not exist: {input}"))?;
-        anyhow::ensure!(
-            canonical.starts_with(root),
-            "path is outside the repository: {input}"
-        );
         return repository_relative(root, &canonical);
     }
 
@@ -193,15 +175,11 @@ fn normalize_repository_path(root: &Path, input: &str) -> anyhow::Result<String>
     );
 
     let candidate = root.join(path);
-    let resolved = resolve_with_existing_parent(root, &candidate, input)?;
+    let resolved = resolve_with_existing_parent(&candidate, input)?;
     repository_relative(root, &resolved)
 }
 
-fn resolve_with_existing_parent(
-    root: &Path,
-    candidate: &Path,
-    input: &str,
-) -> anyhow::Result<PathBuf> {
+fn resolve_with_existing_parent(candidate: &Path, input: &str) -> anyhow::Result<PathBuf> {
     let mut current = candidate.to_path_buf();
     let mut missing: Vec<std::ffi::OsString> = Vec::new();
     loop {
@@ -210,10 +188,6 @@ fn resolve_with_existing_parent(
                 let canonical = current
                     .canonicalize()
                     .with_context(|| format!("cannot resolve path: {input}"))?;
-                anyhow::ensure!(
-                    canonical.starts_with(root),
-                    "path resolves outside the repository: {input}"
-                );
                 let mut resolved = canonical;
                 for component in missing.iter().rev() {
                     resolved.push(component.as_os_str());
@@ -237,10 +211,12 @@ fn resolve_with_existing_parent(
     }
 }
 
-fn repository_relative(root: &Path, path: &Path) -> anyhow::Result<String> {
-    let relative = path
-        .strip_prefix(root)
-        .with_context(|| format!("path is outside the repository: {}", path.display()))?;
+pub(crate) fn repository_relative(root: &Path, path: &Path) -> anyhow::Result<String> {
+    let Ok(relative) = path.strip_prefix(root) else {
+        // Keep native absolute prefixes intact, especially Windows verbatim
+        // paths. Focus becomes a PathBuf again and must round-trip exactly.
+        return Ok(path.to_string_lossy().into_owned());
+    };
     if relative.as_os_str().is_empty() {
         return Ok(".".into());
     }
@@ -329,11 +305,20 @@ struct ModelFinding {
 
 #[derive(Deserialize)]
 struct ModelReport {
+    #[serde(alias = "summary")]
     answer: String,
-    status: InvestigationStatus,
+    #[serde(default)]
+    citations: Vec<Citation>,
+    // Accept older reports without requiring their writing template.
+    #[serde(default)]
+    status: Option<InvestigationStatus>,
+    #[serde(default)]
     findings: Vec<ModelFinding>,
+    #[serde(default)]
     unresolved: Vec<String>,
+    #[serde(default)]
     searched_scope: Vec<String>,
+    #[serde(default)]
     limitations: Vec<String>,
     #[serde(default)]
     confidence: InvestigationConfidence,
@@ -352,61 +337,47 @@ pub fn questions(request: &ScoutRequest) -> Vec<String> {
 pub fn investigation_prompt(request: &ScoutRequest) -> String {
     let context = json!({
         "objective": request.query,
+        "repository": request.root,
         "intent": request.investigation.intent,
-        "questions": questions(request),
         "known_context_unverified": request.investigation.known_context,
+        "questions": request.investigation.questions,
         "target_paths": request.investigation.target_paths,
         "focus": request.focus,
         "prior_findings_unverified": request.investigation.continuation_context,
         "supported_continuation_efforts": request.investigation.continuation_efforts,
     });
     format!(
-        "{}\n\nInvestigation input:\n{}\n\nUse the query as the primary objective. Optional fields are hints; choose useful related reads and follow leads when they help answer the request. Return one JSON object matching this schema. Give useful explanation and code context in the answer and findings. Label findings in concise words of your choice, and state unresolved questions or material missing facts plainly. Attach direct source citations to factual findings. Use partial when questions remain unresolved; not_found means only that the stated search scope yielded no supported answer. Never invent citations. If supported_continuation_efforts lists a higher effort, you may request one continuation for a specific reasoning problem that remains after following useful leads. Name the unresolved relationship and why more reasoning may help. For example, two traced override paths still conflict. Missing ordinary reads, user choices, and transport-trimmed source need those missing inputs, not higher effort. Otherwise return continuation: null. In a continuation, revise the full original report, retaining supported findings and resolving or carrying forward each material gap. Preserve the original objective, requirements, and evidence scope.\n{}",
+        "{}\n\nInvestigation input:\n{}\n\nUse the query as the primary objective. Optional fields are hints. Discover useful leads yourself; the parent supplies what it already knows. Write one coherent answer in whatever structure fits the task, including deciding relationships, useful related discoveries and specific uncertainty. Use citations to select source for attachment, not to duplicate it in prose. For experiments, include the relevant command, inputs, result and what it establishes; citations may be empty. Do not repeat the answer in separate findings or supply operational metadata. Return JSON matching the schema below. If a supported higher effort would resolve a specific reasoning gap, request one continuation with its question and reason; otherwise use null. A continuation must update the complete answer for the original objective, preserving supported evidence and any remaining uncertainty.\n{}",
         request.investigation.intent.strategy(), context, investigation_output_schema()
     )
 }
 
 pub fn investigation_output_schema() -> Value {
-    let citation = json!({
-        "type": "object", "additionalProperties": false,
-        "properties": {
-            "path": {"type": "string", "description": "Repository-relative source path, for example 'crates/core/src/lib.rs'. Absolute paths are not returned. Only cite files inside the repository."}, "start_line": {"type": "integer", "minimum": 1},
-            "end_line": {"type": "integer", "minimum": 1}, "reason": {"type": "string"}
-        }, "required": ["path", "start_line", "end_line", "reason"]
-    });
     json!({
         "type": "object", "additionalProperties": false,
         "properties": {
-            "answer": {"type": "string", "description": "Direct conclusion. Put supporting explanation and code relationships in findings so the two fields complement each other."},
-            "status": {"type": "string", "enum": ["complete", "partial", "not_found", "failed"]},
-            "confidence": {
+            "answer": {"type": "string", "description": "The useful investigation answer, including evidence, relevant experiments and specific uncertainties. Choose its structure for the assignment."},
+            "citations": {"type": "array", "description": "Source ranges the parent needs, in reading order. Empty is valid for answers supported by experiments or other evidence in the answer.", "items": {
                 "type": "object", "additionalProperties": false,
                 "properties": {
-                    "level": {"type": "string", "enum": ["high", "medium", "low", "unknown"], "description": "Your assessment of evidence supporting the answer, not a probability. High: deciding behavior directly traced with no material conflicting evidence. Medium: supported answer with an important inferred relationship. Low: tentative explanation. Unknown: insufficient evidence to assess."},
-                    "basis": {"type": "string", "description": "Explain what evidence justifies the assessment and which claims remain inferred or untested. Distinguish reading a test from running it. List actionable gaps in unresolved, not as a generic request to recheck everything."}
+                    "path": {"type": "string", "description": "Source file path relative to the current target, or absolute for evidence elsewhere. Identify the actual checkout."},
+                    "start_line": {"type": "integer", "minimum": 1},
+                    "end_line": {"type": "integer", "minimum": 1},
+                    "reason": {"type": "string", "description": "What this code supports."}
                 },
-                "required": ["level", "basis"]
-            },
-            "findings": {"type": "array", "items": {
-                "type": "object", "additionalProperties": false,
-                "properties": {"question": {"type": "string", "description": "Concise label for the question or finding; use your own wording."}, "answer": {"type": "string", "description": "The supported explanation or code context for this finding."},
-                    "citations": {"type": "array", "description": "Order source by usefulness to the parent's next step; implementation and relevant tests before peripheral background. This order controls source retention when the reply is oversized.", "items": citation}},
-                "required": ["question", "answer", "citations"]
+                "required": ["path", "start_line", "end_line", "reason"]
             }},
-            "unresolved": {"type": "array", "items": {"type": "string", "description": "Material gap preventing the requested investigation from being answered. Distinguish missing task requirements from unresolved existing-code behavior. Supplied requirements, expected absence of a proposed feature, and optional extensions are not unresolved questions."}},
-            "searched_scope": {"type": "array", "items": {"type": "string"}},
-            "limitations": {"type": "array", "items": {"type": "string"}},
-            "continuation": {"anyOf": [{"type": "object", "additionalProperties": false,
-                "description": "Optional single targeted higher-effort continuation. Use only for a concrete evidence gap after the first useful pass; never request it from a confidence label or query keyword.",
+            "continuation": {"anyOf": [{
+                "type": "object", "additionalProperties": false,
                 "properties": {
-                    "effort": {"type": "string", "description": "A higher effort listed in supported_continuation_efforts; the caller validates native support."},
-                    "question": {"type": "string", "description": "The narrow missing fact or relationship to resolve."},
-                    "reason": {"type": "string", "description": "Why the current evidence cannot resolve that question."}
+                    "effort": {"type": "string", "description": "A supported higher effort from the supplied list."},
+                    "question": {"type": "string", "description": "The specific unresolved relationship."},
+                    "reason": {"type": "string", "description": "Why more reasoning would help after useful investigation."}
                 },
                 "required": ["effort", "question", "reason"]
             }, {"type": "null"}]}
         },
-        "required": ["answer", "status", "confidence", "findings", "unresolved", "searched_scope", "limitations", "continuation"]
+        "required": ["answer", "citations", "continuation"]
     })
 }
 
@@ -417,8 +388,8 @@ pub fn assess_output(
     request: &ScoutRequest,
     raw: &str,
 ) -> (String, Vec<ValidatedCitation>, InvestigationReport) {
+    let raw = raw.trim();
     let raw = raw
-        .trim()
         .strip_prefix("```json")
         .and_then(|s| s.strip_suffix("```"))
         .unwrap_or(raw)
@@ -428,41 +399,33 @@ pub fn assess_output(
         ..Default::default()
     };
     let mut all_citations = Vec::new();
-    let mut rejected_citation = false;
-    let parsed = serde_json::from_str::<ModelReport>(raw);
-    let summary = match parsed {
+    let summary = match serde_json::from_str::<ModelReport>(raw) {
         Ok(model) => {
-            report.status = model.status;
+            report.status = model.status.unwrap_or(InvestigationStatus::Complete);
             report.unresolved = model.unresolved;
             report.searched_scope = model.searched_scope;
             report.limitations = model.limitations;
             report.confidence = model.confidence;
             report.continuation = model.continuation;
+            for citation in model.citations {
+                attach_citation(
+                    request,
+                    &citation,
+                    &mut all_citations,
+                    &mut report.limitations,
+                );
+            }
             for finding in model.findings {
                 let mut citations = Vec::new();
                 for citation in finding.citations {
-                    if let Some(valid) = validate_citation(&request.root, &citation)
-                        .filter(|valid| valid.end_line == citation.end_line)
-                    {
-                        if !all_citations.iter().any(|c: &ValidatedCitation| {
-                            c.path == valid.path
-                                && c.start_line == valid.start_line
-                                && c.end_line == valid.end_line
-                        }) {
-                            all_citations.push(valid.clone());
-                        }
+                    if let Some(valid) = attach_citation(
+                        request,
+                        &citation,
+                        &mut all_citations,
+                        &mut report.limitations,
+                    ) {
                         citations.push(valid);
-                    } else {
-                        rejected_citation = true;
-                        report.limitations.push(format!(
-                            "Rejected citation {}:{}-{}",
-                            citation.path, citation.start_line, citation.end_line
-                        ));
-                        report.status = InvestigationStatus::Partial;
                     }
-                }
-                if finding.answer.trim().is_empty() || citations.is_empty() {
-                    report.unresolved.push(finding.question.clone());
                 }
                 report.findings.push(Finding {
                     question: finding.question,
@@ -473,46 +436,61 @@ pub fn assess_output(
             model.answer
         }
         Err(_) => {
-            // Older/custom providers remain usable, but cannot certify coverage.
-            #[derive(Deserialize)]
-            struct Legacy {
-                answer: String,
-                citations: Vec<Citation>,
+            let (answer, citations) = parse_citations(raw);
+            for citation in citations {
+                attach_citation(
+                    request,
+                    &citation,
+                    &mut all_citations,
+                    &mut report.limitations,
+                );
             }
-            let (summary, citations) = match serde_json::from_str::<Legacy>(raw) {
-                Ok(legacy) => (legacy.answer, legacy.citations),
-                Err(_) => parse_citations(raw),
-            };
-            all_citations = crate::validate_citations(&request.root, &citations);
-            report
-                .limitations
-                .push("Legacy or malformed output: question coverage was not established.".into());
-            summary
+            // Preserve a useful plain answer; structured attachment parsing is
+            // an integration concern, not a reason to repeat paid investigation.
+            report.status = InvestigationStatus::Complete;
+            if answer.trim().is_empty() && all_citations.is_empty() {
+                raw.to_owned()
+            } else {
+                answer
+            }
         }
     };
-    if report.status == InvestigationStatus::Complete
-        && (!report.unresolved.is_empty() || all_citations.is_empty())
-    {
+    if summary.trim().is_empty() || !report.unresolved.is_empty() || report.continuation.is_some() {
         report.status = InvestigationStatus::Partial;
     }
-    if report.status == InvestigationStatus::Complete
-        && request.investigation.intent == InvestigationIntent::Inventory
-        && report.searched_scope.is_empty()
-    {
-        report.status = InvestigationStatus::Partial;
-        report
-            .limitations
-            .push("Inventory completeness requires an explicit searched scope.".into());
-    }
-    if report.status == InvestigationStatus::NotFound
-        && (!all_citations.is_empty() || report.searched_scope.is_empty())
-    {
-        report.status = InvestigationStatus::Partial;
-    }
-    if rejected_citation || report.confidence.basis.trim().is_empty() {
+    if report.confidence.basis.trim().is_empty() {
         report.confidence = InvestigationConfidence::default();
     }
     (summary, all_citations, report)
+}
+
+fn attach_citation(
+    request: &ScoutRequest,
+    citation: &Citation,
+    all: &mut Vec<ValidatedCitation>,
+    limitations: &mut Vec<String>,
+) -> Option<ValidatedCitation> {
+    match validate_citation(&request.root, citation)
+        .filter(|valid| valid.end_line == citation.end_line)
+    {
+        Some(valid) => {
+            if !all.iter().any(|old| {
+                old.path == valid.path
+                    && old.start_line == valid.start_line
+                    && old.end_line == valid.end_line
+            }) {
+                all.push(valid.clone());
+            }
+            Some(valid)
+        }
+        None => {
+            limitations.push(format!(
+                "Source could not be attached: {}:{}-{} (unavailable file or invalid range).",
+                citation.path, citation.start_line, citation.end_line
+            ));
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -533,7 +511,7 @@ mod tests {
     }
 
     #[test]
-    fn confidence_requires_basis_and_survives_only_valid_citations() {
+    fn legacy_confidence_is_not_a_program_verified_verdict() {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("lib.rs"), "fn start() {}\n").unwrap();
         let request = request(root.path());
@@ -554,8 +532,9 @@ mod tests {
         raw["confidence"]["basis"] = json!("Read the definition.");
         raw["findings"][0]["citations"][0]["end_line"] = json!(10);
         let report = assess_output(&request, &raw.to_string()).2;
-        assert_eq!(report.confidence.level, ConfidenceLevel::Unknown);
-        assert_eq!(report.status, InvestigationStatus::Partial);
+        assert_eq!(report.confidence.level, ConfidenceLevel::High);
+        assert_eq!(report.status, InvestigationStatus::Complete);
+        assert!(!report.limitations.is_empty());
         raw.as_object_mut().unwrap().remove("confidence");
         assert_eq!(
             assess_output(&request, &raw.to_string()).2.confidence.level,
@@ -617,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn traversal_and_outside_paths_are_rejected() {
+    fn external_target_paths_keep_explicit_provenance() {
         let parent = tempfile::tempdir().unwrap();
         let root = parent.path().join("repo");
         std::fs::create_dir(&root).unwrap();
@@ -625,17 +604,24 @@ mod tests {
         std::fs::write(&outside, "secret\n").unwrap();
 
         let mut traversal = request(&root);
-        traversal.focus = Some(PathBuf::from("src/../src"));
-        assert!(normalize_request_paths(&mut traversal).is_err());
+        traversal.focus = Some(PathBuf::from("../secret.rs"));
+        normalize_request_paths(&mut traversal).unwrap();
+        assert_eq!(traversal.focus, Some(outside.canonicalize().unwrap()));
+        normalize_request_paths(&mut traversal).unwrap();
+        assert_eq!(traversal.focus, Some(outside.canonicalize().unwrap()));
 
         let mut absolute_outside = request(&root);
         absolute_outside.investigation.target_paths = vec![outside.display().to_string()];
-        assert!(normalize_request_paths(&mut absolute_outside).is_err());
+        normalize_request_paths(&mut absolute_outside).unwrap();
+        assert_eq!(
+            absolute_outside.investigation.target_paths,
+            [outside.canonicalize().unwrap().to_string_lossy()]
+        );
     }
 
     #[cfg(unix)]
     #[test]
-    fn symlink_escapes_are_rejected_even_for_missing_targets() {
+    fn related_symlink_targets_are_identified_by_real_location() {
         let parent = tempfile::tempdir().unwrap();
         let root = parent.path().join("repo");
         std::fs::create_dir(&root).unwrap();
@@ -645,11 +631,21 @@ mod tests {
 
         let mut focus = request(&root);
         focus.focus = Some(PathBuf::from("linked"));
-        assert!(normalize_request_paths(&mut focus).is_err());
+        normalize_request_paths(&mut focus).unwrap();
+        assert_eq!(focus.focus, Some(outside.canonicalize().unwrap()));
 
         let mut missing = request(&root);
         missing.investigation.target_paths = vec!["linked/new.rs".into()];
-        assert!(normalize_request_paths(&mut missing).is_err());
+        normalize_request_paths(&mut missing).unwrap();
+        assert_eq!(
+            missing.investigation.target_paths,
+            [outside
+                .canonicalize()
+                .unwrap()
+                .join("new.rs")
+                .to_string_lossy()
+                .to_string()]
+        );
     }
 
     #[test]
@@ -677,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    fn negative_result_requires_explicit_scope() {
+    fn legacy_not_found_is_a_model_report_not_a_program_verdict() {
         let request = ScoutRequest {
             query: "missing".into(),
             root: ".".into(),
@@ -691,7 +687,7 @@ mod tests {
         .to_string();
         assert_eq!(
             assess_output(&request, &raw).2.status,
-            InvestigationStatus::Partial
+            InvestigationStatus::NotFound
         );
     }
 
@@ -718,7 +714,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_citation_stays_partial_and_is_reported() {
+    fn invalid_citation_keeps_the_answer_and_reports_attachment_failure() {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("lib.rs"), "fn start() {}\n").unwrap();
         let request = request(root.path());
@@ -728,14 +724,15 @@ mod tests {
         }], "unresolved":[], "searched_scope":["lib.rs"], "limitations":[]})
         .to_string();
 
-        let (_, citations, report) = assess_output(&request, &raw);
+        let (answer, citations, report) = assess_output(&request, &raw);
+        assert_eq!(answer, "start");
         assert!(citations.is_empty());
-        assert_eq!(report.status, InvestigationStatus::Partial);
+        assert_eq!(report.status, InvestigationStatus::Complete);
         assert!(report
             .limitations
             .iter()
-            .any(|limitation| limitation.contains("Rejected citation lib.rs:1-2")));
-        assert_eq!(report.unresolved, ["entry"]);
+            .any(|limitation| limitation.contains("Source could not be attached: lib.rs:1-2")));
+        assert!(report.unresolved.is_empty());
     }
 
     #[test]
@@ -828,7 +825,82 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let prompt = investigation_prompt(&request(root.path()));
         assert!(prompt.contains("query as the primary objective"));
-        assert!(prompt.contains("Label findings in concise words of your choice"));
+        assert!(prompt.contains("one coherent answer"));
         assert!(!prompt.contains("Copy question strings exactly"));
+    }
+
+    #[test]
+    fn coherent_experiment_answer_needs_no_source_citation() {
+        let root = tempfile::tempdir().unwrap();
+        let raw = json!({"answer": "Ran the parser on an empty field: it returned an empty string. This reproduces the behavior, not the cause.", "citations": [], "continuation": null});
+        let (answer, citations, report) = assess_output(&request(root.path()), &raw.to_string());
+        assert_eq!(answer, raw["answer"].as_str().unwrap());
+        assert!(citations.is_empty());
+        assert!(report.limitations.is_empty());
+        assert_eq!(report.status, InvestigationStatus::Complete);
+        assert!(report.findings.is_empty());
+    }
+
+    #[test]
+    fn legacy_summary_report_preserves_findings_and_uncertainty() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("lib.rs"), "fn start() {}\n").unwrap();
+        let raw = json!({
+            "summary": "The entry point is start.",
+            "status": "partial",
+            "findings": [{
+                "question": "Where does execution start?",
+                "answer": "The caller has not been traced.",
+                "citations": [{"path": "lib.rs", "start_line": 1, "end_line": 1}]
+            }],
+            "unresolved": ["Which caller selects the entry point?"],
+            "searched_scope": ["lib.rs"],
+            "limitations": ["No execution test was run."]
+        });
+        let (answer, citations, report) = assess_output(&request(root.path()), &raw.to_string());
+        assert_eq!(answer, "The entry point is start.");
+        assert_eq!(report.status, InvestigationStatus::Partial);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(report.findings[0].answer, "The caller has not been traced.");
+        assert_eq!(report.unresolved, ["Which caller selects the entry point?"]);
+        assert_eq!(report.searched_scope, ["lib.rs"]);
+        assert_eq!(report.limitations, ["No execution test was run."]);
+    }
+
+    #[test]
+    fn minimal_schema_does_not_require_operational_or_repeated_report_fields() {
+        let schema = investigation_output_schema();
+        assert_eq!(
+            schema["required"],
+            json!(["answer", "citations", "continuation"])
+        );
+        for field in [
+            "findings",
+            "confidence",
+            "status",
+            "stats",
+            "repository",
+            "next_action",
+        ] {
+            assert!(schema["properties"].get(field).is_none());
+        }
+    }
+
+    #[test]
+    fn external_source_is_attached_with_its_actual_absolute_location() {
+        let root = tempfile::tempdir().unwrap();
+        let dependency = tempfile::tempdir().unwrap();
+        let path = dependency.path().join("library.rs");
+        std::fs::write(&path, "fn external() {}\n").unwrap();
+        let raw = json!({"answer": "The dependency exports external.", "citations": [{"path": path, "start_line": 1, "end_line": 1}], "continuation": null});
+        let (_, citations, _) = assess_output(&request(root.path()), &raw.to_string());
+        assert_eq!(
+            PathBuf::from(&citations[0].path),
+            path.canonicalize().unwrap()
+        );
+        assert_eq!(
+            std::fs::read_to_string(&citations[0].path).unwrap(),
+            "fn external() {}\n"
+        );
     }
 }

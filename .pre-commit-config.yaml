@@ -1,6 +1,6 @@
 ci:
-  # pre-commit.ci does not provide cargo. GitHub CI runs this hook on Linux and
-  # macOS after installing the Rust toolchain.
+  # pre-commit.ci has no Cargo; the Rust CI jobs run cargo fmt --check.
+  # Keep the hook enabled for developers who run pre-commit locally.
   skip: [fmt]
 
 repos:

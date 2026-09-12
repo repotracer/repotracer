@@ -209,7 +209,7 @@ fn uninstall_persists_successful_parent_removal_before_a_later_failure() {
 }
 
 #[test]
-fn uninstall_without_claude_cli_still_removes_managed_files() {
+fn uninstall_without_claude_cli_preserves_managed_files() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
     let claude_home = root.join("claude-home");
@@ -230,13 +230,20 @@ fn uninstall_without_claude_cli_still_removes_managed_files() {
         .env("PATH", root)
         .args(["uninstall", "--yes"])
         .assert()
-        .success();
+        .failure()
+        .stderr(predicates::str::contains("Claude executable unavailable"));
 
-    assert!(!root.join("config.integrations.json").exists());
-    assert!(!root.join("config.claude.toml").exists());
+    assert_eq!(
+        fs::read_to_string(root.join("config.integrations.json")).unwrap(),
+        r#"{"parents":["claude"]}"#
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("config.claude.toml")).unwrap(),
+        "profile"
+    );
     assert_eq!(
         fs::read_to_string(claude_home.join("CLAUDE.md")).unwrap(),
-        "user instructions\n"
+        "user instructions\n\n<!-- repotracer:start -->\nrouting\n<!-- repotracer:end -->\n"
     );
 }
 

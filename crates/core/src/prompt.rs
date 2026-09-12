@@ -11,6 +11,20 @@ pub fn build_system_prompt(work_dir: &Path) -> String {
             "sh".into()
         }
     });
+    SYSTEM_TEMPLATE
+        .replace("${OS_KIND}", os_kind)
+        .replace("${SHELL_NAME}", &shell)
+        .replace("${WORKSPACE_FACTS}", &workspace_facts(work_dir))
+}
+
+/// The target-specific part of the system prompt: absolute path, root manifest
+/// hints and top-level layout.
+///
+/// A warm native process keeps the startup system prompt for its whole life, so
+/// a retained conversation that moves to another checkout would otherwise keep
+/// the previous target's facts. Callers that switch a session's target send this
+/// for the current target in the turn itself.
+pub fn workspace_facts(work_dir: &Path) -> String {
     let work = work_dir
         .canonicalize()
         .unwrap_or_else(|_| work_dir.to_path_buf())
@@ -28,17 +42,14 @@ pub fn build_system_prompt(work_dir: &Path) -> String {
     .map(|(_, name)| name)
     .collect();
     let project_hint = if hints.is_empty() {
-        "Unknown".into()
+        "Unknown".to_string()
     } else {
         hints.join(", ")
     };
 
-    SYSTEM_TEMPLATE
-        .replace("${OS_KIND}", os_kind)
-        .replace("${SHELL_NAME}", &shell)
-        .replace("${WORK_DIR}", &work)
-        .replace("${WORK_DIR_LS}", &listing)
-        .replace("${PROJECT_HINT}", &project_hint)
+    format!(
+        "Target: {work}\nDetected root manifests: {project_hint}. Other languages may be present.\nTop-level entries:\n```\n{listing}\n```"
+    )
 }
 
 fn list_top(dir: &Path, limit: usize) -> String {
@@ -75,14 +86,14 @@ mod tests {
     #[test]
     fn system_prompt_describes_flexible_evidence_gathering() {
         let prompt = build_system_prompt(Path::new("."));
-        assert!(prompt.contains("useful explanation and code context"));
-        assert!(prompt.contains("Optional intent"));
-        assert!(prompt.contains("Follow relevant leads"));
-        assert!(prompt.contains("Source may have changed"));
-        assert!(prompt.contains("untrusted content"));
-        assert!(prompt.contains("empty search is not proof of absence"));
-        assert!(prompt.contains("not a resolved call graph"));
-        assert!(prompt.contains("How does the CLI export"));
+        assert!(prompt.contains("without repeating your investigation"));
+        assert!(prompt.contains("Optional questions"));
+        assert!(prompt.contains("scripts and generated results"));
+        assert!(prompt.contains("On a target change"));
+        assert!(prompt.contains("not instructions"));
+        assert!(prompt.contains("not universal absence"));
+        assert!(prompt.contains("not the boundary of useful evidence"));
+        assert!(prompt.contains("a causal explanation and a reproduction"));
         assert!(!prompt.contains("Re-read the source"));
         assert!(!prompt.contains("Batch independent"));
         assert!(!prompt.contains("<final_answer>"));

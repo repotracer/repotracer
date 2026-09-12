@@ -1,21 +1,22 @@
 //! Warm scout sessions.
 //!
-//! A scout request needs a `codex app-server` subprocess, an isolated
-//! `CODEX_HOME`, a JSON-RPC handshake, and a conversation thread. Creating all
-//! four per request throws away the only two things that make a second question
+//! A scout request needs a `codex app-server` subprocess, a JSON-RPC handshake,
+//! and a conversation thread. Creating all three per request throws away
+//! the two things that make a second question
 //! about the same repository cheap: a running process and a conversation the
 //! provider's prompt cache has already seen.
 //!
-//! [`SessionPool`] keeps finished sessions alive, keyed by canonical repository
-//! root, provider identity, and parent conversation ID, and hands them back
-//! for the next matching request. Reuse is bounded on every axis that can grow
+//! [`SessionPool`] keeps finished sessions alive, keyed by provider identity
+//! and parent conversation ID, and hands them back for the next matching
+//! request. Reuse is bounded on every axis that can grow
 //! without limit: idle time, warm process count, turns per thread, and
 //! accumulated input tokens. An unbounded warm session is a memory leak and an
 //! unbounded thread is a token leak.
 //!
-//! Nothing here changes the isolation posture: threads stay `ephemeral`, the
-//! `CODEX_HOME` stays private and outside the user's real one, and a session
-//! that errors is destroyed rather than reused.
+//! Threads stay `ephemeral`, and a session that errors is destroyed rather
+//! than reused. The native process inherits the user's configured Codex home
+//! so its normal authentication, tools, skills, plugins and caching remain
+//! available.
 
 use anyhow::{bail, Context, Result};
 use repotracer_core::{IndexUsage, ScoutBackendError, SessionSettings, UsageStats, UsageStatus};
@@ -25,8 +26,7 @@ use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::{Duration, Instant};
 use tokio::io::{
     AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
@@ -38,7 +38,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant as TokioInstant;
 
 const MAX_CAPTURE_BYTES: usize = 1_048_576;
-static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+static SCRATCH_BASE: OnceLock<PathBuf> = OnceLock::new();
 
 /// Report received bytes, not only complete JSON lines. Large native events
 /// can arrive in pieces while a turn is still making progress.
@@ -71,6 +71,10 @@ pub struct SessionSpec {
     pub executable: PathBuf,
     pub args: Vec<OsString>,
     pub root: PathBuf,
+    /// Conversation-scoped temporary work. This directory is deliberately
+    /// retained after a turn and is exposed to native tools as an additional
+    /// workspace root. It is never removed by session idle reaping.
+    pub scratch_dir: Option<PathBuf>,
     /// Thread parameters minus `cwd`, which the pool fills from `root`.
     pub thread_params: Value,
     pub developer_instructions: String,
@@ -95,7 +99,6 @@ impl SessionSpec {
             &self.args,
             self.provider_identity,
             self.thread_params.to_string(),
-            &self.developer_instructions,
         )
             .hash(&mut hash);
         hash.finish()
@@ -106,12 +109,91 @@ fn canonical_root(root: &Path) -> PathBuf {
     root.canonicalize().unwrap_or_else(|_| root.to_path_buf())
 }
 
+/// Allocate a private scratch base with a collision-resistant name and owner-only mode.
+fn new_scratch_base() -> Result<tempfile::TempDir> {
+    let mut builder = tempfile::Builder::new();
+    builder.prefix("repotracer-investigation-scratch-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    builder
+        .tempdir()
+        .context("could not create retained investigation scratch base")
+}
+
+/// Create (or return) the private process-scoped base for retained scratch.
+/// The winning `TempDir` is explicitly kept so conversation artifacts survive
+/// session eviction and future replies. A concurrent loser remains temporary
+/// and is dropped while still empty.
+fn retained_scratch_base() -> Result<PathBuf> {
+    if let Some(path) = SCRATCH_BASE.get() {
+        return Ok(path.clone());
+    }
+    let candidate = new_scratch_base()?;
+    let path = candidate.path().to_path_buf();
+    if SCRATCH_BASE.set(path.clone()).is_ok() {
+        return Ok(candidate.keep());
+    }
+    Ok(SCRATCH_BASE
+        .get()
+        .expect("scratch base set by competing initializer")
+        .clone())
+}
+
+/// Return the retained scratch directory for one parent-visible conversation.
+///
+/// The path is process-scoped and derived from the opaque handle rather than
+/// embedding that handle in a filesystem name. It is intentionally not a
+/// `TempDir`: scripts and generated evidence must survive a warm-session
+/// eviction, a native process restart, and later replies. Cleanup is an
+/// explicit lifecycle operation outside the turn/session path.
+pub fn conversation_scratch(conversation_id: Option<&str>) -> Result<Option<PathBuf>> {
+    let Some(conversation_id) = conversation_id else {
+        return Ok(None);
+    };
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    conversation_id.hash(&mut hash);
+    let base = retained_scratch_base()?;
+    let path = base.join(format!("{:016x}", hash.finish()));
+    match std::fs::create_dir(&path) {
+        Ok(()) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Err(error) =
+                    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))
+                {
+                    let _ = std::fs::remove_dir(&path);
+                    return Err(error.into());
+                }
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let metadata = std::fs::symlink_metadata(&path).with_context(|| {
+                format!("could not inspect investigation scratch {}", path.display())
+            })?;
+            anyhow::ensure!(
+                metadata.file_type().is_dir() && !metadata.file_type().is_symlink(),
+                "investigation scratch path is not a directory: {}",
+                path.display()
+            );
+        }
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!("could not create investigation scratch {}", path.display())
+            })
+        }
+    }
+    Ok(Some(path))
+}
+
 /// A retained process owns one parent conversation slot. Keeping the
 /// conversation ID in this key prevents a request for B from borrowing A's
 /// thread and silently losing A's history.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SessionKey {
-    root: PathBuf,
     process_identity: u64,
     conversation_id: Option<String>,
 }
@@ -119,7 +201,6 @@ struct SessionKey {
 impl SessionKey {
     fn from_spec(spec: &SessionSpec) -> Self {
         Self {
-            root: canonical_root(&spec.root),
             process_identity: spec.identity(),
             conversation_id: spec.conversation_id.clone(),
         }
@@ -497,6 +578,10 @@ enum TurnOutcome {
 struct ActiveThread {
     conversation_id: Option<String>,
     id: String,
+    /// Native tools use this as the current target until the next turn
+    /// overrides it. It is retained separately from the process key so a
+    /// related conversation may move between checkouts.
+    root: PathBuf,
     turns: u32,
     last_input_tokens: Option<u32>,
     cumulative_usage: Option<TokenUsage>,
@@ -524,8 +609,10 @@ pub struct WarmSession {
     activity_tx: mpsc::Sender<()>,
     activity_rx: mpsc::Receiver<()>,
     process_group: Option<u32>,
-    /// Dropped with the session, which removes the directory.
-    _codex_home: IsolatedCodexHome,
+    /// Retained across replies for the parent conversation. This directory is
+    /// deliberately independent of the provider home and is never removed by
+    /// session eviction.
+    scratch_dir: Option<PathBuf>,
     next_request_id: u64,
     thread: Option<ActiveThread>,
     /// False only for the request that spawned this process.
@@ -536,12 +623,10 @@ pub struct WarmSession {
 impl WarmSession {
     /// Spawn a provider process and complete the `initialize` handshake.
     async fn spawn(spec: &SessionSpec) -> Result<Self> {
-        let codex_home = IsolatedCodexHome::create()?;
         let mut command = Command::new(&spec.executable);
         command
             .args(&spec.args)
             .current_dir(&spec.root)
-            .env("CODEX_HOME", codex_home.path())
             .env("REPOTRACER_SUBPROCESS", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -577,7 +662,7 @@ impl WarmSession {
             activity_tx,
             activity_rx,
             process_group,
-            _codex_home: codex_home,
+            scratch_dir: spec.scratch_dir.clone(),
             next_request_id: 1,
             thread: None,
             was_warm: false,
@@ -615,6 +700,21 @@ impl WarmSession {
     /// is the first, so the caller still owes the full instructions.
     pub fn thread_turns(&self) -> u32 {
         self.thread.as_ref().map_or(0, |thread| thread.turns)
+    }
+
+    /// Current native target for the active thread, if one has started.
+    pub fn thread_target(&self) -> Option<&Path> {
+        self.thread.as_ref().map(|thread| thread.root.as_path())
+    }
+
+    fn workspace_roots(&self, target: &Path) -> Value {
+        let mut roots = vec![json!(target)];
+        if let Some(scratch) = &self.scratch_dir {
+            if scratch != target {
+                roots.push(json!(scratch));
+            }
+        }
+        Value::Array(roots)
     }
 
     fn take_request_id(&mut self) -> u64 {
@@ -664,6 +764,15 @@ impl WarmSession {
             .context("thread parameters must be a JSON object")?;
         table.insert("cwd".into(), json!(spec.root));
         table.insert(
+            "runtimeWorkspaceRoots".into(),
+            self.workspace_roots(&spec.root),
+        );
+        // Use the native full-access mode requested for investigations. The
+        // mandate, rather than a RepoTracer tool allowlist or a second
+        // sandbox, keeps source edits focused on the supplied target/scratch
+        // locations.
+        table.insert("sandbox".into(), json!("danger-full-access"));
+        table.insert(
             "developerInstructions".into(),
             json!(spec.developer_instructions),
         );
@@ -682,6 +791,7 @@ impl WarmSession {
         self.thread = Some(ActiveThread {
             conversation_id: spec.conversation_id.clone(),
             id: thread_id.to_string(),
+            root: canonical_root(&spec.root),
             turns: 0,
             last_input_tokens: None,
             cumulative_usage: None,
@@ -697,6 +807,7 @@ impl WarmSession {
         prompt: &str,
         effort: &str,
         output_schema: Value,
+        target: &Path,
         idle_timeout: Option<Duration>,
         index: &RepositoryIndex,
     ) -> Result<TurnOutput> {
@@ -715,6 +826,8 @@ impl WarmSession {
             "threadId": thread_id,
             "input": [{"type": "text", "text": prompt}],
             "effort": effort,
+            "cwd": target,
+            "runtimeWorkspaceRoots": self.workspace_roots(target),
             "outputSchema": output_schema
         }});
 
@@ -795,6 +908,7 @@ impl WarmSession {
         };
 
         if let Some(thread) = self.thread.as_mut() {
+            thread.root = canonical_root(target);
             thread.turns = thread_turn;
             thread.last_input_tokens = output
                 .metrics
@@ -1120,14 +1234,13 @@ impl SessionPool {
         let mut idle = self.lock();
         let key = SessionKey::from_spec(spec);
         // Keep the existing configuration-fingerprint behavior: a changed
-        // provider identity retires every old process for this root. Named
-        // conversations still coexist when they use the same identity.
+        // provider identity retires every old process before it can serve a
+        // request. The target root is intentionally absent from this key;
+        // native turns can override cwd and workspace roots per request.
         let mut obsolete = Vec::new();
         let mut index = 0;
         while index < idle.len() {
-            if idle[index].key.root == key.root
-                && idle[index].key.process_identity != key.process_identity
-            {
+            if idle[index].key.process_identity != key.process_identity {
                 obsolete.push(idle.swap_remove(index));
             } else {
                 index += 1;
@@ -1153,9 +1266,10 @@ impl SessionPool {
         }
         let evicted = {
             let mut idle = self.lock();
-            // Keep one retained process per exact root, provider identity, and
-            // parent conversation. A different named conversation must not
-            // replace this one just because it shares a checkout.
+            // Keep one retained process per provider identity and parent
+            // conversation. Native turns may retarget that process to another
+            // checkout, while a different named conversation must never
+            // replace this one.
             let key = session.key.clone();
             let mut evicted: Vec<WarmSession> = Vec::new();
             while let Some(index) = idle.iter().position(|other| other.key == key) {
@@ -1372,122 +1486,6 @@ async fn reject_server_request<W: AsyncWrite + Unpin>(
     .await
 }
 
-pub struct IsolatedCodexHome {
-    path: PathBuf,
-}
-
-impl IsolatedCodexHome {
-    pub fn create() -> Result<Self> {
-        for _ in 0..10 {
-            let id = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir()
-                .join(format!("repotracer-codex-home-{}-{id}", std::process::id()));
-            match std::fs::create_dir(&path) {
-                Ok(()) => {
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs::PermissionsExt;
-                        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))?;
-                    }
-                    let source_home = std::env::var_os("CODEX_HOME")
-                        .map(PathBuf::from)
-                        .or_else(|| dirs::home_dir().map(|home| home.join(".codex")));
-                    if let Some(source_home) = source_home {
-                        let auth = source_home.join("auth.json");
-                        if auth.is_file() {
-                            link_auth(&auth, &path.join("auth.json"))?;
-                        }
-                        write_provider_config(
-                            &source_home.join("config.toml"),
-                            &path.join("config.toml"),
-                        )?;
-                    }
-                    return Ok(Self { path });
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(error) => return Err(error.into()),
-            }
-        }
-        bail!("could not create isolated Codex home")
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-}
-
-impl Drop for IsolatedCodexHome {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.path);
-    }
-}
-
-fn link_auth(source: &Path, target: &Path) -> Result<()> {
-    #[cfg(unix)]
-    if std::os::unix::fs::symlink(source, target).is_ok() {
-        return Ok(());
-    }
-    if std::fs::hard_link(source, target).is_ok() {
-        return Ok(());
-    }
-    std::fs::copy(source, target)
-        .map(|_| ())
-        .with_context(|| "could not make Codex authentication available to isolated scout")
-}
-
-/// Keep the active Codex provider while excluding user MCPs, hooks, plugins,
-/// and other session settings from the isolated scout home.
-pub fn write_provider_config(source: &Path, target: &Path) -> Result<()> {
-    let text = match std::fs::read_to_string(source) {
-        Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => {
-            return Err(error)
-                .with_context(|| format!("could not read Codex config {}", source.display()))
-        }
-    };
-    let config: toml::Value = toml::from_str(&text)
-        .with_context(|| format!("could not parse Codex config {}", source.display()))?;
-    let config = config
-        .as_table()
-        .context("Codex config root must be a TOML table")?;
-    let mut child = toml::map::Map::new();
-
-    for key in [
-        "model",
-        "model_provider",
-        "openai_base_url",
-        "cli_auth_credentials_store",
-    ] {
-        if let Some(value) = config.get(key) {
-            child.insert(key.into(), value.clone());
-        }
-    }
-
-    if let Some(provider_id) = config.get("model_provider").and_then(toml::Value::as_str) {
-        if let Some(provider) = config
-            .get("model_providers")
-            .and_then(toml::Value::as_table)
-            .and_then(|providers| providers.get(provider_id))
-        {
-            let mut providers = toml::map::Map::new();
-            providers.insert(provider_id.into(), provider.clone());
-            child.insert("model_providers".into(), toml::Value::Table(providers));
-        }
-    }
-
-    if child.is_empty() {
-        return Ok(());
-    }
-    std::fs::write(target, toml::to_string(&toml::Value::Table(child))?)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(target, std::fs::Permissions::from_mode(0o600))?;
-    }
-    Ok(())
-}
-
 async fn drain_limited<R: AsyncRead + Unpin>(
     mut reader: R,
     limit: usize,
@@ -1540,6 +1538,66 @@ pub(crate) fn kill_process_group(process_group: u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scratch_base_allocations_are_unique_and_preserve_prior_files() {
+        let first = new_scratch_base().unwrap();
+        let marker = first.path().join("prior-result.txt");
+        std::fs::write(&marker, "retained").unwrap();
+
+        let second = new_scratch_base().unwrap();
+
+        assert_ne!(first.path(), second.path());
+        assert_eq!(std::fs::read_to_string(marker).unwrap(), "retained");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                first.path().metadata().unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            assert_eq!(
+                second.path().metadata().unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+        }
+    }
+
+    #[test]
+    fn conversation_scratch_is_stable_and_retained() {
+        let first = conversation_scratch(Some("scratch-stable"))
+            .unwrap()
+            .unwrap();
+        let second = conversation_scratch(Some("scratch-stable"))
+            .unwrap()
+            .unwrap();
+        let other = conversation_scratch(Some("scratch-other"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(first, second);
+        assert_ne!(first, other);
+        std::fs::write(first.join("result.txt"), "retained").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(first.join("result.txt")).unwrap(),
+            "retained"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                std::fs::metadata(&first).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            assert_eq!(
+                std::fs::metadata(first.parent().unwrap())
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o700
+            );
+        }
+    }
 
     #[tokio::test]
     async fn incomplete_json_line_reports_stream_activity() {
@@ -1715,6 +1773,7 @@ mod tests {
         let thread = ActiveThread {
             conversation_id: None,
             id: "t".into(),
+            root: PathBuf::from("/tmp/repotracer-test"),
             turns: 2,
             last_input_tokens: None,
             cumulative_usage: None,
@@ -1957,15 +2016,6 @@ mod tests {
         assert!(unlimited_input.thread_within_input_budget(Some(u32::MAX)));
     }
 
-    #[cfg(unix)]
-    #[test]
-    fn isolated_codex_home_is_private() {
-        use std::os::unix::fs::PermissionsExt;
-        let home = IsolatedCodexHome::create().unwrap();
-        let mode = std::fs::metadata(home.path()).unwrap().permissions().mode();
-        assert_eq!(mode & 0o777, 0o700);
-    }
-
     #[tokio::test]
     async fn startup_reports_fatal_app_server_notifications() {
         let mut sink = tokio::io::sink();
@@ -1978,65 +2028,5 @@ mod tests {
             .await
             .unwrap_err();
         assert!(error.to_string().contains("sandbox failed"));
-    }
-
-    #[test]
-    fn child_config_keeps_the_selected_provider_and_drops_user_tools() {
-        let dir = tempfile::tempdir().unwrap();
-        let source = dir.path().join("config.toml");
-        let target = dir.path().join("child-config.toml");
-        std::fs::write(
-            &source,
-            r#"
-model = "gpt-5.6-luna"
-model_provider = "codex-lb"
-openai_base_url = "https://ignored-for-custom-provider.example"
-cli_auth_credentials_store = "keyring"
-
-[model_providers.codex-lb]
-name = "Codex LB"
-base_url = "https://codex-lb.example/v1"
-wire_api = "responses"
-requires_openai_auth = true
-
-[mcp_servers.secret]
-command = "do-not-copy"
-
-[hooks.SessionStart]
-hooks = []
-"#,
-        )
-        .unwrap();
-
-        write_provider_config(&source, &target).unwrap();
-        let child: toml::Value = toml::from_str(&std::fs::read_to_string(target).unwrap()).unwrap();
-        assert_eq!(child["model"].as_str(), Some("gpt-5.6-luna"));
-        assert_eq!(child["model_provider"].as_str(), Some("codex-lb"));
-        assert_eq!(
-            child["cli_auth_credentials_store"].as_str(),
-            Some("keyring")
-        );
-        assert_eq!(
-            child["model_providers"]["codex-lb"]["base_url"].as_str(),
-            Some("https://codex-lb.example/v1")
-        );
-        assert!(child.get("mcp_servers").is_none());
-        assert!(child.get("hooks").is_none());
-    }
-
-    #[test]
-    fn child_config_preserves_the_builtin_openai_base_url() {
-        let dir = tempfile::tempdir().unwrap();
-        let source = dir.path().join("config.toml");
-        let target = dir.path().join("child-config.toml");
-        std::fs::write(&source, "openai_base_url = \"https://proxy.example/v1\"\n").unwrap();
-
-        write_provider_config(&source, &target).unwrap();
-        let child: toml::Value = toml::from_str(&std::fs::read_to_string(target).unwrap()).unwrap();
-        assert_eq!(
-            child["openai_base_url"].as_str(),
-            Some("https://proxy.example/v1")
-        );
-        assert!(child.get("model_providers").is_none());
     }
 }

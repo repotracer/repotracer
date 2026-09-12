@@ -1,4 +1,4 @@
-use crate::pathutil::resolve_in_root;
+use crate::pathutil::resolve_path;
 use crate::read::{finish_output, MAX_OUTPUT_BYTES};
 use crate::types::{ToolError, ToolSchema};
 use ignore::WalkBuilder;
@@ -48,7 +48,7 @@ impl GlobTool {
                 "properties": {
                     "directory": {
                         "type": "string",
-                        "description": "Repository-relative directory to search. Use `.` or omit it for the repository root; never use an absolute path."
+                        "description": "Directory to search, relative to the current target or absolute. Omit for the current target."
                     },
                     "pattern": {
                         "type": "string",
@@ -69,7 +69,7 @@ impl GlobTool {
         .map_err(|e| ToolError::InvalidArgs(e.to_string()))?;
 
         let dir_input = args.directory.as_deref().unwrap_or(".");
-        let directory = match resolve_in_root(&self.root, dir_input) {
+        let directory = match resolve_path(&self.root, dir_input) {
             Ok(p) => p,
             Err(e) => {
                 return Ok(format!(

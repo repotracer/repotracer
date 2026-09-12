@@ -16,14 +16,7 @@ use std::sync::Arc;
 const PROTOCOL_VERSION: &str = "2024-11-05";
 const SERVER_NAME: &str = "repotracer";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
-/// Ceiling for either supported rendering of the answer. Native Codex keeps
-/// structuredContent alone; text-only clients keep content. Each must be
-/// self-contained. Compatibility copies on the wire do not halve source space.
-const MAX_HANDOFF_BYTES: usize = 36 * 1024;
-const SUCCESSFUL_HANDOFF: &str = "Investigation complete. Continue the task using the findings and repository source below. Any reported gaps or source changes can be checked locally or in a follow-up.";
-const EMPTY_HANDOFF: &str =
-    "No validated evidence was returned. Fall back to normal repository exploration.";
-const REPO_SCOUT_DESC: &str = "Delegate repository investigation to a cheaper read-only colleague. Ask the question you need answered; no search terms are required. Set repository to the task's checkout when it differs from the server's startup directory. Returns the actual repository, a conversation handle, findings, and line-numbered repository source. Reuse the returned conversation.id as investigation.conversation_id for related questions; status says resumed, fresh, or unknown. Independent calls can run in parallel. structuredContent contains the report and source; content[].text is a readable fallback. Use either representation, not both. Source blocks come from files; conclusions are scout judgments.";
+const REPO_SCOUT_DESC: &str = "Delegate an investigation to a separately configured model. Supply the task and relevant context you already know; do not search first to prepare the request. The investigator follows useful leads and uses available tools or experiments. Set repository to the current target when different from the startup directory. Reuse conversation.id when prior context helps, including related work in another repository; independent calls can run in parallel. The answer includes selected source and experimental evidence. structuredContent is the machine-readable answer; content[].text is a readable alternative. Use either representation, not both.";
 
 #[derive(Clone)]
 pub struct McpServer {
@@ -274,10 +267,15 @@ struct EvidenceSpan {
     start_line: u32,
     end_line: u32,
     text: String,
-    citation_count: usize,
-    // First citation's position in the scout's task-importance order.
-    priority: usize,
     truncated: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct EvidenceAttachmentError {
+    path: String,
+    start_line: u32,
+    end_line: u32,
+    message: String,
 }
 
 #[derive(Debug, Default)]
@@ -285,168 +283,27 @@ struct EvidenceBundle {
     spans: Vec<EvidenceSpan>,
     omitted_citations: usize,
     omitted_spans: usize,
+    errors: Vec<EvidenceAttachmentError>,
 }
 
 #[derive(Debug, Default)]
 struct HandoffOmissions {
     omitted_source_citations: usize,
     omitted_source_spans: usize,
-    report_omitted_citations: usize,
     truncated_spans: usize,
-    report_trimmed: bool,
+    errors: Vec<EvidenceAttachmentError>,
 }
 
 fn handoff_response(root: &Path, mut result: ScoutResult) -> Value {
     result.citations = unique_citations(result.citations);
     let bundle = evidence_excerpts(root, &result.citations);
-    let mut spans = bundle.spans;
-    let mut omissions = HandoffOmissions {
+    let omissions = HandoffOmissions {
         omitted_source_citations: bundle.omitted_citations,
         omitted_source_spans: bundle.omitted_spans,
-        ..Default::default()
+        truncated_spans: bundle.spans.iter().filter(|span| span.truncated).count(),
+        errors: bundle.errors,
     };
-    let mut handoff_limitations = Vec::new();
-    if omissions.omitted_source_spans > 0 {
-        handoff_limitations.push(format!(
-            "{} cited source span{} could not be embedded safely or did not contain the requested lines; this is a handoff limitation, not a determination that a question is unresolved.",
-            omissions.omitted_source_spans,
-            if omissions.omitted_source_spans == 1 { "" } else { "s" }
-        ));
-    }
-
-    // Keep complete source spans whenever the complete result fits. If the
-    // narrative alone is too large, shorten the report; otherwise remove
-    // the lowest-priority source span only as needed for the one ceiling.
-    // The scout orders findings/citations by usefulness to the next step.
-    let mut report_target = MAX_HANDOFF_BYTES / 2;
-    let mut emergency_compaction = false;
-    loop {
-        omissions.truncated_spans = spans.iter().filter(|span| span.truncated).count();
-        handoff_limitations.retain(|limitation| limitation != SOURCE_TRUNCATED);
-        if omissions.truncated_spans > 0 {
-            mark_source_truncated(&mut handoff_limitations);
-        }
-        let response = build_handoff_response(&result, &spans, &omissions, &handoff_limitations);
-        if response_size(&response) <= MAX_HANDOFF_BYTES {
-            return response;
-        }
-
-        // Keep the narrative intact whenever it fits by itself. Source spans
-        // are lower-priority only when the full result needs more room.
-        let explanation_only =
-            build_handoff_response(&result, &[], &omissions, &handoff_limitations);
-        if response_size(&explanation_only) > MAX_HANDOFF_BYTES {
-            let report_changed = bound_report_and_track(&mut result, report_target, &mut omissions);
-            if report_changed {
-                if !omissions.report_trimmed {
-                    omissions.report_trimmed = true;
-                    handoff_limitations.push(
-                        "The model-authored report exceeded the single MCP handoff budget and was shortened; request a narrower investigation for omitted explanation.".into(),
-                    );
-                    result.investigation.status = repotracer_core::InvestigationStatus::Partial;
-                }
-                report_target = report_target.saturating_mul(3) / 4;
-                continue;
-            }
-        }
-
-        if spans.len() > 1 {
-            // Do not evict every other span for one that cannot fit even on
-            // its own. Otherwise preserve task importance, not shortest text.
-            let individually_oversized = spans
-                .iter()
-                .enumerate()
-                .filter(|(_, span)| {
-                    response_size(&build_handoff_response(
-                        &result,
-                        std::slice::from_ref(*span),
-                        &omissions,
-                        &handoff_limitations,
-                    )) > MAX_HANDOFF_BYTES
-                })
-                .max_by_key(|(_, span)| span.text.len())
-                .map(|(index, _)| index);
-            let discard = individually_oversized.unwrap_or_else(|| {
-                spans
-                    .iter()
-                    .enumerate()
-                    .max_by_key(|(_, span)| span.priority)
-                    .map(|(index, _)| index)
-                    .expect("length checked above")
-            });
-            let span = spans.remove(discard);
-            omissions.omitted_source_citations += span.citation_count;
-            omissions.omitted_source_spans += 1;
-            mark_source_omitted(&mut handoff_limitations);
-            continue;
-        }
-
-        if spans.len() == 1 {
-            mark_source_truncated(&mut handoff_limitations);
-            // Include the metadata added by a successful truncation while
-            // testing the candidate, then roll it back if the span is dropped.
-            omissions.truncated_spans = 1;
-            if truncate_last_span_to_fit(&mut spans, &result, &omissions, &handoff_limitations) {
-                continue;
-            }
-            let span = spans.pop().expect("length checked above");
-            omissions.omitted_source_citations += span.citation_count;
-            omissions.omitted_source_spans += 1;
-            mark_source_omitted(&mut handoff_limitations);
-            continue;
-        }
-
-        // At this point no source span can be retained. Only now shorten an
-        // oversized narrative/report, keeping its explicit limitation.
-        let report_changed = bound_report_and_track(&mut result, report_target, &mut omissions);
-        if report_changed {
-            if !omissions.report_trimmed {
-                omissions.report_trimmed = true;
-                handoff_limitations.push(
-                    "The model-authored report exceeded the single MCP handoff budget and was shortened; request a narrower investigation for omitted explanation.".into(),
-                );
-                result.investigation.status = repotracer_core::InvestigationStatus::Partial;
-            }
-            report_target = report_target.saturating_mul(3) / 4;
-            continue;
-        }
-
-        if report_target > 512 {
-            report_target = report_target.saturating_mul(3) / 4;
-            continue;
-        }
-
-        // This is only reachable for adversarially large citation metadata.
-        // Keep protocol shape and stats, but explicitly report that model
-        // detail and citation records had to be discarded for transport.
-        if !emergency_compaction {
-            emergency_compaction = true;
-            omissions.report_trimmed = true;
-            omissions.report_omitted_citations += result.citations.len();
-            result.summary.clear();
-            result.investigation.findings.clear();
-            result.investigation.searched_scope.clear();
-            result.investigation.unresolved.clear();
-            result.investigation.limitations.clear();
-            result.investigation.confidence = Default::default();
-            result.citations.clear();
-            // Model identity is the only unbounded string in stats. Preserve
-            // all usage counters if an oversized custom label reaches here.
-            if result.stats.model.len() > 256 {
-                result.stats.model = "[oversized model label omitted]".into();
-            }
-            result.investigation.status = repotracer_core::InvestigationStatus::Partial;
-            handoff_limitations.push(
-                "The handoff retained only its protocol metadata and stats after oversized report data exceeded the transport budget.".into(),
-            );
-            continue;
-        }
-
-        // The fixed protocol fields themselves are small, so this branch is
-        // defensive. It prevents an accidental infinite loop if their schema
-        // ever grows beyond the declared transport ceiling.
-        return response;
-    }
+    build_handoff_response(&result, &bundle.spans, &omissions)
 }
 
 fn unique_citations(citations: Vec<ValidatedCitation>) -> Vec<ValidatedCitation> {
@@ -463,107 +320,45 @@ fn unique_citations(citations: Vec<ValidatedCitation>) -> Vec<ValidatedCitation>
     unique
 }
 
-fn response_size(response: &Value) -> usize {
-    ["content", "structuredContent"]
-        .iter()
-        .map(|field| serde_json::to_vec(&response[field]).map_or(usize::MAX, |bytes| bytes.len()))
-        .max()
-        .unwrap_or(0)
-}
-
-fn push_limitation(limitations: &mut Vec<String>, message: String) {
-    if !limitations.iter().any(|existing| existing == &message) {
-        limitations.push(message);
-    }
-}
-
-fn mark_source_omitted(limitations: &mut Vec<String>) {
-    push_limitation(
-        limitations,
-        "Some source context was omitted to keep the complete MCP result within its transport budget; the investigation findings and citation locations remain separate from this output limitation.".into(),
-    );
-}
-
-const SOURCE_TRUNCATED: &str = "A source span was truncated to keep the complete MCP result within its transport budget; the missing source text does not by itself make a question unresolved.";
-
-fn mark_source_truncated(limitations: &mut Vec<String>) {
-    push_limitation(limitations, SOURCE_TRUNCATED.into());
-}
-
 fn build_handoff_response(
     result: &ScoutResult,
     spans: &[EvidenceSpan],
     omissions: &HandoffOmissions,
-    handoff_limitations: &[String],
 ) -> Value {
-    let explanation = handoff_explanation(result, handoff_limitations);
-    let next_action = if result.citations.is_empty() {
-        EMPTY_HANDOFF
-    } else if result.investigation.status != repotracer_core::InvestigationStatus::Complete {
-        "Partial investigation handoff. Use the supported explanation and embedded source context, then check the listed unresolved questions or handoff limitations. Missing source text is not proof of absence."
-    } else if !handoff_limitations.is_empty() {
-        "The scout reports the objective answered. Some source text could not be included; the explanation and source locations remain available. Consult the omission metadata if that context matters to your next step."
-    } else {
-        SUCCESSFUL_HANDOFF
-    };
-    // Keep the model's explanation and source context first; the routing
-    // instruction is useful metadata, not the handoff's main payload.
-    let mut text = explanation.clone();
-    let evidence = append_evidence(&mut text, spans, omissions);
-    let citations = source_delivery_citations(&result.citations, spans);
-    let missing = citations
-        .iter()
-        .filter(|citation| citation["source_status"] != "included")
-        .map(|citation| {
-            format!(
-                "{}:{}-{} ({})",
-                citation["path"].as_str().unwrap_or(""),
-                citation["start_line"],
-                citation["end_line"],
-                citation["source_status"].as_str().unwrap_or("omitted")
-            )
-        })
-        .collect::<Vec<_>>();
-    if !missing.is_empty() {
-        text.push_str("\n\nSource not fully included: ");
-        text.push_str(&missing.join(", "));
-    }
-    text.push_str(&format!("\n\nNext action: {next_action}"));
+    let report = handoff_explanation(result);
+    let mut text = report.clone();
+    let evidence = append_evidence(&mut text, spans, &omissions.errors);
+    let citations = source_delivery_citations(&result.citations, spans, &omissions.errors);
     if let Some(conversation) = &result.stats.conversation {
-        text.push_str(&format!("\nRepository: {}\nConversation: {} ({})\nUse this ID in investigation.conversation_id for a related follow-up. A fresh or unknown session needs the current question and necessary context.",
-            conversation.repository, conversation.id, conversation.status));
+        text.push_str(&format!(
+            "\n\nRepository: {}\nConversation: {} ({})",
+            conversation.repository, conversation.id, conversation.status
+        ));
     }
     let structured = json!({
-        "handoff_version": 3,
+        "handoff_version": 4,
         "repository": root_from_stats(&result.stats),
         "conversation": result.stats.conversation,
-        "report": explanation,
-        "investigation": {
-            "intent": result.investigation.intent,
-            "status": result.investigation.status,
-            "confidence": result.investigation.confidence,
-            "unresolved": result.investigation.unresolved,
-        },
-        // This legacy field counts citation records removed from the machine
-        // citation list. Source-only omissions are reported separately below.
-        "omitted_citations": omissions.report_omitted_citations,
+        "report": report,
         "citations": citations,
+        "continuation": result.investigation.continuation,
         "evidence": evidence,
         "evidence_omissions": {
             "omitted_citations": omissions.omitted_source_citations,
             "omitted_spans": omissions.omitted_source_spans,
             "truncated_spans": omissions.truncated_spans,
-            "explicit": omissions.omitted_source_spans > 0 || omissions.truncated_spans > 0,
+            "explicit": omissions.omitted_source_spans > 0
+                || omissions.truncated_spans > 0
+                || !omissions.errors.is_empty(),
+            "errors": omissions.errors,
         },
-        "handoff_limitations": handoff_limitations,
-        "next_action": next_action,
         "stats": result.stats,
     });
 
     json!({
         "content": [{ "type": "text", "text": text }],
         "structuredContent": structured,
-        "isError": false
+        "isError": result.investigation.status == repotracer_core::InvestigationStatus::Failed
     })
 }
 
@@ -576,6 +371,7 @@ fn root_from_stats(stats: &repotracer_core::ScoutStats) -> Option<&str> {
 fn source_delivery_citations(
     citations: &[ValidatedCitation],
     spans: &[EvidenceSpan],
+    errors: &[EvidenceAttachmentError],
 ) -> Vec<Value> {
     citations
         .iter()
@@ -596,33 +392,29 @@ fn source_delivery_citations(
                 });
             let mut value = serde_json::to_value(citation).expect("citation is serializable");
             value["source_status"] = json!(status);
+            if let Some(error) = errors.iter().find(|error| {
+                error.path == citation.path
+                    && error.start_line == citation.start_line
+                    && error.end_line == citation.end_line
+            }) {
+                value["source_error"] = json!(error.message);
+            }
             value
         })
         .collect()
 }
 
-fn handoff_explanation(result: &ScoutResult, handoff_limitations: &[String]) -> String {
-    let mut out = format!("Investigation status: {:?}\n", result.investigation.status);
-    let confidence = &result.investigation.confidence;
-    out.push_str(&format!(
-        "Scout-reported confidence: {:?}\nEvidence basis: {}\n",
-        confidence.level,
-        if confidence.basis.is_empty() {
-            "Not reported."
-        } else {
-            &confidence.basis
-        }
-    ));
-    if !result.summary.is_empty() {
-        out.push_str("\nSummary:\n");
-        out.push_str(&result.summary);
-        out.push('\n');
-    }
-    if result.citations.is_empty() {
-        out.push_str("\nNo validated citations.\n");
+fn handoff_explanation(result: &ScoutResult) -> String {
+    let mut out = result.summary.clone();
+    // Older provider reports can put unique caveats in this field. Preserve
+    // the explanation without adding a confidence score or a fixed section
+    // to current-format answers, which already express uncertainty in prose.
+    let basis = result.investigation.confidence.basis.trim();
+    if !basis.is_empty() {
+        out.push_str(&format!("\n\nScout evidence assessment: {basis}"));
     }
     if !result.investigation.findings.is_empty() {
-        out.push_str("\nFindings:\n");
+        out.push_str("\n\nFindings:\n");
         for finding in &result.investigation.findings {
             out.push_str(&format!(
                 "\nQuestion: {}\nExplanation: {}\n",
@@ -661,19 +453,13 @@ fn handoff_explanation(result: &ScoutResult, handoff_limitations: &[String]) -> 
             out.push_str(&format!("- {limitation}\n"));
         }
     }
-    if !handoff_limitations.is_empty() {
-        out.push_str("\nHandoff limitations:\n");
-        for limitation in handoff_limitations {
-            out.push_str(&format!("- {limitation}\n"));
-        }
-    }
     out
 }
 
 fn append_evidence(
     out: &mut String,
     spans: &[EvidenceSpan],
-    omissions: &HandoffOmissions,
+    errors: &[EvidenceAttachmentError],
 ) -> Vec<Value> {
     let mut evidence = Vec::new();
     if !spans.is_empty() {
@@ -690,185 +476,16 @@ fn append_evidence(
             }));
         }
     }
-    if omissions.omitted_source_spans > 0 || omissions.truncated_spans > 0 {
-        out.push_str(&format!(
-            "\n\nSource context note: {} span{} omitted and {} span{} truncated by the single MCP handoff budget or safe source checks. The findings above are not converted into unanswered questions solely for that reason.",
-            omissions.omitted_source_spans,
-            if omissions.omitted_source_spans == 1 { " was" } else { "s were" },
-            omissions.truncated_spans,
-            if omissions.truncated_spans == 1 { " was" } else { "s were" },
-        ));
+    if !errors.is_empty() {
+        out.push_str("\n\nSource attachment issues:");
+        for error in errors {
+            out.push_str(&format!(
+                "\n- {}:{}-{}: {}",
+                error.path, error.start_line, error.end_line, error.message
+            ));
+        }
     }
     evidence
-}
-
-/// Trim only as much model-authored report material as the full-result fit
-/// requires. The caller owns the single transport ceiling; this helper has no
-/// independent output limit.
-fn bound_report_and_track(
-    result: &mut ScoutResult,
-    target: usize,
-    omissions: &mut HandoffOmissions,
-) -> bool {
-    let before = result.citations.len();
-    let changed = bound_report(result, target);
-    if changed {
-        // The scout assessed its full report, not this shortened version.
-        result.investigation.confidence = Default::default();
-    }
-    omissions.report_omitted_citations += before.saturating_sub(result.citations.len());
-    changed
-}
-
-fn bound_report(result: &mut ScoutResult, target: usize) -> bool {
-    let mut changed = false;
-    while report_size(result) > target {
-        if shorten_string(&mut result.summary) {
-            changed = true;
-        } else if let Some(finding) = result
-            .investigation
-            .findings
-            .iter_mut()
-            .rev()
-            .find(|finding| finding.answer.len() > 64)
-        {
-            shorten_string(&mut finding.answer);
-            changed = true;
-        } else if let Some(finding) = result
-            .investigation
-            .findings
-            .iter_mut()
-            .rev()
-            .find(|finding| finding.question.len() > 64)
-        {
-            shorten_string(&mut finding.question);
-            changed = true;
-        } else if let Some(value) = result
-            .investigation
-            .searched_scope
-            .iter_mut()
-            .rev()
-            .find(|value| value.len() > 64)
-        {
-            shorten_string(value);
-            changed = true;
-        } else if let Some(value) = result
-            .investigation
-            .unresolved
-            .iter_mut()
-            .rev()
-            .find(|value| value.len() > 64)
-        {
-            shorten_string(value);
-            changed = true;
-        } else if let Some(value) = result
-            .investigation
-            .limitations
-            .iter_mut()
-            .rev()
-            .find(|value| value.len() > 64)
-        {
-            shorten_string(value);
-            changed = true;
-        } else if !result.investigation.findings.is_empty() {
-            result.investigation.findings.pop();
-            changed = true;
-        } else if !result.investigation.searched_scope.is_empty() {
-            result.investigation.searched_scope.pop();
-            changed = true;
-        } else if !result.investigation.unresolved.is_empty() {
-            result.investigation.unresolved.pop();
-            changed = true;
-        } else if !result.investigation.limitations.is_empty() {
-            result.investigation.limitations.pop();
-            changed = true;
-        } else if !result.investigation.confidence.basis.is_empty() {
-            result.investigation.confidence = Default::default();
-            changed = true;
-        } else if let Some(citation) = result.citations.iter_mut().rev().find(|citation| {
-            citation
-                .reason
-                .as_ref()
-                .is_some_and(|reason| reason.len() > 64)
-        }) {
-            citation.reason = None;
-            changed = true;
-        } else if !result.citations.is_empty() {
-            result.citations.pop();
-            changed = true;
-        } else {
-            break;
-        }
-    }
-    changed
-}
-
-fn report_size(result: &ScoutResult) -> usize {
-    serde_json::to_vec(&(&result.summary, &result.investigation, &result.citations))
-        .map_or(usize::MAX, |bytes| bytes.len())
-}
-
-fn shorten_string(value: &mut String) -> bool {
-    if value.is_empty() {
-        return false;
-    }
-    let mut end = value.len().saturating_mul(3) / 4;
-    if end >= value.len() {
-        end = value.len().saturating_sub(1);
-    }
-    while end > 0 && !value.is_char_boundary(end) {
-        end -= 1;
-    }
-    value.truncate(end);
-    true
-}
-
-fn truncate_last_span_to_fit(
-    spans: &mut [EvidenceSpan],
-    result: &ScoutResult,
-    omissions: &HandoffOmissions,
-    handoff_limitations: &[String],
-) -> bool {
-    let Some(index) = spans.len().checked_sub(1) else {
-        return false;
-    };
-    let original = spans[index].text.clone();
-    if original.is_empty() {
-        return false;
-    }
-    let marker = "\n[Source span truncated by the MCP handoff budget.]";
-    // Search over character-boundary indices rather than raw bytes. Besides
-    // avoiding invalid UTF-8 slices, this keeps the binary search monotonic
-    // for multi-byte source text.
-    let boundaries = original
-        .char_indices()
-        .map(|(index, _)| index)
-        .chain(std::iter::once(original.len()))
-        .collect::<Vec<_>>();
-    let mut low = 1usize;
-    let mut high = boundaries.len() - 1;
-    let mut best = None;
-    while low <= high {
-        let middle = low + (high - low) / 2;
-        let end = boundaries[middle];
-        spans[index].text = format!("{}{}", &original[..end], marker);
-        spans[index].truncated = true;
-        let candidate = build_handoff_response(result, spans, omissions, handoff_limitations);
-        if response_size(&candidate) <= MAX_HANDOFF_BYTES {
-            best = Some(end);
-            low = middle.saturating_add(1);
-        } else {
-            high = middle - 1;
-        }
-    }
-    let Some(end) = best else {
-        spans[index].text = original;
-        spans[index].truncated = false;
-        return false;
-    };
-    spans[index].text = format!("{}{}", &original[..end], marker);
-    spans[index].truncated = true;
-    true
 }
 
 fn repo_scout_tool_def() -> Value {
@@ -876,10 +493,10 @@ fn repo_scout_tool_def() -> Value {
         "name": "repo_scout",
         "description": REPO_SCOUT_DESC,
         "annotations": {
-            "readOnlyHint": true,
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false
+            "readOnlyHint": false,
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": true
         },
         "inputSchema": {
             "type": "object",
@@ -890,11 +507,11 @@ fn repo_scout_tool_def() -> Value {
                 },
                 "repository": {
                     "type": "string",
-                    "description": "Directory to investigate, including another checkout or worktree. Prefer its absolute path; relative paths resolve from the server startup directory. Omit to use the returned conversation's repository, or the startup directory for a new investigation. The selected directory is the read-only source boundary and is reported in the response."
+                    "description": "Current target directory, including another checkout or worktree. Prefer an absolute path; relative paths resolve from the server startup directory. Omit to reuse the conversation's latest target or the startup directory. Related evidence may be investigated elsewhere."
                 },
                 "focus": {
                     "type": "string",
-                    "description": "Optional file or directory within the selected repository to bias exploration. Relative paths stay within that repository. With no repository or remembered conversation, an absolute focus in another Git checkout selects that checkout, including worktrees. For a non-Git directory set repository explicitly. Paths containing '..' and symlink escapes from the selected repository remain rejected."
+                    "description": "Optional starting file or directory, relative to the current target or absolute. Related paths outside the target are allowed. Without a repository or remembered conversation, an absolute focus in another Git checkout can select that checkout."
                 },
                 "investigation": {
                     "type": "object", "additionalProperties": false,
@@ -903,9 +520,9 @@ fn repo_scout_tool_def() -> Value {
                         "reasoning_effort": {"type":"string", "enum":["low","medium","high","xhigh","max"], "description":"Native subscription effort for this investigation only. Medium suits straightforward lookups; high suits diagnosis, indirect relationships, or cross-component change impact. Omit to use configured effort. Supported levels depend on the selected provider and model."},
                         "intent": {"type":"string", "enum":["locate","explain","change_impact","diagnose","inventory"]},
                         "questions": {"type":"array", "maxItems":24, "items":{"type":"string"}},
-                        "conversation_id": {"type":"string", "maxLength":128, "description":"Use conversation.id from an earlier response for a related follow-up. Omit for a new independent investigation. A caller-chosen ID is also accepted. Reuse is bounded: conversation.status reports resumed, fresh, or unknown. Supply the current question and necessary context, especially after a fresh start. The handle stays bound to its selected repository."},
+                        "conversation_id": {"type":"string", "maxLength":128, "description":"Reuse a prior conversation when its context helps, including related assignments in another repository. Supply a new repository explicitly when changing target. Omit for independent work. Status reports resumed, fresh or unknown; include necessary context when history is unavailable."},
                         "known_context": {"type":"string", "description":"Context already known to the parent; unverified until checked."},
-                        "target_paths": {"type":"array", "maxItems":32, "items":{"type":"string", "description":"Repository-relative file or directory hint. Relative nonexistent paths are allowed as search hints. Use '.' for the repository root. An absolute path is accepted only when it canonicalizes inside this repository and is returned relative. Examples: 'crates/core/src/lib.rs', '.', or '/work/repo/crates/core' when '/work/repo' is this repository. Paths containing '..', outside paths, and symlink escapes are rejected."}}
+                        "target_paths": {"type":"array", "maxItems":32, "items":{"type":"string", "description":"Optional file or directory leads, relative to the current target or absolute for related locations. New relative paths may name proposed files. The investigator discovers other relevant paths itself."}}
                     }
                 }
             },
@@ -968,6 +585,22 @@ mod repository_tools_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_failed_investigations_are_tool_errors() {
+        use repotracer_core::InvestigationStatus;
+        for status in [
+            InvestigationStatus::Complete,
+            InvestigationStatus::Partial,
+            InvestigationStatus::NotFound,
+            InvestigationStatus::Failed,
+        ] {
+            let mut result = scout_result(0);
+            result.investigation.status = status;
+            let response = build_handoff_response(&result, &[], &HandoffOmissions::default());
+            assert_eq!(response["isError"], status == InvestigationStatus::Failed);
+        }
+    }
 
     #[cfg(unix)]
     #[tokio::test(flavor = "current_thread")]
@@ -1110,14 +743,24 @@ mod tests {
             captured.lock().unwrap().as_ref().unwrap().root,
             request.root
         );
-        let wrong = server.tools_call(json!({"name":"repo_scout", "arguments": {
+        let changed = server.tools_call(json!({"name":"repo_scout", "arguments": {
             "query":"different root", "repository":startup.path(), "investigation":{"conversation_id":id}
         }})).await.unwrap();
-        assert_eq!(wrong["isError"], true);
-        assert!(wrong["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .contains("conversation belongs"));
+        assert_eq!(changed["isError"], false);
+        assert_eq!(
+            captured.lock().unwrap().as_ref().unwrap().root,
+            startup.path().canonicalize().unwrap()
+        );
+        server
+            .tools_call(json!({"name":"repo_scout", "arguments": {
+                "query":"continue on the new target", "investigation":{"conversation_id":id}
+            }}))
+            .await
+            .unwrap();
+        assert_eq!(
+            captured.lock().unwrap().as_ref().unwrap().root,
+            startup.path().canonicalize().unwrap()
+        );
     }
 
     #[tokio::test]
@@ -1155,6 +798,30 @@ mod tests {
         assert_eq!(
             response["structuredContent"]["conversation"]["status"],
             "fresh"
+        );
+        let id = response["structuredContent"]["conversation"]["id"]
+            .as_str()
+            .unwrap();
+        let moved = server
+            .tools_call(json!({"name":"repo_scout","arguments":{
+                "query":"read the other checkout", "repository":startup.path(),
+                "investigation":{"conversation_id":id}
+            }}))
+            .await
+            .unwrap();
+        assert_eq!(
+            moved["structuredContent"]["evidence"][0]["text"],
+            "1: WRONG"
+        );
+        assert_eq!(moved["structuredContent"]["conversation"]["id"], id);
+        assert_eq!(
+            moved["structuredContent"]["repository"],
+            startup
+                .path()
+                .canonicalize()
+                .unwrap()
+                .to_string_lossy()
+                .as_ref()
         );
     }
 
@@ -1241,67 +908,46 @@ mod tests {
     }
 
     #[test]
-    fn compatibility_fallback_does_not_halve_source_space() {
+    fn structured_and_text_reports_preserve_source_warnings_and_legacy_findings() {
         let root = tempfile::tempdir().unwrap();
         let mut result = scout_result(0);
-        result.summary = "Useful narrative. ".repeat(120);
-        result.investigation.status = repotracer_core::InvestigationStatus::Complete;
-        for path in ["parser.rs", "main.rs", "variables.rs"] {
-            std::fs::write(
-                root.path().join(path),
-                (1..=100)
-                    .map(|line| format!("{path} line {line} {}\n", "x".repeat(60)))
-                    .collect::<String>(),
-            )
-            .unwrap();
-            result.citations.push(ValidatedCitation {
-                path: path.into(),
-                start_line: 1,
-                end_line: 100,
-                reason: None,
-            });
-        }
+        result.summary = "A reproduction confirms the empty value.".into();
+        result.investigation.limitations =
+            vec!["Source could not be attached: removed.rs:1-8.".into()];
+        result.investigation.unresolved = vec!["Generated export behavior is unknown.".into()];
         let response = handoff_response(root.path(), result);
-        let structured = &response["structuredContent"];
-        assert_eq!(structured["evidence"].as_array().unwrap().len(), 3);
-        assert_eq!(structured["evidence_omissions"]["explicit"], false);
-        assert!(embedded_text(&response, &structured["evidence"][2]["text"])
-            .contains("100: variables.rs"));
-        assert!(response_size(&response) <= MAX_HANDOFF_BYTES);
-        let text = response["content"][0]["text"].as_str().unwrap();
-        assert!(text.len() * 2 > MAX_HANDOFF_BYTES);
-        assert!(serde_json::to_vec(&response).unwrap().len() <= 2 * MAX_HANDOFF_BYTES + 64);
+        let report = response["structuredContent"]["report"].as_str().unwrap();
+        assert!(report.contains("A reproduction confirms"));
+        assert!(report.contains("Source could not be attached: removed.rs:1-8."));
+        assert!(report.contains("Generated export behavior is unknown."));
+        assert!(response["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .starts_with(report));
+        assert_eq!(response["isError"], false);
     }
 
     #[test]
-    fn important_large_implementation_survives_smaller_background() {
+    fn legacy_evidence_caveats_survive_in_both_response_formats() {
         let root = tempfile::tempdir().unwrap();
         let mut result = scout_result(0);
-        result.investigation.status = repotracer_core::InvestigationStatus::Complete;
-        for (path, bytes) in [
-            ("implementation.rs", 18_000),
-            ("regression.rs", 4_000),
-            ("background.md", 8_000),
-            ("extra.md", 8_000),
-        ] {
-            std::fs::write(root.path().join(path), "x".repeat(bytes)).unwrap();
-            result.citations.push(ValidatedCitation {
-                path: path.into(),
-                start_line: 1,
-                end_line: 1,
-                reason: None,
-            });
-        }
+        result.summary = "The loader applies the override.".into();
+        result.investigation.confidence.basis =
+            "Traced the normal caller; the generated caller was unavailable.".into();
         let response = handoff_response(root.path(), result);
-        let structured = &response["structuredContent"];
-        let evidence = structured["evidence"].as_array().unwrap();
-        assert!(evidence
-            .iter()
-            .any(|span| span["path"] == "implementation.rs"));
-        assert!(evidence.iter().any(|span| span["path"] == "regression.rs"));
-        assert!(!evidence.iter().any(|span| span["path"] == "extra.md"));
-        assert!(response_size(&response) <= MAX_HANDOFF_BYTES);
-        assert_eq!(structured["investigation"]["status"], "complete");
+        for text in [
+            &response["structuredContent"]["report"],
+            &response["content"][0]["text"],
+        ] {
+            let text = text.as_str().unwrap();
+            assert!(text.starts_with("The loader applies the override."));
+            assert!(text.contains("the generated caller was unavailable"));
+        }
+        let response = handoff_response(root.path(), scout_result(0));
+        assert!(!response["structuredContent"]["report"]
+            .as_str()
+            .unwrap()
+            .contains("Scout evidence assessment:"));
     }
 
     #[test]
@@ -1316,39 +962,8 @@ mod tests {
         });
         let bundle = evidence_excerpts(root.path(), &citations);
         assert_eq!(bundle.spans.len(), 1);
-        assert_eq!(bundle.spans[0].priority, 0);
-        assert_eq!(bundle.spans[0].citation_count, 2);
-    }
-
-    #[test]
-    fn an_oversized_first_span_does_not_evict_a_small_later_file() {
-        let root = tempfile::tempdir().unwrap();
-        std::fs::write(root.path().join("large.rs"), "x".repeat(MAX_HANDOFF_BYTES)).unwrap();
-        std::fs::write(root.path().join("deciding.rs"), "fn decides() {}\n").unwrap();
-        let mut result = scout_result(0);
-        result.investigation.status = repotracer_core::InvestigationStatus::Complete;
-        result.citations = ["large.rs", "deciding.rs"]
-            .iter()
-            .map(|path| ValidatedCitation {
-                path: (*path).into(),
-                start_line: 1,
-                end_line: 1,
-                reason: None,
-            })
-            .collect();
-        let response = handoff_response(root.path(), result);
-        let structured = &response["structuredContent"];
-        assert_eq!(structured["evidence"].as_array().unwrap().len(), 1);
-        assert_eq!(structured["evidence"][0]["path"], "deciding.rs");
-        assert_eq!(structured["evidence_omissions"]["omitted_spans"], 1);
-        assert_eq!(structured["investigation"]["status"], "complete");
-        assert_eq!(structured["citations"].as_array().unwrap().len(), 2);
-        assert_eq!(structured["citations"][0]["source_status"], "omitted");
-        assert_eq!(structured["citations"][1]["source_status"], "included");
-        assert!(response["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .contains("large.rs:1-1 (omitted)"));
+        assert!(bundle.spans[0].text.contains("1: one"));
+        assert!(bundle.spans[0].text.contains("4: four"));
     }
 
     #[test]
@@ -1381,38 +996,18 @@ mod tests {
     fn repo_scout_description_matches_routing_contract() {
         let tool = repo_scout_tool_def();
         let description = tool["description"].as_str().unwrap();
-        assert!(description.contains("read-only colleague"));
-        assert!(description.contains("line-numbered repository source"));
-        assert!(description.contains("conclusions are scout judgments"));
+        assert!(description.contains("separately configured model"));
+        assert!(description.contains("selected source"));
+        assert!(description.contains("experimental evidence"));
         assert!(description.contains("Use either representation, not both"));
     }
 
     #[test]
-    fn repo_scout_is_declared_read_only() {
+    fn repo_scout_declares_investigation_side_effects() {
         let annotations = &repo_scout_tool_def()["annotations"];
-        assert_eq!(annotations["readOnlyHint"], true);
-        assert_eq!(annotations["destructiveHint"], false);
-        assert_eq!(annotations["openWorldHint"], false);
-    }
-
-    #[test]
-    fn confidence_cannot_bypass_the_handoff_size_bound() {
-        let root = tempfile::tempdir().unwrap();
-        let mut result = scout_result(0);
-        result.investigation.confidence = repotracer_core::InvestigationConfidence {
-            level: repotracer_core::ConfidenceLevel::High,
-            basis: "λ".repeat(MAX_HANDOFF_BYTES),
-        };
-        let response = handoff_response(root.path(), result);
-        assert!(response_size(&response) <= MAX_HANDOFF_BYTES);
-        assert_eq!(
-            response["structuredContent"]["investigation"]["confidence"]["level"],
-            "unknown"
-        );
-        assert_eq!(
-            response["structuredContent"]["investigation"]["status"],
-            "partial"
-        );
+        assert_eq!(annotations["readOnlyHint"], false);
+        assert_eq!(annotations["destructiveHint"], true);
+        assert_eq!(annotations["openWorldHint"], true);
     }
 
     fn scout_result(citation_count: usize) -> ScoutResult {
@@ -1593,7 +1188,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn mcp_rejects_outside_paths_before_starting_backend() {
+    async fn mcp_accepts_outside_absolute_paths_for_backend_context() {
         let parent = tempfile::tempdir().unwrap();
         let root = parent.path().join("repo");
         std::fs::create_dir(&root).unwrap();
@@ -1618,12 +1213,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response["isError"], true);
-        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
-        assert!(response["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .contains("outside"));
+        assert_eq!(response["isError"], false);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
@@ -1647,10 +1238,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
-        assert_eq!(
-            response["structuredContent"]["investigation"]["status"],
-            "partial"
-        );
+        assert!(response["structuredContent"].get("investigation").is_none());
     }
 
     #[tokio::test]
@@ -1676,10 +1264,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
-        assert!(response["structuredContent"]["next_action"]
-            .as_str()
-            .unwrap()
-            .contains("Partial investigation"));
+        assert!(response["structuredContent"].get("next_action").is_none());
     }
 
     #[test]
@@ -1719,8 +1304,6 @@ mod tests {
                 .len(),
             13
         );
-        assert_eq!(response["structuredContent"]["omitted_citations"], 0);
-        assert!(response_size(&response) <= MAX_HANDOFF_BYTES);
     }
 
     #[test]
@@ -1751,6 +1334,37 @@ mod tests {
     }
 
     #[test]
+    fn long_answer_and_large_selected_span_are_delivered_together() {
+        let root = tempfile::tempdir().unwrap();
+        let source = "source ".repeat(18_000);
+        std::fs::write(root.path().join("large.rs"), &source).unwrap();
+        let answer = "answer ".repeat(9_000);
+        let mut result = scout_result(0);
+        result.summary = answer.clone();
+        result.citations = vec![ValidatedCitation {
+            path: "large.rs".into(),
+            start_line: 1,
+            end_line: 1,
+            reason: Some("selected implementation".into()),
+        }];
+
+        let response = handoff_response(root.path(), result);
+        assert_eq!(response["structuredContent"]["report"], answer);
+        assert_eq!(
+            response["structuredContent"]["evidence"][0]["truncated"],
+            false
+        );
+        assert!(
+            response["structuredContent"]["evidence"][0]["text"]
+                .as_str()
+                .unwrap()
+                .len()
+                > 100_000
+        );
+        assert!(response["content"][0]["text"].as_str().unwrap().len() > 150_000);
+    }
+
+    #[test]
     fn handoff_reads_only_the_cited_part_of_a_large_file() {
         use std::io::Write;
         let root = tempfile::tempdir().unwrap();
@@ -1772,13 +1386,9 @@ mod tests {
     }
 
     #[test]
-    fn evidence_loading_caps_long_lines_before_handoff_serialization() {
+    fn evidence_loading_preserves_long_lines_before_handoff_serialization() {
         let root = tempfile::tempdir().unwrap();
-        std::fs::write(
-            root.path().join("long.rs"),
-            "λ".repeat(MAX_HANDOFF_BYTES * 4),
-        )
-        .unwrap();
+        std::fs::write(root.path().join("long.rs"), "λ".repeat(140_000)).unwrap();
         let citations = [ValidatedCitation {
             path: "long.rs".into(),
             start_line: 1,
@@ -1787,8 +1397,8 @@ mod tests {
         }];
         let bundle = evidence_excerpts(root.path(), &citations);
         assert_eq!(bundle.spans.len(), 1);
-        assert!(bundle.spans[0].text.len() <= MAX_HANDOFF_BYTES);
-        assert!(bundle.spans[0].truncated);
+        assert!(bundle.spans[0].text.len() > 140_000);
+        assert!(!bundle.spans[0].truncated);
     }
 
     #[test]
@@ -1865,19 +1475,16 @@ mod tests {
         let response = handoff_response(root.path(), result);
         let text = response["content"][0]["text"].as_str().unwrap();
         let structured = &response["structuredContent"];
-        assert!(text.contains("Scout-reported confidence: High"));
-        assert!(text.contains("Read the leaf function"));
-        assert_eq!(structured["investigation"]["confidence"]["level"], "high");
         assert!(text.contains("The leaf function returns the value."));
         assert!(text.contains("Sources: lib.rs:1-1"));
         assert!(text.contains("1: fn answer() { return 42; }"));
-        assert_eq!(structured["handoff_version"], 3);
+        assert_eq!(structured["handoff_version"], 4);
         let report = embedded_text(&response, &structured["report"]);
         assert!(report.contains("The answer is returned"));
         assert!(report.contains("The leaf function returns the value."));
         assert!(embedded_text(&response, &structured["evidence"][0]["text"]).contains("return 42"));
         assert!(structured.get("summary").is_none());
-        assert!(structured["investigation"].get("findings").is_none());
+        assert!(structured.get("investigation").is_none());
         assert!(structured.get("report_ref").is_none());
         assert!(structured["evidence"][0].get("text_ref").is_none());
         assert!(structured.to_string().contains("return 42"));
@@ -1888,58 +1495,6 @@ mod tests {
                 .count(),
             1
         );
-    }
-
-    #[test]
-    fn source_budget_omissions_are_explicit_and_do_not_create_unresolved_questions() {
-        let root = tempfile::tempdir().unwrap();
-        let source = (1..=40_000)
-            .map(|line| format!("line {line}: λ{}\n", "x".repeat(12)))
-            .collect::<String>();
-        std::fs::write(root.path().join("huge.rs"), source).unwrap();
-        let mut result = scout_result(0);
-        result.investigation.status = repotracer_core::InvestigationStatus::Complete;
-        result.investigation.findings = vec![repotracer_core::Finding {
-            question: "what is in the function?".into(),
-            answer: "The source span contains the function.".into(),
-            citations: vec![ValidatedCitation {
-                path: "huge.rs".into(),
-                start_line: 1,
-                end_line: 40_000,
-                reason: Some("large source".into()),
-            }],
-        }];
-        result.citations = result.investigation.findings[0].citations.clone();
-        let response = handoff_response(root.path(), result);
-        assert!(response_size(&response) <= MAX_HANDOFF_BYTES);
-        assert_eq!(
-            response["structuredContent"]["evidence_omissions"]["explicit"],
-            true
-        );
-        assert_eq!(
-            response["structuredContent"]["evidence"][0]["truncated"],
-            true
-        );
-        assert_eq!(
-            response["structuredContent"]["citations"][0]["source_status"],
-            "truncated"
-        );
-        assert!(response["structuredContent"]["investigation"]["unresolved"]
-            .as_array()
-            .unwrap()
-            .is_empty());
-        assert_eq!(
-            response["structuredContent"]["investigation"]["status"],
-            "complete"
-        );
-        assert!(!response["structuredContent"]["next_action"]
-            .as_str()
-            .unwrap()
-            .contains("Partial investigation"));
-        assert!(response["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .contains("truncated"));
     }
 
     #[test]
@@ -1981,62 +1536,16 @@ mod tests {
             response["structuredContent"]["evidence_omissions"]["explicit"],
             true
         );
-    }
-
-    #[test]
-    fn oversized_report_keeps_explicit_budget_warning_and_fits_transport() {
-        let mut result = scout_result(1);
-        result.summary = "x".repeat(100_000);
-        result.investigation.status = repotracer_core::InvestigationStatus::Complete;
-        result.investigation.limitations = vec!["y".repeat(100_000)];
-        let response = handoff_response(Path::new("."), result);
-        assert!(response_size(&response) <= MAX_HANDOFF_BYTES);
-        assert_eq!(
-            response["structuredContent"]["investigation"]["status"],
-            "partial"
+        assert!(response["structuredContent"]["citations"][0]
+            .get("source_error")
+            .is_some());
+        assert!(
+            response["structuredContent"]["evidence_omissions"]["errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|error| error["path"] == "../secret.rs")
         );
-        assert!(response["content"][0]["text"]
-            .as_str()
-            .unwrap()
-            .contains("model-authored report exceeded"));
-    }
-
-    #[test]
-    fn oversized_model_label_keeps_usage_inside_result_budget() {
-        let mut result = scout_result(0);
-        result.stats.model = "custom".repeat(MAX_HANDOFF_BYTES);
-        result.stats.usage.input_tokens = Some(123);
-        let response = handoff_response(Path::new("."), result);
-        assert!(response_size(&response) <= MAX_HANDOFF_BYTES);
-        assert_eq!(
-            response["structuredContent"]["stats"]["usage"]["input_tokens"],
-            123
-        );
-        assert_eq!(
-            response["structuredContent"]["stats"]["model"],
-            "[oversized model label omitted]"
-        );
-    }
-
-    #[test]
-    fn removed_source_span_does_not_claim_successful_truncation() {
-        let root = tempfile::tempdir().unwrap();
-        std::fs::write(root.path().join("lib.rs"), "fn main() {}\n").unwrap();
-        let mut result = scout_result(0);
-        result.citations.push(ValidatedCitation {
-            path: "lib.rs".into(),
-            start_line: 1,
-            end_line: 1,
-            reason: None,
-        });
-        result.stats.model = "custom".repeat(MAX_HANDOFF_BYTES);
-        let response = handoff_response(root.path(), result);
-        let structured = &response["structuredContent"];
-        assert_eq!(structured["evidence_omissions"]["omitted_spans"], 1);
-        assert_eq!(structured["evidence_omissions"]["truncated_spans"], 0);
-        assert!(!structured["handoff_limitations"]
-            .to_string()
-            .contains("A source span was truncated"));
     }
 
     #[test]
@@ -2058,7 +1567,6 @@ mod tests {
         }];
         result.citations = vec![citation; 10];
         let response = handoff_response(root.path(), result);
-        assert_eq!(response["structuredContent"]["omitted_citations"], 0);
         assert_eq!(
             response["structuredContent"]["citations"]
                 .as_array()
@@ -2067,27 +1575,22 @@ mod tests {
             1
         );
         assert_eq!(
-            response["structuredContent"]["investigation"]["status"],
-            "complete"
+            response["structuredContent"]["evidence"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
         );
+        assert!(response["structuredContent"].get("investigation").is_none());
     }
 
     #[test]
-    fn report_citation_omissions_are_counted_when_report_is_bounded() {
-        let mut result = scout_result(3);
-        let mut omissions = HandoffOmissions::default();
-        assert!(bound_report_and_track(&mut result, 0, &mut omissions));
-        assert!(result.citations.is_empty());
-        assert_eq!(omissions.report_omitted_citations, 3);
-    }
-
-    #[test]
-    fn empty_handoff_explicitly_allows_normal_exploration() {
+    fn empty_handoff_has_no_routing_prose() {
         let response = handoff_response(Path::new("."), scout_result(0));
-        assert_eq!(response["structuredContent"]["next_action"], EMPTY_HANDOFF);
-        assert!(response["content"][0]["text"]
+        assert!(response["structuredContent"].get("next_action").is_none());
+        assert!(!response["content"][0]["text"]
             .as_str()
             .unwrap()
-            .contains("No validated citations"));
+            .contains("Fall back to normal repository exploration"));
     }
 }

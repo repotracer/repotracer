@@ -34,12 +34,12 @@ def run(*args: str | Path, cwd: Path = ROOT, env: dict[str, str] | None = None) 
     return result
 
 
-def binary(root: Path) -> Path:
+def binary(root: Path, profile: str = "debug") -> Path:
     name = "repotracer.exe" if os.name == "nt" else "repotracer"
     target = Path(os.environ.get("CARGO_TARGET_DIR", "target"))
     if not target.is_absolute():
         target = root / target
-    return target / "debug" / name
+    return target / profile / name
 
 
 def asset_name() -> str:
@@ -62,17 +62,32 @@ def version(executable: Path, env: dict[str, str] | None = None) -> str:
     return run(executable, "version", env=env).stdout.strip().split()[-1]
 
 
+def workspace_version() -> str:
+    metadata = json.loads(
+        run("cargo", "metadata", "--no-deps", "--format-version", "1").stdout
+    )
+    versions = {
+        package["version"]
+        for package in metadata["packages"]
+        if package["name"] == "repotracer"
+    }
+    if len(versions) != 1:
+        raise RuntimeError("cargo metadata did not identify one repotracer package version")
+    return versions.pop()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--from-tag", default="v1.0.0")
-    parser.add_argument("--to-version", default="2.0.0")
+    parser.add_argument("--to-version")
     args = parser.parse_args()
+    to_version = args.to_version or workspace_version()
 
     run("git", "rev-parse", "--verify", args.from_tag)
-    run("cargo", "build", "-q", "-p", "repotracer")
-    release_binary = binary(ROOT)
-    if version(release_binary) != args.to_version:
-        raise RuntimeError(f"current binary is {version(release_binary)}, expected {args.to_version}")
+    run("cargo", "build", "-q", "--release", "-p", "repotracer")
+    release_binary = binary(ROOT, "release")
+    if version(release_binary) != to_version:
+        raise RuntimeError(f"current binary is {version(release_binary)}, expected {to_version}")
 
     with tempfile.TemporaryDirectory(prefix="repotracer-upgrade-") as directory:
         work = Path(directory)
@@ -116,7 +131,7 @@ def main() -> None:
         digest = hashlib.sha256(payload).hexdigest()
         asset = asset_name()
         routes = {
-            "/releases/latest": json.dumps({"tag_name": f"v{args.to_version}"}).encode(),
+            "/releases/latest": json.dumps({"tag_name": f"v{to_version}"}).encode(),
             "/SHA256SUMS": f"{digest}  ./{asset}/{asset}\n".encode(),
             f"/{asset}": payload,
         }
@@ -151,9 +166,9 @@ def main() -> None:
             server.shutdown()
             server.server_close()
 
-        if f"Updated to {args.to_version}." not in update.stdout:
+        if f"Updated to {to_version}." not in update.stdout:
             raise RuntimeError(f"unexpected updater output: {update.stdout}")
-        if managed.read_bytes() != payload or version(managed, environment) != args.to_version:
+        if managed.read_bytes() != payload or version(managed, environment) != to_version:
             raise RuntimeError("the managed binary was not replaced")
         if hashlib.sha256(app_config.read_bytes()).digest() != old_config_hash:
             raise RuntimeError("the updater changed the existing RepoTracer config")
@@ -168,13 +183,13 @@ def main() -> None:
             "single MCP entry": refreshed_config.count("[mcp_servers.repotracer]") == 1,
             "user instructions": "Never remove this line." in refreshed_agents,
             "current routing block": refreshed_agents.count("<!-- repotracer:start -->") == 1
-            and "query alone is enough" in refreshed_agents,
+            and "Query alone is enough" in refreshed_agents,
         }
         failed = [name for name, passed in checks.items() if not passed]
         if failed:
             raise RuntimeError(f"upgrade compatibility failed: {', '.join(failed)}")
 
-    print(f"ok: {args.from_tag} upgraded to {args.to_version}; config, MCP, routing, and Scout still work")
+    print(f"ok: {args.from_tag} upgraded to {to_version}; config, MCP, routing, and Scout still work")
 
 
 if __name__ == "__main__":
