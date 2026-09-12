@@ -239,6 +239,7 @@ pub struct ExplorerBudget {
     pub timeout_seconds: u64,
     #[serde(default = "default_max_tool_calls")]
     pub max_tool_calls: u32,
+    /// Per-tool timeout in seconds. Zero disables it.
     #[serde(default = "default_tool_timeout_secs")]
     pub tool_timeout_seconds: u64,
     #[serde(default = "default_concurrency")]

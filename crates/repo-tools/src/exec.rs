@@ -12,7 +12,8 @@ pub trait ToolExecutor {
     fn execute(&self, call: &ToolCall) -> impl Future<Output = ToolResult> + Send;
 }
 
-/// Run tool calls with bounded concurrency and per-tool timeout.
+/// Run tool calls with bounded concurrency and an optional per-tool timeout.
+/// A zero timeout disables the per-tool deadline.
 /// Results are returned in the same order as `calls`.
 pub async fn execute_tools<E: ToolExecutor + Sync>(
     calls: &[ToolCall],
@@ -36,19 +37,23 @@ pub async fn execute_tools<E: ToolExecutor + Sync>(
             next += 1;
             let call = &calls[idx];
             in_flight.push(Box::pin(async move {
-                let res = match timeout(tool_timeout, executor.execute(call)).await {
-                    Ok(r) => r,
-                    Err(_) => ToolResult {
-                        tool_call_id: call.id.clone(),
-                        name: call.name.clone(),
-                        output: format!(
-                            "<system-reminder>Tool `{}` timed out after {}s.</system-reminder>",
-                            call.name,
-                            tool_timeout.as_secs()
-                        ),
-                        failed: true,
-                        duration_ms: tool_timeout.as_millis() as u64,
-                    },
+                let res = if tool_timeout.is_zero() {
+                    executor.execute(call).await
+                } else {
+                    match timeout(tool_timeout, executor.execute(call)).await {
+                        Ok(r) => r,
+                        Err(_) => ToolResult {
+                            tool_call_id: call.id.clone(),
+                            name: call.name.clone(),
+                            output: format!(
+                                "<system-reminder>Tool `{}` timed out after {}s.</system-reminder>",
+                                call.name,
+                                tool_timeout.as_secs()
+                            ),
+                            failed: true,
+                            duration_ms: tool_timeout.as_millis() as u64,
+                        },
+                    }
                 };
                 (idx, res)
             }));
@@ -125,5 +130,44 @@ mod tests {
         for (i, r) in results.iter().enumerate() {
             assert_eq!(r.tool_call_id, format!("c{i}"));
         }
+    }
+
+    #[tokio::test]
+    async fn zero_disables_timeout_but_positive_timeout_still_applies() {
+        let call = ToolCall {
+            id: "slow".into(),
+            name: "Sleep".into(),
+            arguments: "{}".into(),
+        };
+
+        let result = execute_tools(
+            std::slice::from_ref(&call),
+            &Sleepy {
+                peak: Arc::new(AtomicUsize::new(0)),
+                current: Arc::new(AtomicUsize::new(0)),
+            },
+            1,
+            Duration::ZERO,
+        )
+        .await;
+        assert_eq!(result.len(), 1);
+        assert!(!result[0].failed, "zero must let the delayed tool finish");
+
+        let result = execute_tools(
+            std::slice::from_ref(&call),
+            &Sleepy {
+                peak: Arc::new(AtomicUsize::new(0)),
+                current: Arc::new(AtomicUsize::new(0)),
+            },
+            1,
+            Duration::from_millis(10),
+        )
+        .await;
+        assert!(
+            result[0].failed,
+            "positive timeout must still stop a slow tool"
+        );
+        assert!(result[0].output.contains("timed out"));
+        assert_eq!(result[0].duration_ms, 10);
     }
 }
