@@ -144,7 +144,7 @@ pub fn uninstall(root: &Path, cfg: &Path, yes: bool) -> Result<()> {
         println!("Re-run with --yes to confirm.");
         return Ok(());
     }
-    for message in agents::uninstall_all(root)? {
+    for message in agents::uninstall_codex(root)? {
         item(true, &message);
     }
     if cfg.exists() {

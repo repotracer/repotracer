@@ -391,7 +391,7 @@ fn remove_managed_block(existing: &str) -> String {
     existing.to_string()
 }
 
-pub fn uninstall_all(_root: &Path) -> anyhow::Result<Vec<String>> {
+pub fn uninstall_codex(_root: &Path) -> anyhow::Result<Vec<String>> {
     let mut messages = Vec::new();
     if let Some(path) = codex_config_path().filter(|p| p.exists()) {
         let text = fs::read_to_string(&path)?;
