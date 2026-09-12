@@ -364,4 +364,18 @@ mod tests {
             .unwrap();
         assert!(out.contains('2') || out.contains("a.rs"), "{out}");
     }
+
+    #[tokio::test]
+    async fn dash_prefixed_pattern_is_not_a_command_flag() {
+        if which::which("rg").is_err() {
+            return;
+        }
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("a.rs"), "fn f() -> u32 { 1 }\n").unwrap();
+        let output = GrepTool::new(root.path())
+            .call(r#"{"pattern":"-> u32","output_mode":"content","-C":0}"#)
+            .await
+            .unwrap();
+        assert!(output.contains("-> u32"), "{output}");
+    }
 }

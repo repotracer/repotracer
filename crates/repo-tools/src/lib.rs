@@ -129,6 +129,19 @@ mod investigation_scope_tests {
     use super::*;
 
     #[tokio::test]
+    async fn nested_locations_are_not_rewritten_to_root_siblings() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("docs")).unwrap();
+        std::fs::write(root.path().join("README.md"), "wrong-root-file").unwrap();
+        std::fs::write(root.path().join("docs/README.md"), "correct-nested-file").unwrap();
+        let tools = RepoTools::new(root.path());
+        let output = tools.call_one("Read", r#"{"path":"docs/README.md"}"#).await;
+        assert!(!output.failed);
+        assert!(output.output.contains("correct-nested-file"));
+        assert!(!output.output.contains("wrong-root-file"));
+    }
+
+    #[tokio::test]
     async fn related_checkout_reads_and_symbols_keep_absolute_provenance() {
         let root = tempfile::tempdir().unwrap();
         let related = tempfile::tempdir().unwrap();
