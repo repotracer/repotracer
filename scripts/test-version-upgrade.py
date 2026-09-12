@@ -34,12 +34,12 @@ def run(*args: str | Path, cwd: Path = ROOT, env: dict[str, str] | None = None) 
     return result
 
 
-def binary(root: Path) -> Path:
+def binary(root: Path, profile: str = "debug") -> Path:
     name = "repotracer.exe" if os.name == "nt" else "repotracer"
     target = Path(os.environ.get("CARGO_TARGET_DIR", "target"))
     if not target.is_absolute():
         target = root / target
-    return target / "debug" / name
+    return target / profile / name
 
 
 def asset_name() -> str:
@@ -84,8 +84,8 @@ def main() -> None:
     to_version = args.to_version or workspace_version()
 
     run("git", "rev-parse", "--verify", args.from_tag)
-    run("cargo", "build", "-q", "-p", "repotracer")
-    release_binary = binary(ROOT)
+    run("cargo", "build", "-q", "--release", "-p", "repotracer")
+    release_binary = binary(ROOT, "release")
     if version(release_binary) != to_version:
         raise RuntimeError(f"current binary is {version(release_binary)}, expected {to_version}")
 
