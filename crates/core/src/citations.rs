@@ -92,14 +92,13 @@ pub fn validate_citation(root: &Path, c: &Citation) -> Option<ValidatedCitation>
 
     let root_canon = root.canonicalize().ok()?;
     let path_canon = candidate.canonicalize().ok()?;
-    if !path_canon.starts_with(&root_canon) {
-        return None;
-    }
     if !path_canon.is_file() {
         return None;
     }
 
-    let line_count = source_line_count(std::fs::File::open(&path_canon).ok()?, c.end_line)?;
+    let source = std::fs::File::open(&path_canon).ok()?;
+    let snapshot_length = source.metadata().ok()?.len();
+    let line_count = source_line_count(source.take(snapshot_length), c.end_line)?;
     if line_count == 0 {
         return None;
     }
@@ -123,17 +122,16 @@ pub fn validate_citation(root: &Path, c: &Citation) -> Option<ValidatedCitation>
 }
 
 /// Validate locations using bounded buffers, stopping at the requested line.
-/// Binary bytes in the examined prefix and locations beyond the scan budget
-/// are rejected instead of reading an arbitrarily large file into memory.
+/// Binary bytes in the examined prefix are rejected. Buffer size is bounded;
+/// a valid location is not rejected merely because it is deep in a file.
 fn source_line_count(source: impl Read, last_requested: u32) -> Option<u32> {
-    const MAX_SCAN_BYTES: u64 = 8 * 1024 * 1024;
-    let mut reader = BufReader::new(source.take(MAX_SCAN_BYTES));
+    let mut reader = BufReader::new(source);
     let mut lines = 0;
     let mut at_line_start = true;
     loop {
         let chunk = reader.fill_buf().ok()?;
         if chunk.is_empty() {
-            return (reader.get_ref().limit() > 0).then_some(lines);
+            return Some(lines);
         }
         if chunk.contains(&0) {
             return None;
@@ -184,7 +182,10 @@ mod tests {
     #[test]
     fn validation_bounds_long_lines_and_preserves_eof_and_binary_checks() {
         assert_eq!(source_line_count(std::io::repeat(b'x'), 1), Some(1));
-        assert_eq!(source_line_count(std::io::repeat(b'x'), 2), None);
+        assert_eq!(
+            source_line_count(std::io::repeat(b'x').take(16 * 1024 * 1024), 2),
+            Some(1)
+        );
         assert_eq!(source_line_count(&b"a\nb\n"[..], 10), Some(2));
         assert_eq!(source_line_count(&b""[..], 1), Some(0));
         assert_eq!(source_line_count(&b"a\0b"[..], 1), None);

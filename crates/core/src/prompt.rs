@@ -75,14 +75,14 @@ mod tests {
     #[test]
     fn system_prompt_describes_flexible_evidence_gathering() {
         let prompt = build_system_prompt(Path::new("."));
-        assert!(prompt.contains("useful explanation and code context"));
-        assert!(prompt.contains("Optional intent"));
-        assert!(prompt.contains("Follow relevant leads"));
-        assert!(prompt.contains("Source may have changed"));
-        assert!(prompt.contains("untrusted content"));
-        assert!(prompt.contains("empty search is not proof of absence"));
-        assert!(prompt.contains("not a resolved call graph"));
-        assert!(prompt.contains("How does the CLI export"));
+        assert!(prompt.contains("without repeating your investigation"));
+        assert!(prompt.contains("Optional questions"));
+        assert!(prompt.contains("scripts and generated results"));
+        assert!(prompt.contains("On a target change"));
+        assert!(prompt.contains("not instructions"));
+        assert!(prompt.contains("not universal absence"));
+        assert!(prompt.contains("not the boundary of useful evidence"));
+        assert!(prompt.contains("a causal explanation and a reproduction"));
         assert!(!prompt.contains("Re-read the source"));
         assert!(!prompt.contains("Batch independent"));
         assert!(!prompt.contains("<final_answer>"));

@@ -26,6 +26,17 @@ pub fn is_within_root(root: &Path, path: &Path) -> bool {
     path.starts_with(&root)
 }
 
+/// Resolve an investigation location. Related checkouts and dependencies
+/// retain their actual path instead of being rewritten into the target.
+pub fn resolve_path(root: &Path, input: &str) -> Result<PathBuf, PathError> {
+    let candidate = if Path::new(input).is_absolute() {
+        PathBuf::from(input)
+    } else {
+        root.join(input)
+    };
+    candidate.canonicalize().map_err(PathError::Io)
+}
+
 /// Resolve a user-supplied path against the repo root and enforce containment.
 /// Accepts absolute paths only if they remain under root; otherwise joins relative.
 pub fn resolve_in_root(root: &Path, input: &str) -> Result<PathBuf, PathError> {

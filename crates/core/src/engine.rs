@@ -3,8 +3,7 @@ use crate::config::ExplorerBudget;
 use crate::prompt::build_system_prompt;
 use crate::types::{ScoutRequest, ScoutResult, ScoutStats, UsageStats, UsageStatus};
 use repotracer_model::{ChatMessage, ModelBackend, ModelRequest, ToolSpec, Usage};
-use repotracer_repo_tools::{resolve_in_root, RepoTools, ToolCall};
-use std::path::Path;
+use repotracer_repo_tools::{RepoTools, ToolCall};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tracing::{debug, warn};
@@ -211,14 +210,20 @@ impl ScoutEngine {
         max_turns: u32,
         observed_usage: Arc<Mutex<UsageAccumulator>>,
     ) -> anyhow::Result<ScoutResult> {
+        let tools = if self.tools.root().canonicalize().ok() == request.root.canonicalize().ok() {
+            self.tools.clone()
+        } else {
+            RepoTools::new(&request.root)
+                .with_concurrency(self.budget.concurrency)
+                .with_timeout(self.budget.tool_timeout())
+        };
         let system = build_system_prompt(&request.root);
         let mut messages = vec![
             ChatMessage::system(system),
             ChatMessage::user(crate::investigation_prompt(&request)),
         ];
 
-        let tool_specs: Vec<ToolSpec> = self
-            .tools
+        let tool_specs: Vec<ToolSpec> = tools
             .definitions()
             .into_iter()
             .map(|d| ToolSpec {
@@ -231,7 +236,6 @@ impl ScoutEngine {
         let mut turns: u32 = 0;
         let mut tool_calls_total: u32 = 0;
         let mut usage = UsageAccumulator::default();
-        let mut correction_used = false;
 
         loop {
             turns += 1;
@@ -308,11 +312,7 @@ impl ScoutEngine {
                         .map(|c| ToolCall {
                             id: c.id.clone(),
                             name: c.name.clone(),
-                            arguments: sandbox_search_arguments(
-                                &c.name,
-                                &c.arguments,
-                                self.tools.root(),
-                            ),
+                            arguments: c.arguments.clone(),
                         })
                         .collect();
                     for call in &tool_calls {
@@ -320,7 +320,7 @@ impl ScoutEngine {
                     }
 
                     debug!(count = tool_calls.len(), "executing tools concurrently");
-                    let results = self.tools.call_many(&tool_calls).await;
+                    let results = tools.call_many(&tool_calls).await;
                     tool_calls_total += results.len() as u32;
                     for result in results {
                         messages.push(ChatMessage::tool(result.tool_call_id, result.output));
@@ -332,15 +332,6 @@ impl ScoutEngine {
             // Final assistant message (no tool calls).
             let content = msg.content.clone().unwrap_or_default();
             let (summary, validated, investigation) = assess_output(&request, &content);
-
-            // One correction turn if claimed citations are invalid or malformed.
-            if validated.is_empty() && !correction_used && !content.trim().is_empty() {
-                correction_used = true;
-                messages.push(ChatMessage::user(
-                    "The cited locations were invalid. Return investigation JSON with direct source evidence. Mark unresolved questions partial instead of inventing citations.",
-                ));
-                continue;
-            }
 
             let (usage_stats, usage_status) = usage.finish();
             let mut stats = ScoutStats {
@@ -371,73 +362,6 @@ impl crate::types::ScoutBackend for ScoutEngine {
     async fn scout(&self, request: ScoutRequest) -> anyhow::Result<ScoutResult> {
         ScoutEngine::scout(self, request).await
     }
-}
-
-/// Whether a path the *model* produced looks absolute.
-///
-/// `Path::is_absolute` answers for the host, not the model, and gets this wrong
-/// in both directions: Windows rejects `/guessed/auth` for lacking a drive
-/// letter, and Unix rejects `C:\guessed`. Either way an invented path would be
-/// passed straight through to the tool instead of broadened to the repository
-/// root, so decide from the shape of the string rather than the host.
-fn model_path_is_absolute(path: &str) -> bool {
-    let bytes = path.as_bytes();
-    let drive_prefixed = bytes.len() >= 3
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && matches!(bytes[2], b'/' | b'\\');
-    path.starts_with('/') || path.starts_with('\\') || drive_prefixed
-}
-
-fn sandbox_search_arguments(name: &str, arguments: &str, root: &Path) -> String {
-    let field = match name {
-        "Read" | "Grep" => "path",
-        "Glob" => "directory",
-        _ => return arguments.to_string(),
-    };
-    let Ok(mut value) = serde_json::from_str::<serde_json::Value>(arguments) else {
-        return arguments.to_string();
-    };
-    let Some(path) = value.get(field).and_then(|path| path.as_str()) else {
-        return arguments.to_string();
-    };
-
-    if resolve_in_root(root, path).is_ok_and(|resolved| resolved.exists()) {
-        return arguments.to_string();
-    }
-
-    let trimmed = path.trim_start_matches(['/', '\\']);
-    let root_name = root.file_name().and_then(|name| name.to_str());
-    let named_relative = root_name
-        .and_then(|root_name| trimmed.strip_prefix(root_name))
-        .and_then(|path| path.strip_prefix(['/', '\\']));
-    let parts: Vec<_> = trimmed.split(['/', '\\']).collect();
-    let existing_relative = (1..parts.len())
-        .map(|index| parts[index..].join("/"))
-        .find(|path| root.join(path).exists());
-    let relative = named_relative
-        .map(str::to_owned)
-        .or(existing_relative)
-        .filter(|path| resolve_in_root(root, path).is_ok());
-
-    if let Some(relative) = relative {
-        value[field] = relative.into();
-        debug!(field, "normalized model path inside repository root");
-    } else if model_path_is_absolute(path) && resolve_in_root(root, path).is_err() {
-        if name == "Read" {
-            value[field] = trimmed.into();
-            debug!(
-                field,
-                "normalized escaped model read inside repository root"
-            );
-        } else {
-            value.as_object_mut().unwrap().remove(field);
-            debug!(field, "broadened escaped model search to repository root");
-        }
-    } else {
-        return arguments.to_string();
-    }
-    value.to_string()
 }
 
 fn empty_result(
@@ -513,7 +437,65 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn json_reports_with_invalid_citations_get_one_correction() {
+    async fn tool_reads_follow_request_target_instead_of_startup_checkout() {
+        struct ReadAnswer;
+        #[async_trait::async_trait]
+        impl ModelBackend for ReadAnswer {
+            fn name(&self) -> &str {
+                "read-answer"
+            }
+            async fn complete(&self, request: ModelRequest) -> Result<ModelResponse, ModelError> {
+                let last = request.messages.last().unwrap();
+                let message = if last.role == repotracer_model::MessageRole::Tool {
+                    let text = last.content.as_deref().unwrap();
+                    assert!(text.contains("current-target"), "{text}");
+                    assert!(!text.contains("stale-startup"), "{text}");
+                    ChatMessage::assistant(
+                        serde_json::json!({"answer": text, "citations": [], "continuation": null})
+                            .to_string(),
+                    )
+                } else {
+                    ChatMessage::assistant_tools(
+                        None,
+                        vec![repotracer_model::FunctionCall {
+                            id: "read".into(),
+                            name: "Read".into(),
+                            arguments: r#"{"path":"marker.txt"}"#.into(),
+                        }],
+                    )
+                };
+                Ok(ModelResponse {
+                    message,
+                    model: "read-answer".into(),
+                    usage: None,
+                })
+            }
+        }
+        let startup = tempdir().unwrap();
+        let target = tempdir().unwrap();
+        fs::write(startup.path().join("marker.txt"), "stale-startup").unwrap();
+        fs::write(target.path().join("marker.txt"), "current-target").unwrap();
+        let engine = ScoutEngine::new(
+            Arc::new(ReadAnswer),
+            RepoTools::new(startup.path()),
+            ExplorerBudget::default(),
+        );
+        let result = engine
+            .scout(ScoutRequest {
+                query: "Read the marker".into(),
+                root: target.path().into(),
+                focus: None,
+                investigation: Default::default(),
+                max_turns: Some(2),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+        assert!(result.summary.contains("current-target"));
+    }
+
+    #[tokio::test]
+    async fn invalid_citations_do_not_trigger_paid_correction() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("lib.rs"), "fn answer() {}\n").unwrap();
         let report = |path: &str| {
@@ -545,11 +527,10 @@ mod tests {
                 })
                 .await
                 .unwrap();
-            assert_eq!(result.stats.turns, 2);
-            assert_eq!(
-                result.citations.len(),
-                usize::from(corrected_path == "lib.rs")
-            );
+            assert_eq!(result.stats.turns, 1);
+            assert!(result.citations.is_empty());
+            assert!(result.summary.contains("answer function"));
+            assert!(!result.investigation.limitations.is_empty());
         }
     }
 
@@ -817,7 +798,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn malformed_final_answer_gets_one_correction_turn() {
+    async fn malformed_legacy_attachments_do_not_trigger_paid_correction() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("a.rs"), "fn setup() {}\n").unwrap();
         let model = Arc::new(MockModel::new(MockScript {
@@ -840,58 +821,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.stats.turns, 2);
-        assert_eq!(result.citations.len(), 1);
-    }
-
-    #[test]
-    fn model_paths_are_absolute_regardless_of_host_platform() {
-        // Windows' own is_absolute rejects these, but the model emits them on
-        // every platform, so they must still be treated as escapes.
-        assert!(model_path_is_absolute("/guessed/auth"));
-        assert!(model_path_is_absolute("\\guessed\\auth"));
-        assert!(model_path_is_absolute("C:\\guessed"));
-        assert!(!model_path_is_absolute("src/main.rs"));
-        assert!(!model_path_is_absolute("./src"));
-    }
-
-    #[test]
-    fn escaped_model_searches_fall_back_to_repository_root() {
-        let dir = tempdir().unwrap();
-        let arguments = sandbox_search_arguments(
-            "Grep",
-            r#"{"pattern":"token","path":"/guessed/auth"}"#,
-            dir.path(),
-        );
-        let value: serde_json::Value = serde_json::from_str(&arguments).unwrap();
-        assert_eq!(value["pattern"], "token");
-        assert!(value.get("path").is_none());
-    }
-
-    #[test]
-    fn escaped_model_reads_are_normalized_inside_repository_root() {
-        let dir = tempdir().unwrap();
-        let root = dir.path().join("Gigo");
-        let arguments = sandbox_search_arguments(
-            "Read",
-            r#"{"path":"/Gigo/internal/server/server.go"}"#,
-            &root,
-        );
-        let value: serde_json::Value = serde_json::from_str(&arguments).unwrap();
-        assert_eq!(value["path"], "internal/server/server.go");
-    }
-
-    #[test]
-    fn model_paths_prefixed_with_repository_name_are_normalized() {
-        let dir = tempdir().unwrap();
-        let root = dir.path().join("checkout");
-        fs::create_dir_all(root.join("crates/core")).unwrap();
-
-        for (tool, field) in [("Read", "path"), ("Grep", "path"), ("Glob", "directory")] {
-            let arguments = format!(r#"{{"{field}":"repotracer/crates/core","pattern":"engine"}}"#);
-            let normalized = sandbox_search_arguments(tool, &arguments, &root);
-            let value: serde_json::Value = serde_json::from_str(&normalized).unwrap();
-            assert_eq!(value[field], "crates/core");
-        }
+        assert_eq!(result.stats.turns, 1);
+        assert!(result.citations.is_empty());
     }
 }

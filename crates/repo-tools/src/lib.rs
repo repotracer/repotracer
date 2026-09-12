@@ -13,7 +13,7 @@ pub use exec::{execute_tools, ToolExecutor, DEFAULT_CONCURRENCY, DEFAULT_TOOL_TI
 pub use glob_tool::GlobTool;
 pub use grep::GrepTool;
 pub use index::{RepositoryIndex, SymbolOccurrence};
-pub use pathutil::{is_within_root, resolve_in_root, PathError};
+pub use pathutil::{is_within_root, resolve_in_root, resolve_path, PathError};
 pub use read::ReadTool;
 pub use types::{
     ToolCall, ToolDefinition, ToolError, ToolName, ToolResult, ToolSchema, TOOL_DESCRIPTIONS,
@@ -121,5 +121,43 @@ impl ToolExecutor for RepoTools {
         let mut result = self.call_one(&call.name, &call.arguments).await;
         result.tool_call_id = call.id.clone();
         result
+    }
+}
+
+#[cfg(test)]
+mod investigation_scope_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn related_checkout_reads_and_symbols_keep_absolute_provenance() {
+        let root = tempfile::tempdir().unwrap();
+        let related = tempfile::tempdir().unwrap();
+        let source = related.path().join("dependency.rs");
+        std::fs::write(&source, "fn related_symbol() {}\n").unwrap();
+        let tools = RepoTools::new(root.path());
+        for name in ["Read", "Symbols"] {
+            let output = tools
+                .call_one(name, &serde_json::json!({"path":source}).to_string())
+                .await;
+            assert!(!output.failed, "{}", output.output);
+            assert!(
+                output.output.contains("related_symbol"),
+                "{}",
+                output.output
+            );
+            assert!(output.output.contains("dependency.rs"), "{}", output.output);
+            assert!(
+                output.output.contains(
+                    &related
+                        .path()
+                        .canonicalize()
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace('\\', "/")
+                ),
+                "{}",
+                output.output
+            );
+        }
     }
 }

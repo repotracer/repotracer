@@ -1,4 +1,4 @@
-use crate::pathutil::resolve_in_root;
+use crate::pathutil::resolve_path;
 use crate::read::{finish_output, MAX_OUTPUT_BYTES};
 use crate::types::{ToolError, ToolSchema};
 use serde::Deserialize;
@@ -123,7 +123,7 @@ impl GrepTool {
         .map_err(|e| ToolError::InvalidArgs(e.to_string()))?;
 
         let search_path_input = args.path.as_deref().unwrap_or(".");
-        let search_path = match resolve_in_root(&self.root, search_path_input) {
+        let search_path = match resolve_path(&self.root, search_path_input) {
             Ok(p) => p,
             Err(e) => {
                 return Ok(format!(
@@ -142,7 +142,7 @@ impl GrepTool {
         let mut cmd = Command::new(&self.rg_path);
         cmd.arg("--color").arg("never");
         cmd.arg("--heading");
-        // Never leave the repo via rg globs; constrain to path.
+        // Relative output uses the current target; related locations are passed absolutely.
         cmd.current_dir(&self.root);
         cmd.stdin(Stdio::null());
 
