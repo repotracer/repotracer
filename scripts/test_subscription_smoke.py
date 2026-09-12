@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import importlib.util
 from pathlib import Path
+import sys
 import unittest
 
 
 SCRIPT = Path(__file__).with_name("subscription-smoke.py")
 SPEC = importlib.util.spec_from_file_location("subscription_smoke", SCRIPT)
 SUBSCRIPTION_SMOKE = importlib.util.module_from_spec(SPEC)
+sys.dont_write_bytecode = True
 SPEC.loader.exec_module(SUBSCRIPTION_SMOKE)
 
 
