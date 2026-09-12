@@ -183,7 +183,7 @@ def main() -> None:
             "single MCP entry": refreshed_config.count("[mcp_servers.repotracer]") == 1,
             "user instructions": "Never remove this line." in refreshed_agents,
             "current routing block": refreshed_agents.count("<!-- repotracer:start -->") == 1
-            and "query alone is enough" in refreshed_agents,
+            and "Query alone is enough" in refreshed_agents,
         }
         failed = [name for name, passed in checks.items() if not passed]
         if failed:

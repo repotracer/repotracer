@@ -474,10 +474,11 @@ pub fn refresh(base: &Path) -> Result<bool> {
 fn remove_parent(base: &Path, parent: &str) -> Result<()> {
     match parent {
         "claude" => {
-            // If Claude Code is no longer installed, its native registration
-            // cannot be present. Continue removing RepoTracer-owned files.
-            if which::which("claude").is_ok() {
-                let output = Command::new("claude")
+            // A missing executable does not mean its saved registration is gone.
+            let claude = which::which("claude")
+                .context("Claude executable unavailable; profile and integration state retained. Restore Claude to PATH and retry uninstall")?;
+            {
+                let output = Command::new(claude)
                     .args(["mcp", "remove", "--scope", "user", "repotracer"])
                     .output()?;
                 if !output.status.success() {

@@ -1575,7 +1575,7 @@ mod tests {
             1
         );
         assert_eq!(
-            response["structuredContent"]["citations"]
+            response["structuredContent"]["evidence"]
                 .as_array()
                 .unwrap()
                 .len(),
