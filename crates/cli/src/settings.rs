@@ -97,6 +97,19 @@ fn apply_model_choice(
     Ok(())
 }
 
+fn persist_install_state(path: &Path, state: &InstallState) -> Result<()> {
+    if state.parents.is_empty() {
+        match fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    } else {
+        fs::write(path, serde_json::to_vec_pretty(state)?)?;
+        Ok(())
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     base: &Path,
@@ -218,21 +231,12 @@ pub fn run(
     if !removals.is_empty() && !dry {
         for parent in &removals {
             remove_parent(base, parent)?;
+            installed.parents.retain(|installed| installed != parent);
+            state.parents.retain(|installed| installed != parent);
+            // Persist each successful detach. If a later parent fails, the
+            // state file must not claim that the earlier parent is installed.
+            persist_install_state(&state_path, &installed)?;
             println!("Removed the RepoTracer integration from {parent}.");
-        }
-        installed
-            .parents
-            .retain(|parent| !removals.contains(parent));
-        state.parents.retain(|parent| !removals.contains(parent));
-        if installed.parents.is_empty() {
-            fs::remove_file(&state_path).or_else(|error| {
-                match error.kind() == std::io::ErrorKind::NotFound {
-                    true => Ok(()),
-                    false => Err(error),
-                }
-            })?;
-        } else {
-            fs::write(&state_path, serde_json::to_vec_pretty(&installed)?)?;
         }
     }
     let requested: Vec<&str> = match targets.as_deref() {
@@ -364,7 +368,7 @@ pub fn run(
             installed.parents.push(parent);
         }
         // Preserve successful installations if a later parent fails.
-        fs::write(&state_path, serde_json::to_vec_pretty(&installed)?)?;
+        persist_install_state(&state_path, &installed)?;
     }
     println!(
         "Saved. Restart the configured parent agents. Use repotracer settings to change mappings."
@@ -443,11 +447,18 @@ pub fn refresh(base: &Path) -> Result<bool> {
 fn remove_parent(base: &Path, parent: &str) -> Result<()> {
     match parent {
         "claude" => {
-            let status = Command::new("claude")
-                .args(["mcp", "remove", "--scope", "user", "repotracer"])
-                .status()?;
-            if !status.success() {
-                bail!("Claude MCP removal failed; profiles retained");
+            // If Claude Code is no longer installed, its native registration
+            // cannot be present. Continue removing RepoTracer-owned files.
+            if which::which("claude").is_ok() {
+                let output = Command::new("claude")
+                    .args(["mcp", "remove", "--scope", "user", "repotracer"])
+                    .output()?;
+                if !output.status.success() {
+                    return Err(crate::session::attach_stderr(
+                        anyhow::anyhow!("Claude MCP removal failed; profiles retained"),
+                        output.stderr,
+                    ));
+                }
             }
             if let Some(instructions) = crate::agents::claude_instructions_path() {
                 let mut messages = Vec::new();
@@ -477,11 +488,13 @@ pub fn uninstall(base: &Path) -> Result<()> {
     if !path.exists() {
         return Ok(());
     }
-    let state: InstallState = serde_json::from_slice(&fs::read(&path)?)?;
-    for parent in &state.parents {
-        remove_parent(base, parent)?;
+    let mut state: InstallState = serde_json::from_slice(&fs::read(&path)?)?;
+    for parent in state.parents.clone() {
+        remove_parent(base, &parent)?;
+        state.parents.retain(|installed| installed != &parent);
+        // Keep partial uninstall recoverable when a later parent fails.
+        persist_install_state(&path, &state)?;
     }
-    fs::remove_file(path)?;
     Ok(())
 }
 
@@ -560,5 +573,26 @@ mod tests {
         assert_eq!(cfg.model.base_url, "https://gateway.example/v1");
         assert_eq!(cfg.model.api_key.as_deref(), Some("secret"));
         assert!(cfg.model.reasoning_effort.is_empty());
+    }
+
+    #[test]
+    fn removal_state_is_persisted_after_each_successful_parent() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.integrations.json");
+        let mut state = InstallState {
+            parents: vec!["codex".into(), "claude".into()],
+        };
+        persist_install_state(&path, &state).unwrap();
+
+        state.parents.retain(|parent| parent != "codex");
+        persist_install_state(&path, &state).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
+            serde_json::json!({"parents": ["claude"]})
+        );
+
+        state.parents.retain(|parent| parent != "claude");
+        persist_install_state(&path, &state).unwrap();
+        assert!(!path.exists());
     }
 }
