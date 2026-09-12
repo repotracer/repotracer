@@ -39,9 +39,4 @@ Useful answer: describe the responsible branch and the result of a focused input
 ## Current workspace
 
 OS: ${OS_KIND}
-Target: ${WORK_DIR}
-Detected root manifests: ${PROJECT_HINT}. Other languages may be present.
-Top-level entries:
-```
-${WORK_DIR_LS}
-```
+${WORKSPACE_FACTS}

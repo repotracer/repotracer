@@ -759,9 +759,8 @@ impl ScoutBackend for ClaudeScout {
             },
             target_context = if target_changed {
                 format!(
-                    "\n\nThe current investigation target changed. Earlier evidence belongs to `{}`. The current target is `{}`. Use the current target and its workspace for every tool call; refresh claims whose source may differ.",
-                    previous_root.display(),
-                    root.display()
+                    "\n\n{}",
+                    crate::subscription::target_change_notice(&previous_root, &root)
                 )
             } else {
                 String::new()
@@ -1499,6 +1498,119 @@ for line in sys.stdin:
         assert!(
             !recovered.stats.warm_process,
             "failed cwd session must not be reused"
+        );
+    }
+
+    /// The workspace facts baked into `--system-prompt` describe the target the
+    /// process was started for and cannot be replaced without a respawn. A
+    /// retained conversation that moves to another checkout must therefore be
+    /// told the current target's workspace facts in the turn itself, or it keeps
+    /// navigating by the previous checkout's layout while relative citations are
+    /// resolved against the new one.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn native_target_switch_delivers_the_current_workspace_facts() {
+        let dir = tempfile::tempdir().unwrap();
+        let root_a = dir.path().join("repo-a");
+        let root_b = dir.path().join("repo-b");
+        std::fs::create_dir_all(root_a.join("alpha_only")).unwrap();
+        std::fs::create_dir_all(root_b.join("beta_only")).unwrap();
+        std::fs::write(root_a.join("Cargo.toml"), "[workspace]\n").unwrap();
+        std::fs::write(root_b.join("go.mod"), "module beta\n").unwrap();
+        let executable = dir.path().join("claude-fake-workspace");
+        let log = dir.path().join("events.jsonl");
+        let argv_log = dir.path().join("argv.jsonl");
+        let script = r##"#!/usr/bin/env python3
+import json, sys
+log = "__LOG__"
+argv_log = "__ARGV__"
+structured = {"summary":"fixture", "status":"partial", "findings":[], "unresolved":["fixture"], "searched_scope":[], "limitations":[]}
+with open(argv_log, "a") as handle:
+    handle.write(json.dumps(sys.argv[1:]) + "\n")
+for line in sys.stdin:
+    request = json.loads(line)
+    with open(log, "a") as handle:
+        handle.write(json.dumps(request) + "\n")
+    if request.get("type") == "control_request":
+        control = request["request"]
+        if control.get("trust_accepted"):
+            response = {"subtype":"success", "request_id":request["request_id"], "response":{"status":"ok", "cwd":control["path"], "changed":True}}
+        else:
+            response = {"subtype":"needs_trust", "request_id":request["request_id"], "response":{"status":"needs_trust"}}
+        print(json.dumps({"type":"control_response", "response":response}), flush=True)
+        continue
+    print(json.dumps({"type":"result", "subtype":"success", "is_error":False, "num_turns":1, "structured_output":structured, "usage":{"input_tokens":1,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":1,"reasoning_output_tokens":0,"total_tokens":2}}), flush=True)
+"##;
+        write_executable_fixture(
+            &executable,
+            &script
+                .replace("__LOG__", &log.display().to_string())
+                .replace("__ARGV__", &argv_log.display().to_string()),
+        );
+
+        let mut cfg = RepoTracerConfig::default();
+        cfg.model.backend = "claude-cli".into();
+        cfg.model.model = "haiku".into();
+        cfg.model.executable = Some(executable.display().to_string());
+        let scout = ClaudeScout::new(&cfg).unwrap();
+        let request = |root: &std::path::Path, query: &str| ScoutRequest {
+            investigation: repotracer_core::InvestigationSpec {
+                conversation_id: Some("move".into()),
+                ..Default::default()
+            },
+            query: query.into(),
+            root: root.to_path_buf(),
+            focus: None,
+            max_turns: Some(2),
+            timeout: Some(Duration::from_secs(3)),
+        };
+
+        scout.scout(request(&root_a, "first")).await.unwrap();
+        let second = scout.scout(request(&root_b, "second")).await.unwrap();
+        assert!(
+            second.stats.warm_process,
+            "the switch must reuse the process"
+        );
+
+        let argv: Vec<Vec<String>> = std::fs::read_to_string(&argv_log)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(argv.len(), 1, "the switch must not respawn the process");
+        let system_prompt = argv[0]
+            .iter()
+            .position(|arg| arg == "--system-prompt")
+            .map(|index| argv[0][index + 1].clone())
+            .unwrap();
+        // The startup prompt is bound to the first target, as expected.
+        assert!(system_prompt.contains("alpha_only"));
+        assert!(system_prompt.contains("Rust"));
+        assert!(!system_prompt.contains("beta_only"));
+
+        let events: Vec<Value> = std::fs::read_to_string(&log)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        let moved_prompt = events
+            .iter()
+            .filter(|event| event["type"] == "user")
+            .filter_map(|event| event["message"]["content"].as_str())
+            .find(|content| content.contains("current investigation target changed"))
+            .expect("the moved turn must carry a target-change notice");
+        assert!(moved_prompt.contains(root_b.to_str().unwrap()));
+        assert!(
+            moved_prompt.contains("beta_only"),
+            "the moved turn must describe the current target's workspace: {moved_prompt}"
+        );
+        assert!(
+            moved_prompt.contains("Go"),
+            "the moved turn must describe the current target's manifests: {moved_prompt}"
+        );
+        assert!(
+            !moved_prompt.contains("alpha_only"),
+            "the moved turn must not restate the previous checkout's layout"
         );
     }
 

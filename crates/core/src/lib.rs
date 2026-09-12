@@ -15,7 +15,7 @@ pub use investigation::{
     ConfidenceLevel, Finding, InvestigationConfidence, InvestigationIntent, InvestigationReport,
     InvestigationSpec, InvestigationStatus, ReasoningContinuation,
 };
-pub use prompt::build_system_prompt;
+pub use prompt::{build_system_prompt, workspace_facts};
 pub use types::{
     ConversationInfo, ExplorerTurn, IndexUsage, ScoutAttemptStats, ScoutBackend, ScoutBackendError,
     ScoutRequest, ScoutResult, ScoutStats, UsageStats, UsageStatus, ValidatedCitation,
