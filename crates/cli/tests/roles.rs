@@ -33,6 +33,9 @@ if sys.argv[1:3]==['mcp','add-json']:
     if (root/'fail-add').exists(): sys.exit(1)
     marker.write_text(sys.argv[-1])
 elif sys.argv[1:3]==['mcp','remove']:
+    if (root/'fail-remove').exists():
+        print('permission denied while removing MCP entry',file=sys.stderr)
+        sys.exit(7)
     if not marker.exists(): sys.exit(1)
     marker.unlink()
 else: sys.exit(2)
@@ -177,6 +180,64 @@ fn untracked_claude_registration_is_never_replaced() {
     assert!(!fs::read_to_string(root.join("claude-calls.jsonl"))
         .unwrap()
         .contains("remove"));
+}
+
+#[test]
+fn uninstall_persists_successful_parent_removal_before_a_later_failure() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    fake_claude(root);
+    cli(root)
+        .args(["settings", "--agents", "both"])
+        .assert()
+        .success();
+    fs::write(root.join("fail-remove"), "fixture").unwrap();
+
+    cli(root)
+        .args(["uninstall", "--yes"])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains(
+            "permission denied while removing MCP entry",
+        ));
+
+    let state: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("config.integrations.json")).unwrap()).unwrap();
+    assert_eq!(state["parents"], serde_json::json!(["claude"]));
+    assert!(!root.join("config.codex.toml").exists());
+    assert!(root.join("config.claude.toml").exists());
+}
+
+#[test]
+fn uninstall_without_claude_cli_still_removes_managed_files() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let claude_home = root.join("claude-home");
+    fs::create_dir_all(&claude_home).unwrap();
+    fs::write(
+        claude_home.join("CLAUDE.md"),
+        "user instructions\n\n<!-- repotracer:start -->\nrouting\n<!-- repotracer:end -->\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("config.integrations.json"),
+        r#"{"parents":["claude"]}"#,
+    )
+    .unwrap();
+    fs::write(root.join("config.claude.toml"), "profile").unwrap();
+
+    cli(root)
+        .env("PATH", root)
+        .args(["uninstall", "--yes"])
+        .assert()
+        .success();
+
+    assert!(!root.join("config.integrations.json").exists());
+    assert!(!root.join("config.claude.toml").exists());
+    assert_eq!(
+        fs::read_to_string(claude_home.join("CLAUDE.md")).unwrap(),
+        "user instructions\n"
+    );
 }
 
 #[test]

@@ -11,13 +11,165 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Padding, Paragraph, Wrap},
     Frame, Terminal,
 };
 use std::{io, sync::mpsc, time::Duration};
+
+/// Presentation only. Both axes degrade independently: a terminal without
+/// colour keeps every shape, and a terminal without UTF-8 keeps every colour.
+struct Theme {
+    unicode: bool,
+    color: bool,
+}
+
+impl Theme {
+    fn plain(&self) -> Style {
+        Style::default()
+    }
+
+    fn bold(&self) -> Style {
+        Style::default().add_modifier(Modifier::BOLD)
+    }
+
+    fn dim(&self) -> Style {
+        Style::default().add_modifier(Modifier::DIM)
+    }
+
+    fn accent(&self) -> Style {
+        if self.color {
+            Style::default().fg(Color::Cyan)
+        } else {
+            self.bold()
+        }
+    }
+
+    fn warn(&self) -> Style {
+        if self.color {
+            Style::default().fg(Color::Yellow)
+        } else {
+            self.plain()
+        }
+    }
+
+    fn danger(&self) -> Style {
+        if self.color {
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+        } else {
+            self.bold()
+        }
+    }
+
+    /// A filled pill reads as "selected" far faster than reversed body text.
+    fn highlight(&self) -> Style {
+        let style = Style::default().add_modifier(Modifier::BOLD);
+        if self.color {
+            style.fg(Color::Black).bg(Color::Cyan)
+        } else {
+            style.add_modifier(Modifier::REVERSED)
+        }
+    }
+
+    fn pointer(&self) -> &'static str {
+        if self.unicode {
+            "❯ "
+        } else {
+            "> "
+        }
+    }
+
+    fn checkbox(&self, checked: bool) -> &'static str {
+        match (self.unicode, checked) {
+            (true, true) => "◉",
+            (true, false) => "◯",
+            (false, true) => "[x]",
+            (false, false) => "[ ]",
+        }
+    }
+
+    fn step_mark(&self, active: bool) -> &'static str {
+        match (self.unicode, active) {
+            (true, true) => "●",
+            (true, false) => "○",
+            (false, true) => "*",
+            (false, false) => "-",
+        }
+    }
+
+    fn caret(&self) -> &'static str {
+        if self.unicode {
+            "▌"
+        } else {
+            "|"
+        }
+    }
+
+    fn separator(&self) -> &'static str {
+        if self.unicode {
+            " · "
+        } else {
+            " | "
+        }
+    }
+
+    /// Three tints so the wordmark reads as one shape with depth instead of a
+    /// flat slab. Without colour the same gradient is carried by weight.
+    fn banner(&self, row: usize) -> Style {
+        match (self.color, row) {
+            (true, 0) => Style::default().fg(Color::LightCyan),
+            (true, 1) => Style::default().fg(Color::Cyan),
+            (true, _) => Style::default().fg(Color::DarkGray),
+            (false, 0) => self.bold(),
+            (false, 1) => self.plain(),
+            (false, _) => self.dim(),
+        }
+    }
+
+    fn border(&self) -> BorderType {
+        if self.unicode {
+            BorderType::Rounded
+        } else {
+            BorderType::Plain
+        }
+    }
+}
+
+/// Box-drawing and glyphs are wrong on a terminal that cannot encode them, so
+/// the check is the encoding, not the terminal name. `REPOTRACER_ASCII` forces
+/// the fallback for terminals that claim UTF-8 and render it badly.
+fn unicode_enabled() -> bool {
+    if std::env::var_os("REPOTRACER_ASCII").is_some() {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        std::env::var_os("WT_SESSION").is_some() || std::env::var_os("TERM_PROGRAM").is_some()
+    }
+    #[cfg(not(windows))]
+    {
+        ["LC_ALL", "LC_CTYPE", "LANG"]
+            .iter()
+            .find_map(std::env::var_os)
+            .map(|value| value.to_string_lossy().to_lowercase().replace('-', ""))
+            .is_some_and(|value| value.contains("utf8"))
+    }
+}
+
+/// Centre the chrome instead of stretching it. A wizard that fills a 200-column
+/// terminal edge to edge is harder to read than one held to a column.
+fn centered(area: Rect, max_width: u16, max_height: u16) -> Rect {
+    let width = area.width.min(max_width);
+    let height = area.height.min(max_height);
+    Rect {
+        x: area.x + (area.width - width) / 2,
+        y: area.y + (area.height - height) / 2,
+        width,
+        height,
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct CustomApiProfile {
@@ -42,7 +194,12 @@ pub struct ParentModelChoice {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct ModelSelection(pub Vec<ParentModelChoice>);
+pub struct ModelSelection {
+    pub chosen: Vec<ParentModelChoice>,
+    /// Parents that were installed and have been unchecked. The wizard never
+    /// writes; the caller detaches these.
+    pub removed: Vec<String>,
+}
 
 const PARENTS: [&str; 2] = ["codex", "claude"];
 const LABELS: [&str; 2] = ["Codex", "Claude Code"];
@@ -59,6 +216,15 @@ fn recommended_model(index: usize) -> ModelChoice {
         label: label.into(),
     }
 }
+
+/// Half-block wordmark, 39 columns. Drawn only where there is room for it;
+/// every other size falls back to the one-line lockup.
+const WORDMARK: [&str; 3] = [
+    "█▀▄ █▀▀ █▀▄ █▀█ ▀█▀ █▀▄ ▄▀▄ █▀▀ █▀▀ █▀▄",
+    "█▀▄ █▀▀ █▀  █ █  █  █▀▄ █▀█ █   █▀▀ █▀▄",
+    "▀ ▀ ▀▀▀ ▀   ▀▀▀  ▀  ▀ ▀ ▀ ▀ ▀▀▀ ▀▀▀ ▀ ▀",
+];
+const TAGLINE: &str = "small models investigate. big models solve.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Page {
@@ -91,6 +257,7 @@ struct App {
     picker: ListState,
     message: String,
     no_color: bool,
+    unicode: bool,
 }
 
 enum Outcome {
@@ -171,7 +338,26 @@ impl App {
             picker: ListState::default(),
             message: String::new(),
             no_color: std::env::var_os("NO_COLOR").is_some(),
+            unicode: unicode_enabled(),
         }
+    }
+
+    fn theme(&self) -> Theme {
+        Theme {
+            unicode: self.unicode,
+            color: !self.no_color,
+        }
+    }
+
+    /// Land on Save only when there is something to save. Opening on a Save
+    /// button that immediately rejects the press is the worst first keystroke.
+    fn enter_models_page(&mut self) {
+        let parents = self.parents();
+        self.page = Page::Models;
+        self.focus = parents
+            .iter()
+            .position(|index| self.choices[*index].is_none())
+            .unwrap_or(parents.len());
     }
 
     fn set_catalog(&mut self, catalog: Catalog) {
@@ -184,8 +370,17 @@ impl App {
         (0..2).filter(|index| self.enabled[*index]).collect()
     }
 
+    /// Unchecking an installed agent is the uninstall gesture: the same box
+    /// that put the integration there takes it away.
+    fn removals(&self) -> Vec<String> {
+        (0..2)
+            .filter(|index| self.installed[*index] && !self.enabled[*index])
+            .map(|index| PARENTS[index].to_owned())
+            .collect()
+    }
+
     fn save(&mut self) -> Outcome {
-        let mut result = Vec::new();
+        let mut chosen = Vec::new();
         for index in self.parents() {
             let Some(model) = self.choices[index].clone() else {
                 self.message = format!("Choose a scout for {} first.", LABELS[index]);
@@ -196,17 +391,19 @@ impl App {
                     .unwrap_or(0);
                 return Outcome::Continue;
             };
-            result.push(ParentModelChoice {
+            chosen.push(ParentModelChoice {
                 parent: PARENTS[index].into(),
                 model,
                 custom: self.custom[index].clone(),
                 reasoning_effort: self.selected_efforts[index].clone(),
             });
         }
-        if result.is_empty() {
+        let removed = self.removals();
+        // Removing every integration is a real outcome, not an empty selection.
+        if chosen.is_empty() && removed.is_empty() {
             return Outcome::Continue;
         }
-        Outcome::Save(ModelSelection(result))
+        Outcome::Save(ModelSelection { chosen, removed })
     }
 
     fn candidates(&self) -> Vec<ModelChoice> {
@@ -471,11 +668,14 @@ impl App {
                 }
                 KeyCode::Enter if self.focus == 3 => return Outcome::Cancel,
                 KeyCode::Enter => {
-                    if self.parents().is_empty() {
-                        self.message = "Select Codex or Claude Code with Space.".into();
+                    if !self.parents().is_empty() {
+                        self.enter_models_page();
+                    } else if !self.removals().is_empty() {
+                        // Nothing left checked and something installed: there is
+                        // no model to pick, only integrations to remove.
+                        return self.save();
                     } else {
-                        self.page = Page::Models;
-                        self.focus = self.parents().len();
+                        self.message = "Select Codex or Claude Code with Space.".into();
                     }
                 }
                 _ => {}
@@ -635,15 +835,6 @@ impl App {
         Outcome::Continue
     }
 
-    fn highlight(&self) -> Style {
-        let style = Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED);
-        if self.no_color {
-            style
-        } else {
-            style.fg(Color::Cyan)
-        }
-    }
-
     fn model_text(&self, index: usize, model: &ModelChoice, discovery_result: bool) -> String {
         let known = if model.provider == "openai-compatible" {
             self.custom_discovered[index]
@@ -682,130 +873,338 @@ impl App {
         let area = frame.area();
         if area.width < 32 || area.height < 10 {
             frame.render_widget(
-                Paragraph::new("Enlarge to 32 x 10 to configure.\nCtrl+C cancels.")
+                Paragraph::new("Enlarge this window to 32 x 10 to continue.\nCtrl+C cancels.")
                     .wrap(Wrap { trim: false }),
                 area,
             );
             return;
         }
-        let tall = area.height >= 22;
-        let compact = area.height < 16;
-        let parts = Layout::vertical([
-            Constraint::Length(if tall { 3 } else { 1 }),
-            Constraint::Length(if compact { 1 } else { 2 }),
-            Constraint::Min(1),
-            Constraint::Length(1),
-            Constraint::Length(2),
+        let theme = self.theme();
+        // Hold the chrome to a readable column and centre it, rather than
+        // pinning content to the top-left of an arbitrarily large terminal.
+        const CARD_WIDTH: u16 = 84;
+        let compact = area.height < 18;
+        let gap = u16::from(!compact);
+        // The wordmark earns its four rows only where the viewport can spare
+        // them; anywhere tighter the one-line lockup carries the brand.
+        let banner = self.unicode && area.height >= 26 && area.width >= 48;
+        let brand = if banner { 4 } else { 1 };
+        // Size the card to its page. A box stretched to the viewport reads as
+        // an empty screen with a caption, which is what this looked like before.
+        let chrome = brand + 4 + 3 * gap;
+        let width = area.width.min(CARD_WIDTH);
+        let wanted = chrome + 2 + self.body_height(compact, width.saturating_sub(4));
+        // The floor is exactly what the layout below needs: chrome plus the
+        // `Min(4)` body. Anything larger pads short pages with blank rows.
+        let card = centered(area, CARD_WIDTH, wanted.max(chrome + 4));
+        let rows = Layout::vertical([
+            Constraint::Length(brand), // wordmark or one-line lockup
+            Constraint::Length(gap),
+            Constraint::Length(1), // step rail
+            Constraint::Length(gap),
+            Constraint::Min(4), // page body
+            Constraint::Length(gap),
+            Constraint::Length(1), // actions
+            Constraint::Length(1), // page keys
+            Constraint::Length(1), // message or global keys
         ])
-        .split(area);
-        let title = if tall {
-            "  ))) RepoTracer\n      Setup & settings"
+        .split(card);
+
+        if banner {
+            self.draw_banner(frame, rows[0], &theme);
         } else {
-            "  ))) RepoTracer"
+            frame.render_widget(
+                Paragraph::new(Line::from(vec![
+                    Span::styled(")))", theme.accent()),
+                    Span::styled(" RepoTracer", theme.bold()),
+                    Span::styled("  setup & settings", theme.dim()),
+                ])),
+                rows[0],
+            );
+        }
+        self.draw_steps(frame, rows[2], &theme);
+
+        let title = match self.page {
+            Page::Install => " Install in ".to_owned(),
+            Page::Models => " Scout models ".to_owned(),
+            Page::Picker => format!(" Model for {} ", LABELS[self.editing]),
+            Page::Custom => " Custom OpenAI-compatible API ".to_owned(),
+            Page::Effort => " Reasoning effort ".to_owned(),
         };
-        frame.render_widget(
-            Paragraph::new(title).style(Style::default().add_modifier(Modifier::BOLD)),
-            parts[0],
-        );
-        let step = if self.page == Page::Install {
-            "1 / 2   Install in"
-        } else {
-            "2 / 2   Scout models"
+        let frame_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(theme.border())
+            .border_style(theme.dim())
+            .padding(Padding::horizontal(1))
+            .title(Span::styled(title, theme.accent()));
+        let body = frame_block.inner(rows[4]);
+        frame.render_widget(frame_block, rows[4]);
+        match self.page {
+            Page::Install => self.draw_install(frame, body, compact, &theme),
+            Page::Models => self.draw_models(frame, body, compact, &theme),
+            Page::Effort => self.draw_effort(frame, body, compact, &theme),
+            Page::Custom => self.draw_custom(frame, body, &theme),
+            Page::Picker => self.draw_picker(frame, body, &theme),
+        }
+
+        self.draw_actions(frame, rows[6], &theme);
+        let keys = match self.page {
+            Page::Install if self.parents().is_empty() && !self.removals().is_empty() => {
+                "Space toggle   Enter remove   Esc cancel"
+            }
+            Page::Install => "Space toggle   Enter continue   Esc cancel",
+            Page::Models => "Enter change   E effort   Ctrl+S save",
+            Page::Picker => "Type to filter   Enter apply   Esc back",
+            Page::Custom => "Tab fields   F2 discover   Enter next   Esc back",
+            Page::Effort => "Enter apply   Esc back",
         };
-        frame.render_widget(
-            Paragraph::new(step).block(Block::default().borders(Borders::BOTTOM)),
-            parts[1],
-        );
-        let help = match self.page {
-            Page::Install => "Space select  Enter next  Esc cancel",
-            Page::Models => "Enter select  E effort  A advanced  Ctrl+S save",
-            Page::Picker => "Type to search  Enter apply  Esc back",
-            Page::Custom => "Tab fields  F2 discover  Enter next/save  Esc back",
-            Page::Effort => "Enter apply  Esc back  Tab / arrows move",
-        };
+        frame.render_widget(Paragraph::new(Span::styled(keys, theme.dim())), rows[7]);
+        // A message must never cost the reader the navigation keys, so the two
+        // occupy separate rows rather than taking turns.
         let footer = if self.message.is_empty() {
-            format!("{help}\nTab / arrows move  Ctrl+C cancel")
+            Line::from(Span::styled(
+                format!("Tab / arrows move{}Ctrl+C cancel", theme.separator()),
+                theme.dim(),
+            ))
         } else {
-            format!("{}\n{help}", self.message)
+            Line::from(Span::styled(self.message.clone(), theme.danger()))
         };
-        frame.render_widget(Paragraph::new(footer), parts[4]);
+        frame.render_widget(Paragraph::new(footer), rows[8]);
+    }
+
+    /// Rows the current page wants inside the border. Lists are capped so a
+    /// long catalog scrolls instead of pushing the footer off screen.
+    fn body_height(&self, compact: bool, width: u16) -> u16 {
+        let pad = if compact { 0 } else { 2 };
+        let wrapped = |text: &str| {
+            let width = width.max(1) as usize;
+            text.chars().count().div_ceil(width).max(1) as u16
+        };
+        match self.page {
+            Page::Install => pad + 2 + pad,
+            Page::Models => {
+                let rows = self.parents().len() as u16 * if compact { 1 } else { 2 };
+                let note: u16 = if self.catalog.warnings.is_empty() || self.loading {
+                    1
+                } else {
+                    self.catalog.warnings.iter().map(|w| wrapped(w)).sum()
+                };
+                rows + 1 + note
+            }
+            Page::Picker => 2 + (self.candidates().len() as u16 + 1).clamp(3, 12),
+            Page::Custom => 5,
+            Page::Effort => {
+                let header = if compact { 1 } else { 2 };
+                header + (self.effort_candidates().len() as u16).clamp(1, 8)
+            }
+        }
+    }
+
+    /// The radar sits on the middle row so it reads as part of the wordmark
+    /// rather than a bullet in front of it.
+    fn draw_banner(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
+        let mut lines: Vec<Line> = WORDMARK
+            .iter()
+            .enumerate()
+            .map(|(row, art)| {
+                Line::from(vec![
+                    Span::styled(
+                        if row == 1 { "))) " } else { "    " },
+                        theme.accent().add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(*art, theme.banner(row)),
+                ])
+            })
+            .collect();
+        lines.push(Line::from(vec![
+            Span::styled("    setup & settings", theme.accent()),
+            Span::styled(format!("{}{TAGLINE}", theme.separator()), theme.dim()),
+        ]));
+        frame.render_widget(Paragraph::new(lines), area);
+    }
+
+    fn draw_steps(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
+        let on_install = self.page == Page::Install;
+        let style = |active: bool| {
+            if active {
+                theme.accent().add_modifier(Modifier::BOLD)
+            } else {
+                theme.dim()
+            }
+        };
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(
+                    format!("{} 1 Install in", theme.step_mark(on_install)),
+                    style(on_install),
+                ),
+                Span::styled("    ", theme.plain()),
+                Span::styled(
+                    format!("{} 2 Scout models", theme.step_mark(!on_install)),
+                    style(!on_install),
+                ),
+            ])),
+            area,
+        );
+    }
+
+    fn draw_actions(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let (actions, offset): (&[&str], usize) = match self.page {
+            // Name the button after what pressing it does. With every installed
+            // agent unchecked there is nothing to continue to, only removal.
+            Page::Install if self.parents().is_empty() && !self.removals().is_empty() => {
+                (&["Remove", "Cancel"], 2)
+            }
             Page::Install => (&["Continue", "Cancel"], 2),
             Page::Models => (&["Save", "Back", "Cancel"], self.parents().len()),
-            _ => (&[], 0),
+            // A sub-page has one way out; say what it is instead of leaving a
+            // row of dead space where buttons used to be.
+            _ => {
+                frame.render_widget(
+                    Paragraph::new(Span::styled("Esc returns to Scout models", theme.dim())),
+                    area,
+                );
+                return;
+            }
         };
         let buttons: Vec<Span> = actions
             .iter()
             .enumerate()
-            .map(|(index, label)| {
+            .flat_map(|(index, label)| {
                 let style = if self.focus == offset + index {
-                    self.highlight()
+                    theme.highlight()
                 } else {
-                    Style::default()
+                    theme.dim()
                 };
-                Span::styled(format!(" [ {label} ] "), style)
+                [
+                    Span::styled(format!("  {label}  "), style),
+                    Span::styled(" ", theme.plain()),
+                ]
             })
             .collect();
-        frame.render_widget(Paragraph::new(Line::from(buttons)), parts[3]);
-        if self.page == Page::Install {
-            let rows: Vec<ListItem> = (0..2)
-                .map(|index| {
-                    ListItem::new(format!(
-                        "[{}] {}",
-                        if self.enabled[index] { "x" } else { " " },
-                        LABELS[index]
-                    ))
-                })
-                .collect();
-            let body = Layout::vertical([
-                Constraint::Min(1),
-                Constraint::Length(if self.installed.iter().any(|value| *value) && tall {
-                    2
-                } else {
-                    0
-                }),
-            ])
-            .split(parts[2]);
-            let mut state =
-                ListState::default().with_selected((self.focus < 2).then_some(self.focus));
-            frame.render_stateful_widget(
-                List::new(rows)
-                    .highlight_style(self.highlight())
-                    .highlight_symbol("> "),
-                body[0],
-                &mut state,
-            );
-            frame.render_widget(
-                Paragraph::new("Unchecked installations stay unchanged.")
-                    .wrap(Wrap { trim: false }),
-                body[1],
-            );
-            return;
-        }
+        frame.render_widget(Paragraph::new(Line::from(buttons)), area);
+    }
+
+    fn draw_install(&self, frame: &mut Frame, area: Rect, compact: bool, theme: &Theme) {
+        let parts = Layout::vertical([
+            Constraint::Length(if compact { 0 } else { 2 }),
+            Constraint::Min(1),
+            Constraint::Length(if compact { 0 } else { 2 }),
+        ])
+        .split(area);
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "Pick the agents that should route through RepoTracer.",
+                theme.dim(),
+            ))
+            .wrap(Wrap { trim: false }),
+            parts[0],
+        );
+        let rows: Vec<ListItem> = (0..2)
+            .map(|index| {
+                // State the consequence of the current checkbox, not just the
+                // state on disk, so an about-to-be-removed agent is obvious.
+                let (note, style) = match (self.installed[index], self.enabled[index]) {
+                    (true, true) => ("   already installed", theme.dim()),
+                    (true, false) => ("   will be removed", theme.warn()),
+                    (false, _) => ("", theme.dim()),
+                };
+                ListItem::new(Line::from(vec![
+                    Span::raw(format!("{} ", theme.checkbox(self.enabled[index]))),
+                    Span::raw(LABELS[index]),
+                    Span::styled(note, style),
+                ]))
+            })
+            .collect();
+        let mut state = ListState::default().with_selected((self.focus < 2).then_some(self.focus));
+        frame.render_stateful_widget(
+            List::new(rows)
+                .highlight_style(theme.highlight())
+                .highlight_symbol(theme.pointer()),
+            parts[1],
+            &mut state,
+        );
+        let note = if self.removals().is_empty() {
+            Span::styled("Agents left unchecked are not modified.", theme.dim())
+        } else {
+            Span::styled(
+                "Unchecking an installed agent removes its RepoTracer integration.",
+                theme.warn(),
+            )
+        };
+        frame.render_widget(
+            Paragraph::new(vec![Line::default(), Line::from(note)]).wrap(Wrap { trim: false }),
+            parts[2],
+        );
+    }
+
+    fn draw_models(&mut self, frame: &mut Frame, area: Rect, compact: bool, theme: &Theme) {
         let parents = self.parents();
-        let editing = matches!(self.page, Page::Picker | Page::Custom | Page::Effort);
-        let body = Layout::vertical([
+        let parts = Layout::vertical([
             Constraint::Length(parents.len() as u16 * if compact { 1 } else { 2 }),
             Constraint::Min(1),
         ])
-        .split(parts[2]);
+        .split(area);
+        self.draw_parent_rows(frame, parts[0], compact, theme);
+        let note = if self.loading {
+            vec![Line::from(Span::styled(
+                "Checking subscriptions…",
+                theme.dim(),
+            ))]
+        } else if self.catalog.warnings.is_empty() {
+            vec![Line::from(Span::styled(
+                "Enter changes the highlighted scout.",
+                theme.dim(),
+            ))]
+        } else {
+            self.catalog
+                .warnings
+                .iter()
+                .map(|warning| Line::from(Span::styled(warning.clone(), theme.warn())))
+                .collect()
+        };
+        // parts[0] is sized to the rows exactly, so the gap belongs here.
+        let note = std::iter::once(Line::default())
+            .chain(note)
+            .collect::<Vec<_>>();
+        frame.render_widget(Paragraph::new(note).wrap(Wrap { trim: false }), parts[1]);
+    }
+
+    /// The scout rows stay visible on the sub-pages so the edit always has a
+    /// subject on screen.
+    fn draw_parent_rows(&mut self, frame: &mut Frame, area: Rect, compact: bool, theme: &Theme) {
+        let parents = self.parents();
+        let editing = matches!(self.page, Page::Picker | Page::Custom | Page::Effort);
         let rows: Vec<ListItem> = parents
             .iter()
             .map(|index| {
-                let model = self.choices[*index]
-                    .as_ref()
-                    .map(|model| {
-                        let effort = self.selected_efforts[*index].as_deref().unwrap_or("Auto");
-                        let effort = format!(" · effort {effort}");
-                        format!("{}{effort}", self.model_text(*index, model, false))
-                    })
-                    .unwrap_or_else(|| "Choose a model".into());
+                let chosen = self.choices[*index].as_ref().map(|model| {
+                    let default_effort = if model.provider == "openai-compatible" {
+                        "Provider default"
+                    } else {
+                        "Auto"
+                    };
+                    let effort = self.selected_efforts[*index]
+                        .as_deref()
+                        .unwrap_or(default_effort);
+                    let effort = format!("{}effort {effort}", theme.separator());
+                    format!("{}{effort}", self.model_text(*index, model, false))
+                });
+                let value = chosen.clone().unwrap_or_else(|| "not chosen yet".into());
+                let value_style = if chosen.is_some() {
+                    theme.plain()
+                } else {
+                    theme.warn()
+                };
                 if compact {
-                    ListItem::new(format!("{} > {model}", LABELS[*index]))
+                    ListItem::new(Line::from(vec![
+                        Span::styled(format!("{:<12}", LABELS[*index]), theme.bold()),
+                        Span::styled(value, value_style),
+                    ]))
                 } else {
                     ListItem::new(vec![
-                        Line::from(format!("{} scout", LABELS[*index])),
-                        Line::from(format!("  {model}")),
+                        Line::from(Span::styled(LABELS[*index], theme.bold())),
+                        Line::from(vec![Span::raw("  "), Span::styled(value, value_style)]),
                     ])
                 }
             })
@@ -822,118 +1221,129 @@ impl App {
             ListState::default().with_selected((selected < parents.len()).then_some(selected));
         frame.render_stateful_widget(
             List::new(rows)
-                .highlight_style(self.highlight())
-                .highlight_symbol("> "),
-            body[0],
+                .highlight_style(theme.highlight())
+                .highlight_symbol(theme.pointer()),
+            area,
             &mut state,
         );
-        if self.page == Page::Models {
-            let note = if self.loading {
-                "Checking subscriptions...".into()
-            } else if self.catalog.warnings.is_empty() {
-                "Select a scout above to change it.".into()
-            } else {
-                self.catalog.warnings.join("\n")
-            };
-            frame.render_widget(Paragraph::new(note).wrap(Wrap { trim: false }), body[1]);
-        } else if self.page == Page::Effort {
-            let (default_label, default_description) = self.effort_default_copy();
-            let rows = self
-                .effort_options()
-                .into_iter()
-                .map(|effort| ListItem::new(effort.unwrap_or_else(|| default_label.into())))
-                .collect::<Vec<_>>();
-            let effort_body =
-                Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(body[1]);
-            frame.render_widget(
-                Paragraph::new(default_description).wrap(Wrap { trim: false }),
-                effort_body[0],
-            );
-            frame.render_stateful_widget(
-                List::new(rows)
-                    .highlight_style(self.highlight())
-                    .highlight_symbol("> "),
-                effort_body[1],
-                &mut self.picker,
-            );
-        } else {
-            let picker = Layout::vertical([
-                Constraint::Length(if compact { 1 } else { 2 }),
-                Constraint::Min(1),
-            ])
-            .split(body[1]);
-            let label = if self.page == Page::Custom {
-                "Custom OpenAI-compatible API"
-            } else {
-                "Search models"
-            };
-            // Keep the typed end visible, including on narrow terminals.
-            let capacity = picker[0].width.saturating_sub(2) as usize;
-            let input: String = self
-                .query
-                .chars()
-                .rev()
-                .take(capacity)
-                .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .collect();
-            let search = if self.page == Page::Custom {
-                label.to_owned()
-            } else if compact {
-                format!("/ {input}_")
-            } else {
-                format!("{label}\n{input}_")
-            };
-            frame.render_widget(Paragraph::new(search), picker[0]);
-            if self.page == Page::Custom {
-                let fields = ["Base URL", "Model ID", "API key (optional)"];
-                let lines = fields
-                    .iter()
-                    .enumerate()
-                    .map(|(index, label)| {
-                        let value = if index == 2 && self.custom_connection().api_key.is_some() {
-                            "••••••••".to_owned()
-                        } else {
-                            self.custom_fields[index].clone()
-                        };
-                        let marker = if self.custom_field == index { ">" } else { " " };
-                        Line::from(format!("{marker} {label}: {value}"))
-                    })
-                    .chain(std::iter::once(Line::from(if self.custom_loading {
-                        "Discovering /models…".to_owned()
+    }
+
+    fn draw_picker(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
+        let parts = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(area);
+        // Keep the typed end visible, including on narrow terminals.
+        let capacity = parts[0].width.saturating_sub(4) as usize;
+        let input: String = self
+            .query
+            .chars()
+            .rev()
+            .take(capacity)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        frame.render_widget(
+            Paragraph::new(vec![
+                Line::from(vec![
+                    Span::styled("/ ", theme.dim()),
+                    Span::styled(input, theme.plain()),
+                    Span::styled(theme.caret(), theme.accent()),
+                ]),
+                Line::from(Span::styled(
+                    if self.loading {
+                        "Checking subscriptions…".to_owned()
                     } else {
-                        "F2 discovers GET /models; API key is never displayed.".to_owned()
-                    })))
-                    .collect::<Vec<_>>();
-                frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), picker[1]);
-            } else {
-                let mut rows: Vec<ListItem> = self
-                    .candidates()
-                    .iter()
-                    .map(|model| ListItem::new(self.model_text(self.editing, model, true)))
-                    .collect();
-                rows.push(ListItem::new("Custom model..."));
-                let highlight = self.highlight();
-                let block = if compact {
-                    Block::default()
-                } else {
-                    Block::default().title(if self.loading {
-                        "Checking subscriptions..."
-                    } else {
-                        "Available models"
-                    })
+                        let count = self.candidates().len();
+                        format!("{count} available")
+                    },
+                    theme.dim(),
+                )),
+            ]),
+            parts[0],
+        );
+        let mut rows: Vec<ListItem> = self
+            .candidates()
+            .iter()
+            .map(|model| ListItem::new(self.model_text(self.editing, model, true)))
+            .collect();
+        rows.push(ListItem::new(Span::styled("Custom model…", theme.accent())));
+        frame.render_stateful_widget(
+            List::new(rows)
+                .highlight_style(theme.highlight())
+                .highlight_symbol(theme.pointer()),
+            parts[1],
+            &mut self.picker,
+        );
+    }
+
+    fn draw_custom(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
+        let labels = ["Base URL", "Model ID", "API key"];
+        let lines: Vec<Line> = labels
+            .iter()
+            .enumerate()
+            .map(|(index, label)| {
+                let focused = self.custom_field == index;
+                // The key is masked whenever one is in effect, typed or saved.
+                // Echoing what was just typed would defeat the whole point.
+                let effective_key = (index == 2).then(|| self.custom_connection().api_key);
+                let value = match &effective_key {
+                    Some(Some(_)) => "••••••••".to_owned(),
+                    Some(None) => String::new(),
+                    None => self.custom_fields[index].clone(),
                 };
-                frame.render_stateful_widget(
-                    List::new(rows)
-                        .block(block)
-                        .highlight_style(highlight)
-                        .highlight_symbol("> "),
-                    picker[1],
-                    &mut self.picker,
-                );
-            }
-        }
+                let mut spans = vec![
+                    Span::styled(if focused { theme.pointer() } else { "  " }, theme.accent()),
+                    Span::styled(
+                        format!("{label:<10}"),
+                        if focused { theme.bold() } else { theme.dim() },
+                    ),
+                    Span::styled(value, theme.plain()),
+                ];
+                if focused {
+                    spans.push(Span::styled(theme.caret(), theme.accent()));
+                } else if matches!(effective_key, Some(None)) {
+                    spans.push(Span::styled("optional", theme.dim()));
+                }
+                Line::from(spans)
+            })
+            .chain(std::iter::once(Line::from(Span::styled(
+                String::new(),
+                theme.plain(),
+            ))))
+            .chain(std::iter::once(Line::from(Span::styled(
+                if self.custom_loading {
+                    "Discovering /models…".to_owned()
+                } else {
+                    "F2 lists models from GET /models. The key is never displayed.".to_owned()
+                },
+                theme.dim(),
+            ))))
+            .collect();
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
+    }
+
+    fn draw_effort(&mut self, frame: &mut Frame, area: Rect, compact: bool, theme: &Theme) {
+        let parts = Layout::vertical([
+            Constraint::Length(if compact { 1 } else { 2 }),
+            Constraint::Min(1),
+        ])
+        .split(area);
+        let (default_label, default_description) = self.effort_default_copy();
+        frame.render_widget(
+            Paragraph::new(default_description).wrap(Wrap { trim: false }),
+            parts[0],
+        );
+        let rows = self
+            .effort_options()
+            .into_iter()
+            .map(|effort| ListItem::new(effort.unwrap_or_else(|| default_label.into())))
+            .collect::<Vec<_>>();
+        frame.render_stateful_widget(
+            List::new(rows)
+                .highlight_style(theme.highlight())
+                .highlight_symbol(theme.pointer()),
+            parts[1],
+            &mut self.picker,
+        );
     }
 }
 
@@ -1012,6 +1422,8 @@ mod tests {
     }
     fn app() -> App {
         let mut app = App::new(&["codex".into(), "claude".into()], &[]);
+        // Glyphs otherwise follow the host locale, which a test must not depend on.
+        app.unicode = true;
         app.set_catalog(Catalog {
             models: vec![
                 model("codex", "gpt-5.6-luna"),
@@ -1050,8 +1462,8 @@ mod tests {
         let Outcome::Save(selection) = key(&mut app, KeyCode::Enter) else {
             panic!("Save should be focused")
         };
-        assert_eq!(selection.0[0].model.id, "gpt-5.6-luna");
-        assert_eq!(selection.0[1].model.id, "sonnet");
+        assert_eq!(selection.chosen[0].model.id, "gpt-5.6-luna");
+        assert_eq!(selection.chosen[1].model.id, "sonnet");
     }
 
     #[test]
@@ -1076,9 +1488,9 @@ mod tests {
         let Outcome::Save(selection) = app.save() else {
             panic!("the seeded defaults should be saveable while discovery is pending")
         };
-        assert_eq!(selection.0.len(), 2);
+        assert_eq!(selection.chosen.len(), 2);
         assert!(selection
-            .0
+            .chosen
             .iter()
             .all(|entry| entry.reasoning_effort.is_none()));
     }
@@ -1193,7 +1605,7 @@ mod tests {
         let Outcome::Save(selection) = app.save() else {
             panic!("the unverified recommendation should remain saveable")
         };
-        assert_eq!(selection.0[0].model.id, "sonnet");
+        assert_eq!(selection.chosen[0].model.id, "sonnet");
         assert!(app
             .model_text(1, app.choices[1].as_ref().unwrap(), false)
             .contains("unverified"));
@@ -1223,8 +1635,8 @@ mod tests {
         let Outcome::Save(selection) = app.save() else {
             panic!()
         };
-        assert_eq!(selection.0.len(), 1);
-        assert_eq!(selection.0[0].model.provider, "claude");
+        assert_eq!(selection.chosen.len(), 1);
+        assert_eq!(selection.chosen[0].model.provider, "claude");
     }
 
     #[test]
@@ -1282,6 +1694,7 @@ mod tests {
             reasoning_effort: None,
         };
         let mut app = App::new_with_profiles(&["codex".into()], &[profile]);
+        app.unicode = true;
         app.set_catalog(Catalog::default());
         app.open_custom();
         assert!(app.custom_fields[2].is_empty());
@@ -1293,7 +1706,7 @@ mod tests {
     }
 
     fn saved_custom_app() -> App {
-        App::new_with_profiles(
+        let mut app = App::new_with_profiles(
             &["codex".into()],
             &[CurrentProfile {
                 parent: "codex".into(),
@@ -1304,7 +1717,9 @@ mod tests {
                 }),
                 reasoning_effort: Some("high".into()),
             }],
-        )
+        );
+        app.unicode = true;
+        app
     }
 
     fn pending_discovery(
@@ -1368,10 +1783,10 @@ mod tests {
                 let Outcome::Save(selection) = app.save() else {
                     panic!("save failed")
                 };
-                let profile = selection.0[0].custom.as_ref().unwrap();
+                let profile = selection.chosen[0].custom.as_ref().unwrap();
                 assert_eq!(profile.base_url, base_url);
                 assert_eq!(profile.api_key.as_deref(), expected_key);
-                assert_eq!(selection.0[0].reasoning_effort, None);
+                assert_eq!(selection.chosen[0].reasoning_effort, None);
             }
         }
     }
@@ -1518,7 +1933,7 @@ mod tests {
             .content
             .iter()
             .all(|cell| cell.fg == Color::Reset && cell.bg == Color::Reset));
-        assert!(screen(&mut app, 80, 24).contains("> [x] Codex"));
+        assert!(screen(&mut app, 80, 24).contains("❯ ◉ Codex"));
     }
 
     #[test]
@@ -1529,7 +1944,7 @@ mod tests {
             .collect();
         app.open_picker(0);
         app.picker.select(Some(49));
-        assert!(screen(&mut app, 60, 18).contains("> codex:model-49"));
+        assert!(screen(&mut app, 60, 18).contains("❯ codex:model-49"));
     }
 
     #[test]
@@ -1548,6 +1963,73 @@ mod tests {
         let mut app = app();
         app.open_picker(0);
         app.picker.select(Some(1));
-        assert!(screen(&mut app, 32, 10).contains("> claude:sonnet"));
+        assert!(screen(&mut app, 32, 10).contains("❯ claude:sonnet"));
+    }
+
+    #[test]
+    fn unchecking_an_installed_agent_requests_its_removal() {
+        let mut app = app();
+        app.enabled[1] = false;
+        assert_eq!(app.removals(), vec!["claude".to_owned()]);
+        key(&mut app, KeyCode::Enter);
+        let Outcome::Save(selection) = key(&mut app, KeyCode::Enter) else {
+            panic!("Save should be focused")
+        };
+        // The kept parent is still configured; only the unchecked one is cut.
+        assert_eq!(selection.chosen.len(), 1);
+        assert_eq!(selection.chosen[0].parent, "codex");
+        assert_eq!(selection.removed, vec!["claude".to_owned()]);
+    }
+
+    #[test]
+    fn an_agent_that_was_never_installed_is_not_a_removal() {
+        let mut app = App::new(&["codex".into()], &[]);
+        app.unicode = true;
+        app.set_catalog(Catalog::default());
+        assert!(!app.enabled[1]);
+        assert_eq!(app.removals(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn clearing_every_installed_agent_saves_a_removal_instead_of_refusing() {
+        let mut app = app();
+        app.enabled = [false, false];
+        // Previously this dead-ended on "Select Codex or Claude Code".
+        let screen = screen(&mut app, 80, 24);
+        assert!(screen.contains("Remove"));
+        assert!(screen.contains("will be removed"));
+        let Outcome::Save(selection) = key(&mut app, KeyCode::Enter) else {
+            panic!("Enter should commit the removal")
+        };
+        assert!(selection.chosen.is_empty());
+        assert_eq!(selection.removed, vec!["codex".to_owned(), "claude".into()]);
+    }
+
+    #[test]
+    fn nothing_installed_and_nothing_chosen_still_asks_for_a_choice() {
+        let mut app = App::new(&[], &[]);
+        app.unicode = true;
+        app.set_catalog(Catalog::default());
+        assert!(matches!(key(&mut app, KeyCode::Enter), Outcome::Continue));
+        assert_eq!(app.message, "Select Codex or Claude Code with Space.");
+    }
+
+    #[test]
+    fn the_wordmark_appears_only_where_there_is_room_for_it() {
+        let mut app = app();
+        assert!(screen(&mut app, 100, 32).contains("▀▀▀"));
+        // A short viewport keeps the one-line lockup rather than clipping art.
+        let small = screen(&mut app, 100, 24);
+        assert!(!small.contains("▀▀▀"));
+        assert!(small.contains("))) RepoTracer"));
+    }
+
+    #[test]
+    fn the_wordmark_is_never_drawn_without_utf8() {
+        let mut app = app();
+        app.unicode = false;
+        let rendered = screen(&mut app, 100, 32);
+        assert!(!rendered.contains('█'));
+        assert!(rendered.contains(")))"));
     }
 }

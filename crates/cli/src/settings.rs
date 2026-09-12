@@ -125,6 +125,19 @@ fn apply_model_choice(
     Ok(())
 }
 
+fn persist_install_state(path: &Path, state: &InstallState) -> Result<()> {
+    if state.parents.is_empty() {
+        match fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    } else {
+        fs::write(path, serde_json::to_vec_pretty(state)?)?;
+        Ok(())
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     base: &Path,
@@ -160,6 +173,7 @@ pub fn run(
     let interactive =
         no_options && std::io::stdin().is_terminal() && std::io::stderr().is_terminal();
     let mut edited_parents: Option<Vec<String>> = None;
+    let mut removals: Vec<String> = Vec::new();
     let mut interactive_selection: HashMap<String, crate::wizard::ParentModelChoice> =
         HashMap::new();
     if interactive {
@@ -221,20 +235,36 @@ pub fn run(
         else {
             return Ok(());
         };
+        removals = selection.removed;
         let parents: Vec<String> = selection
-            .0
+            .chosen
             .iter()
             .map(|entry| entry.parent.clone())
             .collect();
-        for selection in selection.0 {
+        for selection in selection.chosen {
             interactive_selection.insert(selection.parent.clone(), selection);
         }
-        targets = Some(if parents.len() == 2 {
-            "both".into()
-        } else {
-            parents[0].clone()
-        });
+        // A removal-only run leaves nothing to target, so there is no first
+        // parent to name here.
+        targets = match parents.len() {
+            0 => None,
+            2 => Some("both".into()),
+            _ => Some(parents[0].clone()),
+        };
         edited_parents = Some(parents);
+    }
+    // Detach before any write, so an unchecked agent is fully removed even if a
+    // later install fails.
+    if !removals.is_empty() && !dry {
+        for parent in &removals {
+            remove_parent(base, parent)?;
+            installed.parents.retain(|installed| installed != parent);
+            state.parents.retain(|installed| installed != parent);
+            // Persist each successful detach. If a later parent fails, the
+            // state file must not claim that the earlier parent is installed.
+            persist_install_state(&state_path, &installed)?;
+            println!("Removed the RepoTracer integration from {parent}.");
+        }
     }
     let requested: Vec<&str> = match targets.as_deref() {
         Some("both") => vec!["codex", "claude"],
@@ -268,7 +298,11 @@ pub fn run(
         state.parents.push("claude".into());
     }
     if state.parents.is_empty() {
-        println!("No parent profiles. Use settings --agents codex|claude|both.");
+        // After a removal-only run the empty state is the requested result, not
+        // a missing configuration to complain about.
+        if removals.is_empty() {
+            println!("No parent profiles. Use settings --agents codex|claude|both.");
+        }
         return Ok(());
     }
     let mut pending = Vec::new();
@@ -361,7 +395,7 @@ pub fn run(
             installed.parents.push(parent);
         }
         // Preserve successful installations if a later parent fails.
-        fs::write(&state_path, serde_json::to_vec_pretty(&installed)?)?;
+        persist_install_state(&state_path, &installed)?;
     }
     println!(
         "Saved. Restart the configured parent agents. Use repotracer settings to change mappings."
@@ -434,38 +468,60 @@ pub fn refresh(base: &Path) -> Result<bool> {
     Ok(true)
 }
 
+/// Detach one parent: its native registration, then the generated profile.
+/// The profile is removed last so a failed registration removal leaves a
+/// working install rather than a config pointing at a missing file.
+fn remove_parent(base: &Path, parent: &str) -> Result<()> {
+    match parent {
+        "claude" => {
+            // If Claude Code is no longer installed, its native registration
+            // cannot be present. Continue removing RepoTracer-owned files.
+            if which::which("claude").is_ok() {
+                let output = Command::new("claude")
+                    .args(["mcp", "remove", "--scope", "user", "repotracer"])
+                    .output()?;
+                if !output.status.success() {
+                    return Err(crate::session::attach_stderr(
+                        anyhow::anyhow!("Claude MCP removal failed; profiles retained"),
+                        output.stderr,
+                    ));
+                }
+            }
+            if let Some(instructions) = crate::agents::claude_instructions_path() {
+                let mut messages = Vec::new();
+                crate::agents::remove_managed_instructions(&instructions, &mut messages)?;
+                for message in messages {
+                    println!("{message}");
+                }
+            }
+        }
+        "codex" => {
+            for message in crate::agents::uninstall_codex(base)? {
+                println!("{message}");
+            }
+        }
+        _ => bail!("invalid parent profile"),
+    }
+    let profile = profile(base, parent);
+    if profile.exists() {
+        fs::remove_file(&profile)?;
+        println!("Removed generated profile {}", profile.display());
+    }
+    Ok(())
+}
+
 pub fn uninstall(base: &Path) -> Result<()> {
     let path = base.with_extension("integrations.json");
     if !path.exists() {
         return Ok(());
     }
-    let state: InstallState = serde_json::from_slice(&fs::read(&path)?)?;
-    if state.parents.iter().any(|p| p == "claude") {
-        let status = Command::new("claude")
-            .args(["mcp", "remove", "--scope", "user", "repotracer"])
-            .status()?;
-        if !status.success() {
-            bail!("Claude MCP removal failed; profiles retained");
-        }
-        if let Some(instructions) = crate::agents::claude_instructions_path() {
-            let mut messages = Vec::new();
-            crate::agents::remove_managed_instructions(&instructions, &mut messages)?;
-            for message in messages {
-                println!("{message}");
-            }
-        }
+    let mut state: InstallState = serde_json::from_slice(&fs::read(&path)?)?;
+    for parent in state.parents.clone() {
+        remove_parent(base, &parent)?;
+        state.parents.retain(|installed| installed != &parent);
+        // Keep partial uninstall recoverable when a later parent fails.
+        persist_install_state(&path, &state)?;
     }
-    for parent in state.parents {
-        if !matches!(parent.as_str(), "codex" | "claude") {
-            bail!("invalid parent profile");
-        }
-        let profile = profile(base, &parent);
-        if profile.exists() {
-            fs::remove_file(&profile)?;
-            println!("Removed generated profile {}", profile.display());
-        }
-    }
-    fs::remove_file(path)?;
     Ok(())
 }
 
@@ -637,5 +693,26 @@ mod tests {
         cfg.model.backend = "openai-compatible".into();
         cfg.model.reasoning_effort = "medium".into();
         assert_eq!(profile_reasoning_effort(&cfg).as_deref(), Some("medium"));
+    }
+
+    #[test]
+    fn removal_state_is_persisted_after_each_successful_parent() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.integrations.json");
+        let mut state = InstallState {
+            parents: vec!["codex".into(), "claude".into()],
+        };
+        persist_install_state(&path, &state).unwrap();
+
+        state.parents.retain(|parent| parent != "codex");
+        persist_install_state(&path, &state).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
+            serde_json::json!({"parents": ["claude"]})
+        );
+
+        state.parents.retain(|parent| parent != "claude");
+        persist_install_state(&path, &state).unwrap();
+        assert!(!path.exists());
     }
 }
