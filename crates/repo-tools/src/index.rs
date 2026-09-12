@@ -34,6 +34,7 @@ pub struct SymbolOccurrence {
 
 #[derive(Clone)]
 struct FileRecord {
+    native_path: PathBuf,
     fingerprint: String,
     occurrences: Vec<SymbolOccurrence>,
     parse_errors: bool,
@@ -203,7 +204,7 @@ impl RepositoryIndex {
             };
             let canonical =
                 resolve_path(&root, &rel).map_err(|e| ToolError::Path(e.to_string()))?;
-            let file = std::fs::File::open(canonical)?;
+            let file = std::fs::File::open(&canonical)?;
             if file.metadata()?.len() > MAX_FILE_BYTES {
                 incomplete = true;
                 state.files.remove(&rel);
@@ -279,6 +280,7 @@ impl RepositoryIndex {
             state.files.insert(
                 rel,
                 FileRecord {
+                    native_path: canonical,
                     fingerprint,
                     occurrences,
                     parse_errors,
@@ -289,9 +291,9 @@ impl RepositoryIndex {
         }
         // Only remove records within a fully traversed scope; queries outside it remain cached.
         if !incomplete {
-            state
-                .files
-                .retain(|path, _| !root.join(path).starts_with(&scope) || seen.contains(path));
+            state.files.retain(|path, record| {
+                !record.native_path.starts_with(&scope) || seen.contains(path)
+            });
         }
         state.generation = state.generation.saturating_add(1);
         let mut cached_occurrences = 0;
@@ -308,7 +310,10 @@ impl RepositoryIndex {
         let records: Vec<_> = state
             .files
             .iter()
-            .filter(|(path, _)| verified.contains(*path) && root.join(path).starts_with(&scope))
+            // `verified` contains only files inspected in this query. Do not
+            // reconstruct native paths from slash-normalized display keys;
+            // Windows verbatim prefixes differ after that conversion.
+            .filter(|(path, _)| verified.contains(*path))
             .collect();
         let parse_error_files: Vec<_> = records
             .iter()
