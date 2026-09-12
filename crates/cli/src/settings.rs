@@ -67,6 +67,7 @@ fn select_provider(cfg: &mut RepoTracerConfig, provider: &str) {
         }
         cfg.model.backend = "openai-compatible".into();
         cfg.model.executable = None;
+        cfg.model.adaptive_reasoning = false;
         return;
     }
     let changed = cfg.model.backend != format!("{provider}-cli");
@@ -106,6 +107,7 @@ fn apply_model_choice(
         cfg.model.model = choice.model.id.clone();
         cfg.model.base_url = custom.base_url.trim_end_matches('/').into();
         cfg.model.api_key = custom.api_key.clone().filter(|key| !key.is_empty());
+        cfg.model.adaptive_reasoning = false;
         // An empty effort is intentional for a manually entered API model:
         // unsupported provider-specific defaults must not be invented.
         cfg.model.reasoning_effort = choice.reasoning_effort.clone().unwrap_or_default();
@@ -542,6 +544,45 @@ mod tests {
         assert_eq!(cfg.model.base_url, "https://gateway.example/v1");
         assert_eq!(cfg.model.api_key.as_deref(), Some("secret"));
         assert!(cfg.model.reasoning_effort.is_empty());
+    }
+
+    #[test]
+    fn native_auto_to_custom_resets_adaptive_reasoning_and_keeps_custom_settings() {
+        let native = crate::wizard::ParentModelChoice {
+            parent: "codex".into(),
+            model: crate::model_catalog::ModelChoice {
+                provider: "codex".into(),
+                id: "gpt-5.6-luna".into(),
+                label: "Luna".into(),
+            },
+            custom: None,
+            reasoning_effort: None,
+        };
+        let custom = crate::wizard::ParentModelChoice {
+            parent: "codex".into(),
+            model: crate::model_catalog::ModelChoice {
+                provider: "openai-compatible".into(),
+                id: "vendor/reasoner.v9".into(),
+                label: "custom".into(),
+            },
+            custom: Some(crate::wizard::CustomApiProfile {
+                base_url: "https://gateway.example/v1/".into(),
+                api_key: Some("secret".into()),
+            }),
+            reasoning_effort: Some("high".into()),
+        };
+
+        let mut cfg = RepoTracerConfig::default();
+        apply_model_choice(&mut cfg, &native).unwrap();
+        assert!(cfg.model.adaptive_reasoning);
+        apply_model_choice(&mut cfg, &custom).unwrap();
+
+        assert!(!cfg.model.adaptive_reasoning);
+        assert_eq!(cfg.model.backend, "openai-compatible");
+        assert_eq!(cfg.model.model, "vendor/reasoner.v9");
+        assert_eq!(cfg.model.base_url, "https://gateway.example/v1");
+        assert_eq!(cfg.model.api_key.as_deref(), Some("secret"));
+        assert_eq!(cfg.model.reasoning_effort, "high");
     }
 
     #[test]

@@ -292,6 +292,23 @@ impl App {
             .collect()
     }
 
+    fn effort_default_copy(&self) -> (&'static str, &'static str) {
+        if self.choices[self.editing]
+            .as_ref()
+            .is_some_and(|model| model.provider == "openai-compatible")
+        {
+            (
+                "Provider default",
+                "Provider default lets the provider choose. Manual overrides are optional.",
+            )
+        } else {
+            (
+                "Auto (agent-selected)",
+                "Auto lets the agent choose. Manual overrides are optional.",
+            )
+        }
+    }
+
     fn open_custom(&mut self) {
         self.custom_field = 0;
         if let Some(profile) = &self.custom[self.editing] {
@@ -730,18 +747,16 @@ impl App {
             };
             frame.render_widget(Paragraph::new(note).wrap(Wrap { trim: false }), body[1]);
         } else if self.page == Page::Effort {
+            let (default_label, default_description) = self.effort_default_copy();
             let rows = self
                 .effort_options()
                 .into_iter()
-                .map(|effort| {
-                    ListItem::new(effort.unwrap_or_else(|| "Auto (agent-selected)".into()))
-                })
+                .map(|effort| ListItem::new(effort.unwrap_or_else(|| default_label.into())))
                 .collect::<Vec<_>>();
             let effort_body =
                 Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(body[1]);
             frame.render_widget(
-                Paragraph::new("Auto lets the agent choose. Manual overrides are optional.")
-                    .wrap(Wrap { trim: false }),
+                Paragraph::new(default_description).wrap(Wrap { trim: false }),
                 effort_body[0],
             );
             frame.render_stateful_widget(
@@ -1086,6 +1101,27 @@ mod tests {
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.selected_efforts[0].as_deref(), Some("medium"));
+    }
+
+    #[test]
+    fn effort_picker_uses_provider_default_for_custom_and_auto_for_native() {
+        let mut native = App::new(&["codex".into()], &[]);
+        native.page = Page::Effort;
+        native.editing = 0;
+        let native_screen = screen(&mut native, 80, 24);
+        assert!(native_screen.contains("Auto (agent-selected)"));
+        assert!(native_screen.contains("Auto lets the agent choose."));
+        assert!(!native_screen.contains("Provider default"));
+
+        let mut custom = App::new(&["codex".into()], &[]);
+        custom.choices[0] = Some(model("openai-compatible", "private-model"));
+        custom.page = Page::Effort;
+        custom.editing = 0;
+        let custom_screen = screen(&mut custom, 80, 24);
+        assert!(custom_screen.contains("Provider default"));
+        assert!(custom_screen.contains("Provider default lets the provider choose."));
+        assert!(!custom_screen.contains("Auto (agent-selected)"));
+        assert!(!custom_screen.contains("Auto lets the agent choose."));
     }
 
     #[test]
