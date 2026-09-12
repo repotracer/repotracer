@@ -30,7 +30,7 @@ use tracing_subscriber::EnvFilter;
 #[command(
     name = "repotracer",
     version,
-    about = "Repository scout for AI coding agents. Small models search. Big models solve.",
+    about = "Repository scout for AI coding agents. Small models investigate. Big models solve.",
     long_about = None
 )]
 struct Cli {
@@ -352,7 +352,8 @@ async fn run(cli: Cli) -> Result<()> {
 fn cmd_welcome(root: &std::path::Path) -> Result<()> {
     let configured = agents::detect(root).iter().any(|a| a.configured);
     println!("repotracer {}", env!("CARGO_PKG_VERSION"));
-    println!("Small models search. Big models solve.\n");
+    println!("Small models investigate. Big models solve.");
+    println!("Better answers than searching alone, at a fraction of the cost.\n");
     if configured {
         println!("Parent integration is configured. Keep prompting normally.\n");
         println!("  repotracer settings            change parent/scout mappings");

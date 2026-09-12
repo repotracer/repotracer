@@ -454,11 +454,22 @@ pub(crate) enum AuthStatus {
     MissingCli,
 }
 
+/// A hidden provider is a dead end unless the message says how to unhide it,
+/// so each reason carries the command that fixes it.
 fn auth_warning(provider: &str, status: AuthStatus) -> String {
+    let login = if provider.starts_with("Claude") {
+        "claude auth login"
+    } else {
+        "codex login"
+    };
     let reason = match status {
-        AuthStatus::MissingCli => "CLI not found",
-        AuthStatus::NotAuthenticated => "native CLI is not logged in",
-        _ => "native authentication could not be checked",
+        AuthStatus::MissingCli => {
+            format!("CLI not found — install {provider}, then reopen this screen")
+        }
+        AuthStatus::NotAuthenticated => {
+            format!("native CLI is not logged in — run `{login}`")
+        }
+        _ => "native authentication could not be checked".to_owned(),
     };
     format!("{provider} models hidden: {reason}")
 }
