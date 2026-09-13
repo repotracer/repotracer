@@ -1,0 +1,32 @@
+[
+  {
+    "trial": "t09",
+    "source_file": "native-39074.jsonl",
+    "source_line": 1918,
+    "command": "/bin/zsh -lc \"go test ./promql -run '\"'^TestEvaluations$/.*functions'\"\\\\.test\"'$'\"' -count=1\"",
+    "command_actions": [
+      "go test ./promql -run '^TestEvaluations$/.*functions\\.test$' -count=1"
+    ],
+    "exit_code": 0,
+    "output_excerpt": [
+      "ok  \tgithub.com/prometheus/prometheus/promql\t0.386s [no tests to run]"
+    ],
+    "selected_function_test_run_count": 0
+  },
+  {
+    "trial": "t09",
+    "source_file": "native-39074.jsonl",
+    "source_line": 2345,
+    "command": "/bin/zsh -lc \"go test ./promql -run 'TestEvaluations/testdata/functions\\\\.test\"'$'\"' -count=1 -v\"",
+    "command_actions": [
+      "go test ./promql -run 'TestEvaluations/testdata/functions\\.test$' -count=1 -v"
+    ],
+    "exit_code": 0,
+    "output_excerpt": [
+      "=== RUN   TestEvaluations/testdata/functions.test/line_754/sort_by_label(http_requests,_\"instance\")",
+      "--- PASS: TestEvaluations (0.61s)",
+      "        --- PASS: TestEvaluations/testdata/functions.test/line_754/sort_by_label(http_requests,_\"instance\") (0.00s)"
+    ],
+    "selected_function_test_run_count": 378
+  }
+]

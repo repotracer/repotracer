@@ -32,6 +32,22 @@ caused it. The long parent also ran substantially more verification, including
 over 107,000 fuzz comparisons. That work prevents attributing its entire timing
 gap to the two scout calls.
 
+The report also contains a transcription error: its displayed focused Go test
+selector has two backslashes before the dot. Preserve that recorded wording as
+an observation, rather than silently repairing the scout's answer. The
+[execution records](scout-execution-t09.json) show an initial selector matching
+no tests, followed by a successful corrected execution with 378 function-test
+subtests, including `sort_by_label` at line 754. The normalized executed command
+uses one backslash:
+
+```sh
+go test ./promql -run 'TestEvaluations/testdata/functions\.test$' -count=1 -v
+```
+
+This is an error in the scout's reported command, not evidence that the final
+focused execution skipped the tests. These native execution excerpts are
+separate from the held-out grader results used for the pilot scores.
+
 ## Early invocation, late handoff
 
 Codex Textual [t15](scouts/t15.json) requested high effort. Its investigation took
