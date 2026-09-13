@@ -407,17 +407,13 @@ async fn cmd_serve(root: &std::path::Path, cfg: &RepoTracerConfig, mock: bool) -
         && (cfg.model.is_claude() || subscription::is_subscription_backend(cfg)))
     .then(|| native_supported_efforts(cfg))
     .flatten();
-    let engine = build_scout_with_efforts(root, cfg, mock, discovered_efforts.clone())?;
+    let reasoning_efforts = effective_reasoning_efforts(cfg, discovered_efforts);
+    let engine = build_scout_with_efforts(root, cfg, mock, reasoning_efforts.clone())?;
     // Off the request path and before the first message. The swap only ever
     // affects the next launch.
     selfupdate::spawn(cfg.updates.automatic);
-    let advertised_efforts = model_catalog::advertised_reasoning_efforts(
-        &cfg.model.backend,
-        &cfg.model.model,
-        discovered_efforts.as_deref(),
-    );
     let server =
-        McpServer::new(engine, root.to_path_buf()).with_reasoning_efforts(advertised_efforts);
+        McpServer::new(engine, root.to_path_buf()).with_reasoning_efforts(reasoning_efforts);
     server.serve_stdio().await
 }
 
@@ -526,14 +522,15 @@ fn build_scout(
         && (cfg.model.is_claude() || subscription::is_subscription_backend(cfg)))
     .then(|| native_supported_efforts(cfg))
     .flatten();
-    build_scout_with_efforts(root, cfg, mock, discovered_efforts)
+    let reasoning_efforts = effective_reasoning_efforts(cfg, discovered_efforts);
+    build_scout_with_efforts(root, cfg, mock, reasoning_efforts)
 }
 
 fn build_scout_with_efforts(
     root: &std::path::Path,
     cfg: &RepoTracerConfig,
     mock: bool,
-    discovered_efforts: Option<Vec<String>>,
+    reasoning_efforts: Option<Vec<String>>,
 ) -> Result<Arc<dyn ScoutBackend>> {
     if !mock && cfg.model.is_claude() {
         let backend: Arc<dyn ScoutBackend> = Arc::new(claude::ClaudeScout::new(cfg)?);
@@ -542,7 +539,7 @@ fn build_scout_with_efforts(
             adaptive::AdaptiveScout::new(
                 backend,
                 enabled,
-                enabled.then(|| discovered_efforts.clone()).flatten(),
+                enabled.then(|| reasoning_efforts.clone()).flatten(),
                 cfg.model.native_reasoning_effort().to_string(),
             )
             .with_turn_ceiling(cfg.explorer.max_turns),
@@ -555,7 +552,7 @@ fn build_scout_with_efforts(
             adaptive::AdaptiveScout::new(
                 backend,
                 enabled,
-                enabled.then(|| discovered_efforts.clone()).flatten(),
+                enabled.then(|| reasoning_efforts.clone()).flatten(),
                 cfg.model.native_reasoning_effort().to_string(),
             )
             .with_turn_ceiling(cfg.explorer.max_turns),
@@ -606,6 +603,17 @@ fn adaptive_enabled(cfg: &RepoTracerConfig) -> bool {
         )
 }
 
+fn effective_reasoning_efforts(
+    cfg: &RepoTracerConfig,
+    discovered: Option<Vec<String>>,
+) -> Option<Vec<String>> {
+    model_catalog::advertised_reasoning_efforts(
+        &cfg.model.backend,
+        &cfg.model.model,
+        discovered.as_deref(),
+    )
+}
+
 fn native_supported_efforts(cfg: &RepoTracerConfig) -> Option<Vec<String>> {
     model_catalog::discover_efforts(
         &cfg.model.backend,
@@ -629,6 +637,28 @@ fn init_tracing(verbose: bool) {
 
 #[cfg(test)]
 mod endpoint_tests {
+    #[test]
+    fn recommended_model_policy_also_limits_adaptive_efforts() {
+        let discovered = Some(
+            ["low", "medium", "high", "xhigh", "max"]
+                .map(str::to_owned)
+                .to_vec(),
+        );
+        let mut config = repotracer_core::RepoTracerConfig::default();
+        config.model.backend = "claude-cli".into();
+        config.model.model = "opus".into();
+        assert_eq!(
+            super::effective_reasoning_efforts(&config, discovered.clone()).unwrap(),
+            ["low", "medium"]
+        );
+
+        config.model.model = "sonnet".into();
+        assert_eq!(
+            super::effective_reasoning_efforts(&config, discovered).unwrap(),
+            ["low", "medium", "high", "xhigh", "max"]
+        );
+    }
+
     #[test]
     fn mixed_case_claude_backends_use_native_validation() {
         for backend in ["Claude", "CLAUDE-CLI"] {

@@ -38,21 +38,19 @@ pub fn profile(base: &Path, parent: &str) -> PathBuf {
     ))
 }
 
-// Native CLIs require a concrete initial effort. Keep Auto in the wizard as
-// None, then use the config's existing conservative default at the boundary.
-const AUTOMATIC_NATIVE_EFFORT: &str = "medium";
-
 fn profile_reasoning_effort(cfg: &RepoTracerConfig) -> Option<String> {
     let effort = cfg.model.reasoning_effort.trim();
-    // Older profiles had no Auto marker. Treat the native default medium plus
-    // adaptive reasoning as Auto; explicit medium remains visible when the
-    // adaptive flag is disabled.
+    // Older profiles had no Auto marker. Treat the former native default of
+    // medium as Auto, along with the current model-specific default. An
+    // explicit effort remains visible when adaptive reasoning is disabled.
     let native = matches!(
         cfg.model.backend.to_ascii_lowercase().as_str(),
         "codex" | "codex-cli" | "claude" | "claude-cli"
     );
     if effort.is_empty()
-        || (native && cfg.model.adaptive_reasoning && effort == AUTOMATIC_NATIVE_EFFORT)
+        || (native
+            && cfg.model.adaptive_reasoning
+            && (effort == "medium" || effort == cfg.model.automatic_native_reasoning_effort()))
     {
         None
     } else {
@@ -144,7 +142,8 @@ fn apply_model_choice(
             cfg.model.reasoning_effort = effort.clone();
             cfg.model.adaptive_reasoning = false;
         } else {
-            cfg.model.reasoning_effort = AUTOMATIC_NATIVE_EFFORT.into();
+            cfg.model.reasoning_effort.clear();
+            cfg.model.reasoning_effort = cfg.model.native_reasoning_effort().to_string();
             cfg.model.adaptive_reasoning = true;
         }
     }
@@ -717,25 +716,39 @@ mod tests {
     }
 
     #[test]
-    fn native_auto_uses_conservative_config_effort_and_keeps_explicit_override() {
-        let choice = |reasoning_effort| crate::wizard::ParentModelChoice {
-            parent: "codex".into(),
-            model: crate::model_catalog::ModelChoice {
-                provider: "codex".into(),
-                id: "gpt-5.6-luna".into(),
-                label: "Luna".into(),
-            },
-            custom: None,
-            reasoning_effort,
-            fast_tier: Some(true),
+    fn native_auto_uses_model_default_and_keeps_explicit_override() {
+        let choice = |provider: &str, id: &str, reasoning_effort: Option<String>| {
+            crate::wizard::ParentModelChoice {
+                parent: provider.into(),
+                model: crate::model_catalog::ModelChoice {
+                    provider: provider.into(),
+                    id: id.into(),
+                    label: id.into(),
+                },
+                custom: None,
+                reasoning_effort,
+                fast_tier: (provider == "codex").then_some(true),
+            }
         };
         let mut cfg = RepoTracerConfig::default();
-        apply_model_choice(&mut cfg, &choice(None)).unwrap();
+        apply_model_choice(&mut cfg, &choice("codex", "gpt-5.6-luna", None)).unwrap();
         assert_eq!(cfg.model.reasoning_effort, "medium");
         assert_ne!(cfg.model.reasoning_effort, "auto");
         assert!(cfg.model.adaptive_reasoning);
 
-        apply_model_choice(&mut cfg, &choice(Some("max".into()))).unwrap();
+        apply_model_choice(&mut cfg, &choice("claude", "opus", None)).unwrap();
+        assert_eq!(cfg.model.reasoning_effort, "low");
+        assert!(cfg.model.adaptive_reasoning);
+
+        apply_model_choice(&mut cfg, &choice("claude", "opus", Some("high".into()))).unwrap();
+        assert_eq!(cfg.model.reasoning_effort, "high");
+        assert!(!cfg.model.adaptive_reasoning);
+
+        apply_model_choice(
+            &mut cfg,
+            &choice("codex", "gpt-5.6-luna", Some("max".into())),
+        )
+        .unwrap();
         assert_eq!(cfg.model.reasoning_effort, "max");
         assert!(!cfg.model.adaptive_reasoning);
     }
@@ -747,6 +760,12 @@ mod tests {
         cfg.model.reasoning_effort = "medium".into();
         cfg.model.adaptive_reasoning = true;
         assert_eq!(profile_reasoning_effort(&cfg), None);
+
+        let mut opus_auto = cfg.clone();
+        opus_auto.model.backend = "claude-cli".into();
+        opus_auto.model.model = "opus".into();
+        opus_auto.model.reasoning_effort = "low".into();
+        assert_eq!(profile_reasoning_effort(&opus_auto), None);
 
         let mut manual_medium = cfg.clone();
         manual_medium.model.adaptive_reasoning = false;

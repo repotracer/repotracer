@@ -9,7 +9,8 @@
   without changing other MCP entries or custom timeout values. ([#20](https://github.com/repotracer/repotracer/pull/20))
 - `repo_scout` advertises the discovered reasoning effort levels for the
   configured native model. The recommended Luna model offers medium through
-  max, and the recommended Opus model offers low and medium. ([#20](https://github.com/repotracer/repotracer/pull/20))
+  max. The recommended Opus model starts Auto at low and can automatically
+  escalate only to medium. ([#20](https://github.com/repotracer/repotracer/pull/20))
 
 ## 2.1.0
 
