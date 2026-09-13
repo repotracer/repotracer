@@ -3,6 +3,7 @@
 import hashlib
 import itertools
 import json
+import re
 from pathlib import Path
 from statistics import mean
 
@@ -22,6 +23,9 @@ def require(condition, message):
 def main():
     manifest = read("manifest.json")
     rows = read("results.json")
+    host_paths = re.compile(r"/Users/|(?:/private)?/var/folders/|repotracer-investigation-scratch-")
+    for path in [ROOT / "parent-events.json", *sorted((ROOT / "scouts").glob("*.json"))]:
+        require(not host_paths.search(path.read_text()), f"{path.name}: residual host path")
     expected = set(itertools.product(
         manifest["parents"], manifest["arms"],
         (task["id"] for task in manifest["tasks"]),
