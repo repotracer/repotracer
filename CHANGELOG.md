@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.1.0
+
+### Added
+
+- An Uninstall button on the install page, reachable by tabbing or with `R`.
+  It stages each installed integration for removal so the rows and the primary
+  button say what will happen before anything is touched.
+- A Codex fast tier setting on the Scout models page, on for the recommended
+  model and off for every other Codex model.
+
+### Changed
+
+- The setup and settings wizard sizes its card to the page it is showing
+  instead of stretching one box to the whole viewport, and adds a step rail,
+  a per-page title, and a wordmark where there is room for one.
+- A first install arrives with Codex and Claude Code both selected rather than
+  both unchecked.
+- The Claude Code default is `claude:opus` with automatic reasoning. Codex
+  stays `codex:gpt-5.6-luna`.
+- `Custom model…` leads the model picker instead of trailing the catalog.
+- Every scout setting is a row you arrow onto: model, reasoning effort, and
+  fast tier. Enter opens the focused setting and Space flips a toggle, in
+  place of the previous letter shortcuts.
+- Left and right move within the row of buttons; up and down treat that row as
+  a single stop.
+
+### Fixed
+
+- `service_tier` is written only for Codex, the one backend that reads it.
+  Claude Code and custom-endpoint profiles no longer carry a setting that
+  nothing consumes. A tier already saved on a profile is preserved, and
+  pinning a tier then changing models drops the pin with the model it was
+  pinned on.
+- Integration removals that succeed before a later failure are persisted, so a
+  retry does not start from the beginning.
+- Uninstall state survives a rerun of the wizard.
+
+### Verification status
+
+Workspace tests, Clippy, and rustfmt pass, and the release tag gates the
+published artifacts on GitHub CI across Linux, macOS, and Windows. This note
+makes no savings, latency, or quality claim.
+
 ## 2.0.0
 
 ### Added
