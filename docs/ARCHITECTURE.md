@@ -1,202 +1,209 @@
 # Architecture
 
-## Request path
+RepoTracer separates **repository investigation** from **implementation**.
+
+Claude Code or Codex keeps the coding task. When it needs help understanding the repository, it calls `repo_scout`. The investigator traces the relevant behavior in a separate conversation, can run useful checks or experiments, and reports back with findings, source, results, and anything it could not resolve.
 
 ```text
-Codex Sol
-  → MCP call: repo_scout(query, investigation)
-    → RepoTracer MCP server
-      → reusable isolated codex app-server process
-        → fresh conversation, or bounded explicit follow-up
-        → GPT-5.6 Luna, medium reasoning, fast service tier
-          → read-only shell and local Symbols lookup
-      ← structured scout result
-    ← validated citations and source excerpts
-  → use findings and excerpts; inspect any missing evidence
-  → edit and verify
+Claude Code / Codex
+        │
+        │ repo_scout
+        ▼
+    RepoTracer
+        │
+        ▼
+ investigator conversation
+   trace / inspect / test
+        │
+        ▼
+ findings + source + results + unresolved parts
+        │
+        ▼
+Claude Code / Codex
+   implement + verify
 ```
 
-`repotracer setup` registers the stdio MCP server and writes managed instructions describing the scout. The parent chooses whether to delegate or investigate directly. A natural-language query is sufficient, even when the parent does not know the relevant files or search terms. Optional context, questions, intent, and paths can help the scout. They do not prescribe its search sequence.
+The coding agent can use that report directly, inspect any remaining gaps, and continue with the change.
 
-## Components
+## Two investigator paths
 
-| Crate | Responsibility |
-|---|---|
-| `repotracer-repo-tools` | Read, Glob, Grep, syntax index, root checks, and concurrent execution |
-| `repotracer-model` | OpenAI-compatible model client and mock backend |
-| `repotracer-core` | Scout loop, prompts, configuration, and citation parsing |
-| `repotracer-mcp` | MCP stdio server and `repo_scout` schema |
-| `repotracer` | CLI, Codex setup, doctor, scout, and server commands |
-| `repotracer-bench` | Paired benchmark manifests and runners |
+RepoTracer supports native Claude Code / Codex investigators and OpenAI-compatible model endpoints. They do not have the same runtime.
 
-## Default Codex backend
+### Native Claude Code and Codex
 
-The default backend uses the existing Codex subscription through `codex app-server` over local stdio. It retains the process between requests. A temporary Codex home exposes current authentication and active model-provider settings while excluding personal instructions, skills, hooks, plugins, and MCP servers. Configuration and authentication file fingerprints are checked before reuse; changes retire the old process. No separate API key or gateway is required.
+Native investigations run through the CLI the user already has installed and signed into.
 
-Conversation reuse is independent. The MCP server generates and returns a handle when `investigation.conversation_id` is omitted. Supply the returned handle for a related follow-up, or a caller-owned ID from the first request. The handle remembers the canonical repository. `repository` can explicitly select a different checkout from the server startup directory; Git can also resolve an absolute focus in another checkout. Different repositories require different handles. Reuse is best-effort: idle expiry, thread budgets, configuration changes, errors, and process recycling can start a fresh conversation. `conversation.status` reports resumed, fresh, or unknown from the first attempt's native thread counter, not the warm-process flag. Supply the current objective and necessary context. Freshness is a model instruction, not a filesystem-snapshot guarantee.
+Each `repo_scout` call starts a new investigation or continues an existing one. The repository is the starting point, not a hard operating-system boundary. A native investigator may follow relevant code into related repositories or paths, and it may run checks or create temporary experiment artifacts when that helps answer the question.
 
-Session defaults are engineering bounds, not benchmark-derived optima: 300 idle seconds, two idle processes, four requests per continued conversation, a 120,000-token previous-input ceiling, and 32 created threads per process. Process recycling bounds server-retained old threads. `max_warm` limits idle sessions, not active concurrency. Named conversations are retained separately, including within one repository, so A → B → A can resume while the cache budget permits it. Independent MCP requests execute concurrently and complete responses are written one at a time with their original JSON-RPC IDs. A per-handle gate orders calls to the same conversation across the entire adaptive operation. Startup is capped at 60 seconds, or the shorter configured inactivity timeout; model inactivity timeout remains separately configurable.
+The investigator is instructed to investigate rather than modify the product, but RepoTracer does **not** turn the native CLI into a read-only security sandbox. Capabilities available to the native CLI can remain available to the investigator.
 
-The MCP handle registry stores up to 1,024 root bindings and ordering locks, not
-source or model history. It evicts the oldest inactive binding when full and
-never evicts an active gate. Native idle-session retention is a separate,
-smaller budget. Generated handles missing after eviction or server restart
-require an explicit repository rather than silently falling back to startup.
+That distinction is important:
 
-The child process receives:
+- do not assume native investigations are limited to Read / Grep / Glob
+- do not assume every file mentioned in prose was validated
+- do not assume temporary investigation artifacts are deleted automatically
+- do not treat RepoTracer as an operating-system sandbox
 
-- The repository root
-- The scout query
-- RepoTracer's read-only scout instructions
-- Read-only filesystem access
-- A restricted capability set without inherited MCP servers, apps, plugins, browser, image, or multi-agent tools
+Use the permission and sandbox controls of the underlying Claude Code or Codex installation for anything security-sensitive.
 
-The child returns text plus structured citation metadata. RepoTracer rejects paths outside the repository, missing files, invalid line ranges, and symlink escapes before returning the result to the MCP client.
+### OpenAI-compatible endpoints
 
-## Scout-requested reasoning
+Custom OpenAI-compatible models use RepoTracer's own model/tool loop instead of inheriting the native Claude Code or Codex environment.
 
-Native backends also use `AdaptiveScout` to permit one scout-requested
-higher-effort continuation. The initial configured or parent-selected effort
-does not change. Native model metadata determines which higher settings can
-be offered, and positive turn ceilings prevent spending that budget twice.
-`[model].adaptive_reasoning = false` disables this behavior.
-
-Codex can reuse the conversation at higher effort subject to its existing
-reuse limits. Claude currently restarts its native process when effort changes.
-The continuation carries the original request and first findings in both cases.
-It returns a revised full report; a failed or unusable continuation retains
-the first findings as partial. Two-attempt statistics preserve cache-aware
-usage and reported cost, with missing dimensions left unknown. Native metadata
-does not prove the applied effort when an organization silently caps it.
-
-## OpenAI-compatible backend
-
-Custom GPT endpoints use RepoTracer's native tool loop:
+At a high level:
 
 ```text
-query + system prompt
-  → model response
-  → validate tool calls
-  → execute independent Read / Glob / Grep / Symbols calls concurrently
-  → append bounded results
-  → repeat until final answer or limit
-  → parse and validate citations
+query
+  → model
+  → repository tool calls
+  → tool results
+  → model
+  → final report
 ```
 
-Set the backend in the CLI or config file. `REPOTRACER_API_KEY` supplies endpoint authentication when required.
+RepoTracer provides the repository tools for this path and validates their arguments before execution. This backend does not automatically gain the native CLI's execution environment or capabilities.
 
-## Limits
+Configure it with a base URL and model ID:
 
-The generic OpenAI-compatible engine enforces:
+```bash
+npx repotracer@latest setup \
+  --base-url http://localhost:11434/v1 \
+  --model deepseek-coder
+```
 
-- Maximum model turns
-- Maximum repository tool calls
-- Per-tool timeout
-- Total scout timeout
-- Tool-result byte limits
+Set `REPOTRACER_API_KEY` when the endpoint requires authentication.
 
-Each MCP answer representation has a 36 KiB serialized ceiling. Text and structured output are compatible alternatives, so neither is shortened just to make room for the other on the wire. This is a safeguard, not a target answer length or a demonstrated quality optimum. There are no intent-specific citation counts or per-citation excerpt limits.
+## Investigations and continuation
 
-Do not assume native engine turn/tool limits apply to Codex's internal agent loop. Subscription requests use the read-only Codex sandbox, startup/inactivity bounds, and bounded local Symbols results. MCP cancellation drops the targeted handler future, releasing its conversation guard and owned native session. Native child processes use `kill_on_drop`. This verifies local cancellation, not upstream billing cancellation or guaranteed termination of every descendant. Missing provider usage remains unknown.
+An investigation has its own conversation outside the coding agent's main conversation.
 
-The stdio dispatcher accepts up to 16 executing requests and 16 pending
-requests. It continues reading cancellation notifications at full capacity;
-overflow requests receive a queue-full error before model startup. If a client
-stops reading and rejection replies fill the bounded output buffer, the server
-closes that connection and cancels its active work rather than blocking input.
-Active cancellation drops the handler; pending cancellation removes the request
-before it reaches the backend. Unknown, completed or malformed cancellation
-targets are ignored, and numeric IDs remain distinct from string IDs. The
-notification receives no response. Normal EOF drains accepted work. A frame
-being read must retain its parser state while other requests complete.
+A related `repo_scout` call can continue the same investigation instead of asking a fresh model to rediscover the repository. Independent investigations can run in parallel.
 
-Claude native I/O uses the configured stream inactivity timeout, not a total
-investigation deadline. Zero disables that timeout. Pre-terminal failures
-preserve observed tool-call counts and elapsed time, without inventing token
-usage or cost when the native process has not reported them.
+Continuation is useful when the next question depends on work the investigator already did:
 
-Read, Glob, and Grep return bounded output with continuation information. This prevents a single file or search from filling the scout context.
+```text
+1. Trace how refresh rotation works.
+2. Continue that investigation: where can the rotated token be rejected?
+3. Continue again: does the mobile client use the same path?
+```
 
-## Syntax navigation
+A continuation can also move into a related repository when the investigation requires it. The caller should still provide the current objective and any requirements that matter; the investigator does not inherit the coding agent's full conversation.
 
-`Symbols` and `repotracer symbols` reuse upstream Tree-sitter tag queries for Rust, Python, JavaScript, TypeScript/TSX, and Go. They return definitions, name references, or an outline. Content hashes invalidate changed files; deletion and incomplete scans are handled explicitly. The in-memory cache belongs to the long-lived scout, independently of its provider processes.
+## When the investigator is not sure
 
-This is not a resolved call graph, persistent disk index, or Aider-style ranked map. Hidden/ignored/generated files and unsupported languages may be excluded. Results report scope and limitations; text search remains necessary.
+A hard investigation does not have to collapse into a confident guess.
 
-Codex replies include per-investigation `stats.index_usage`: calls, failures,
-parsed/reused files, incomplete calls, duration, and output bytes. Counts do
-not include source or search terms. `available: true` with zero calls means
-the index was offered but unused. Claude reports `available: false`; absent
-telemetry means unknown, as with older backends. These counters do not measure
-answer quality or prove the index saved tokens.
+The report can preserve:
+
+- what the investigator found
+- what it checked or ran
+- the source it selected
+- results from experiments or checks
+- unresolved questions
+- limitations or missing evidence
+
+The coding agent can continue from that work. A partial investigation is still useful if it prevents the parent from repeating the same search from zero.
 
 ## MCP result
 
-`repo_scout` returns:
+`repo_scout` returns a model-written report plus structured metadata when available.
 
-- An explanation and findings for locate, explain, change-impact, diagnose, or inventory intent
-- Complete, partial, not-found, or failed status, plus unresolved questions, searched scope, and limitations
-- Validated `path:start-end` citations
-- Source text once per selected rendering, with overlapping or adjacent spans merged
-- Truncation metadata
-- The recommended next repository action
-- Scout usage and timing when the backend reports them
+The report can include findings, selected source, experiment results, unresolved questions, usage, timing, and continuation information.
 
-RepoTracer does not edit repository files. The parent Codex process owns edits, commands, and verification.
+Structured source attachments may contain `path:start-end` ranges and source text. RepoTracer checks the attachment location before returning it. That check answers:
 
-Citation validation proves locations exist, not that claims are true. The scout reports whether the objective is answered. Rust checks output integrity and citation locations; matching question labels or counting findings cannot establish semantic completeness. One finding may address several questions.
+> Does this source location exist and match the requested range?
 
-Handoff version 4 keeps both supported renderings self-contained.
-`structuredContent.report` contains the explanation and `evidence[].text`
-contains line-numbered source. Citation locations, source omissions, conversation
-metadata, continuation requests, and usage remain structured fields.
-`content[0].text` is a full readable fallback. Callers should forward either
-representation, not the entire envelope with both compatibility copies.
+It does **not** answer:
 
-Version 4 removes the version-3 fields `investigation`, `next_action`,
-`handoff_limitations`, and `omitted_citations`. Consumers that need those fields
-must keep their version-3 parser separate from the version-4 parser. Failed
-investigations, including a configured total timeout, set the MCP envelope's
-`isError` to true while retaining the report, usage, and conversation metadata.
-Partial and not-found results are not tool errors. Source attachment failures
-also preserve the answer and carry explicit delivery warnings.
+> Is the investigator's conclusion true?
 
-Version 2 used cross-field byte references, which were unsafe for clients that
-retain only one rendering. Versions 3 and 4 instead embed report and source text
-in each rendering. The smoke reader accepts versions 1 through 4. The CLI's own
-`ScoutResult` JSON and the package version are unchanged by this protocol bump.
+Source delivery and claim correctness are separate.
 
-The formatter returns the selected source ranges without the former 36 KiB
-handoff ceiling or source eviction. Overlapping ranges share one source block.
-Each MCP citation adds `source_status`: `included`, `truncated`, or `omitted`.
-Attachment failures add `source_error`, with details also available under
-`evidence_omissions.errors`; the text fallback names unavailable ranges. These
-fields describe source delivery, not claim confidence.
+A source attachment can also fail while the rest of the report remains useful. RepoTracer preserves the answer and records the attachment problem instead of discarding the entire investigation.
 
-The parent passes relevant task requirements in the existing query, separately
-from assumptions about current code. The scout does not inherit the parent
-conversation. Supplied requirements guide the requested investigation; they
-are not claims that the feature already exists. Completion describes the
-investigation, not implementation progress. Missing requirements that block
-the answer and unresolved source behavior should be identified separately.
-No automatic filter removes real unresolved questions or upgrades confidence.
+## Parent responsibilities
 
-Subscription usage uses cumulative thread updates with request-local deltas when available. Missing counters and fallback snapshots remain qualified. Task comparisons include parent and scout usage, with cached tokens counted at their documented weights. These API-equivalent figures are not subscription invoices. Instrumented Codex trials retain native per-request usage and tool outputs to check accounting and what reached the parent; they do not capture provider HTTP payloads.
+RepoTracer investigates. Claude Code or Codex still owns the coding task.
 
-Claude Code's `total_cost_usd` is cumulative across a streaming-input session.
-The Claude adapter reports the increase since the preceding result, including
-terminal failures, and resets its baseline for a new process. Missing or
-regressing snapshots make that request's cost unknown. Its separate `usage`
-object is retained as reported; it must not be presented as covering every
-query-pipeline helper call. The native `modelUsage` totals cover that wider
-scope and are not yet retained by this adapter.
+The parent can:
 
-## Security
+- use the returned findings directly
+- inspect anything still unclear
+- edit files
+- run its own verification
+- call `repo_scout` again for a related or independent question
 
-- Repository-root enforcement on every local tool call
-- Symlink-escape rejection
-- Read-only child sandbox
-- No shell interpolation in repository tools
-- Citation validation before MCP output
-- Provider credentials owned by the provider CLI
-- No telemetry by default
+It does not have to reopen every cited file before it can act, though important changes should still be verified with the repository's normal tests and checks.
+
+## Routing
+
+RepoTracer is not meant to run on every prompt.
+
+```text
+"Rename this variable in src/config.ts"
+  → parent handles it directly
+
+"Trace why refresh tokens fail after rotation"
+  → repo_scout
+```
+
+The current routing suite records **42/42 correct decisions**.
+
+Routing is instruction-driven rather than a security boundary. The parent agent ultimately decides whether to call the MCP tool.
+
+## Components
+
+The repository is split into small Rust crates:
+
+| Crate | Responsibility |
+|---|---|
+| `repotracer-repo-tools` | Local repository tools and syntax lookup used by RepoTracer-managed backends |
+| `repotracer-model` | OpenAI-compatible model client and deterministic mock backend |
+| `repotracer-core` | Investigation loop, prompts, configuration, result handling |
+| `repotracer-mcp` | MCP stdio server and `repo_scout` schema |
+| `repotracer` | CLI, setup, settings, doctor, scout, and server commands |
+| `repotracer-bench` | Paired benchmark manifests and runners |
+
+The native Claude Code / Codex path can use capabilities from those CLIs that are broader than the local repository-tool crate.
+
+## Sessions and concurrency
+
+RepoTracer can retain native provider processes so related work does not pay startup cost every time. Conversation continuation and process reuse are separate ideas: a warm process can host more than one investigation, and an investigation can be restarted if reuse is no longer possible.
+
+Independent MCP requests can run concurrently. Calls that continue the same investigation are ordered so two follow-ups do not race the same conversation state.
+
+`session.idle_secs` controls how long an inactive retained process can stay warm. It is not a total investigation timeout.
+
+`model.timeout_ms` controls native stream inactivity when configured.
+
+`explorer.timeout_seconds` applies only to the generic OpenAI-compatible investigation loop.
+
+## Syntax lookup
+
+`repotracer symbols` provides local Tree-sitter-based syntax lookup for Rust, Python, JavaScript, TypeScript/TSX, and Go.
+
+It can return definitions, references, or an outline. It is a lookup tool, not a resolved call graph or a complete semantic index, so text search and ordinary investigation are still necessary.
+
+```bash
+repotracer symbols "Config" --mode references
+```
+
+## Usage accounting
+
+Complete-task comparisons count both sides of the assisted run:
+
+```text
+without RepoTracer = coding-agent usage
+with RepoTracer    = coding-agent usage + investigator usage
+```
+
+Provider counters differ by backend. Missing usage stays unknown rather than being filled in with an estimate. See [Benchmarks](../BENCHMARKS.md) for the public results and [Measure the complete task](./benchmarks/why-token-counters-lie.md) for the reasoning behind this rule.
+
+## Security model
+
+Native investigators run in the user's existing Claude Code or Codex environment. RepoTracer is not a security sandbox around those CLIs.
+
+OpenAI-compatible investigations use RepoTracer's own repository-tool loop and therefore have a different capability surface.
+
+See [SECURITY.md](../SECURITY.md) for the threat model and operational guidance.

@@ -1,59 +1,93 @@
-# v2 integration status
+# Integration status
 
-RepoTracer v2 is a release candidate. It supports independent MCP profiles for
-Codex and Claude Code, with native subscription CLIs providing authentication
-and model execution.
+RepoTracer supports Claude Code and Codex as parent coding agents, with independent investigator profiles for each.
 
-## Included
+This page tracks integration behavior and verification. It does not make benchmark claims; see [BENCHMARKS.md](../BENCHMARKS.md) for those.
 
-- Codex and Claude Code parent integrations, installed separately or together.
-- A full-screen, two-step terminal wizard with searchable models and visible
-  mappings, built with Ratatui.
-- Defaults of `codex:gpt-5.6-luna` for Codex and `claude:sonnet` for Claude
-  Code.
-- Inline advanced selection for independent per-parent mappings.
-- Native model discovery, custom `provider:model-id` entries, dry runs, and
-  cancellation without partial settings writes.
-- Independent profiles and bounded process/conversation reuse.
-- The `repo_scout` MCP tool with repository and focus hints, investigation
-  intents, optional follow-up handles, structured results, and text fallback.
-- Read-only native repository tools and path/line citation validation.
+## Supported
+
+| Area | Status |
+|---|---|
+| Codex parent | Supported |
+| Claude Code parent | Supported |
+| Configure both together | Supported |
+| Independent parent profiles | Supported |
+| Native model discovery | Supported |
+| Custom OpenAI-compatible investigator | Supported |
+| Investigation continuation | Supported |
+| Independent parallel investigations | Supported |
+| Structured source attachments | Supported |
+| Text fallback | Supported |
+
+The native parent CLI is still required for native investigations.
+
+## Current setup defaults
+
+| Parent | Investigator |
+|---|---|
+| Codex | `gpt-5.6-luna` |
+| Claude Code | `opus` with automatic reasoning |
+
+These are defaults, not a promise that they are available to every account or that they are optimal for every repository.
 
 ## Verification
 
-Local release-candidate checks currently cover Linux. They include the Rust
-workspace and npm launcher checks used by this repository. The exact commands
-belong to the release pipeline and may change with the candidate.
+The release pipeline covers the Rust workspace and npm launcher on the supported CI platforms.
 
-GitHub CI has passed on Linux, macOS, and Windows, including the native Codex
-app-server checks. Live Claude subscription checks remain a separate, opt-in
-local check described in CONTRIBUTING.md.
+Codex native integration checks run in CI where the Codex CLI is available.
 
-The defaults describe the configuration shipped by v2; they do not predict an
-outcome. This status page does not make cost, latency, or quality claims.
+Claude Code end-to-end checks require a signed-in `claude` session and therefore remain an opt-in local smoke test:
 
-## Behavior and limits
+```bash
+cargo build -p repotracer
 
-RepoTracer validates that returned citation paths and line ranges resolve
-inside the selected repository. Source validation checks locations, not the
-truth of model-authored findings. Important conclusions still require local
-review and relevant tests.
+python3 scripts/subscription-smoke.py \
+  --binary target/debug/repotracer \
+  --output /tmp/repotracer-smoke \
+  --backend claude-cli
+```
 
-Warm provider processes may be retained for related calls. `session.idle_secs`
-retires an inactive retained process; it is an idle-retention setting, not a
-total request or investigation timeout. `model.timeout_ms` measures native
-stream inactivity. `explorer.timeout_seconds` is an optional whole-run limit
-only for the generic OpenAI-compatible engine, not native scouts. Both default
-to zero.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full smoke-test workflow.
 
-Claude scouts use Read, Grep, and Glob. Codex scouts use their native read-only
-shell and optional Symbols lookup. Editing and external MCP tools are disabled.
-Repository-root and symlink checks are application
-controls, not an operating-system filesystem sandbox. Provider behavior,
-account limits, model availability, and parent-agent decisions remain outside
-RepoTracer's control.
+## Native investigator behavior
 
-The native parent CLIs remain required. Their supported flags and model
-catalogs can vary by installed version. Unavailable current models remain
-selectable only when the settings screen labels them as availability
-unverified.
+Native investigations run through the user's Claude Code or Codex CLI environment.
+
+RepoTracer does not enforce a read-only sandbox around those CLIs. The investigator is instructed to investigate, but it may use capabilities available in the underlying environment, including useful checks or experiments.
+
+The repository is a starting location rather than a hard filesystem boundary. Related repositories or external paths can be part of an investigation when needed.
+
+Temporary artifacts created during an investigation may persist.
+
+## Result handling
+
+A result can be complete, partial, not found, or failed.
+
+Partial and uncertain investigations should preserve useful work: what was found, what was checked, source or experiment results, and what remains unresolved.
+
+Structured source ranges are checked for location validity when they are attached. That check does not prove the model-written conclusion.
+
+Source attachment failures can be reported separately from the investigation itself so a useful report is not thrown away.
+
+## Timeouts and sessions
+
+`session.idle_secs` controls idle retention of a warm native process.
+
+`model.timeout_ms` controls native stream inactivity when configured.
+
+`explorer.timeout_seconds` applies only to the generic OpenAI-compatible investigation loop.
+
+These settings do not describe the native model's internal turn or tool limits.
+
+## External dependencies
+
+RepoTracer cannot guarantee behavior controlled by the provider or parent CLI, including:
+
+- model availability
+- account or subscription limits
+- native CLI flags
+- upstream permission behavior
+- provider usage reporting
+- parent-agent routing decisions
+
+When a native CLI changes, RepoTracer may need an integration update even when the MCP protocol itself has not changed.
