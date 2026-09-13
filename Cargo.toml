@@ -11,7 +11,7 @@ exclude = ["crates/bench"]
 default-members = ["crates/cli"]
 
 [workspace.package]
-version = "2.1.0"
+version = "2.1.1"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repotracer/repotracer"
@@ -37,6 +37,7 @@ libc = "0.2"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 self-replace = "1.5"
+semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"

@@ -1,8 +1,9 @@
-"""Check the published pilot records and print aggregates, without model calls."""
+"""Check the published guidance studies and print aggregates, without model calls."""
 
 import hashlib
 import itertools
 import json
+import math
 import re
 from pathlib import Path
 from statistics import mean
@@ -20,7 +21,84 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def verify_native_followup():
+    data = read("native-claude.json")
+    rows = data["conditions"]
+    require({row["group"] for row in rows} == {"baseline", "current", "changed"}
+            and len(rows) == 3, "Native follow-up: missing/duplicate conditions")
+    require(data["task"]["independent_tasks"] == 1
+            and data["task"]["solves_per_condition"] == 1, "Native follow-up: sample size")
+    require(not data["task"]["influenced_submitted_guidance"], "Native task was used for tuning")
+    require(data["runtime"]["conditions_share_binary"]
+            and data["runtime"]["conditions_share_snapshot"], "Native conditions differ")
+    require(data["runtime"]["whole_task_deadline"] is None, "Unexpected native cutoff")
+    proposed = next(row for row in rows if row["group"] == "changed")
+    source = (ROOT.parents[2] / "crates/cli/src/agents.rs").read_text()
+    body = source.split("pub(crate) const ROUTING_INSTRUCTIONS: &str = concat!(", 1)[1]
+    body = body.split("\n);", 1)[0]
+    routing = "".join(json.loads(part) for part in re.findall(r'"(?:[^"\\]|\\.)*"', body))
+    require(hashlib.sha256(routing.encode()).hexdigest() == proposed["guidance_sha256"],
+            "Proposed guidance changed since the native benchmark")
+    require(len(routing.split()) == proposed["guidance_words"] == 132,
+            "Native proposed guidance word count")
+    for row in rows:
+        group = row["group"]
+        require(row["status"] == "completed" and row["solving_launches"] == 1,
+                f"Native {group}: solving status")
+        require(row["parent"] == {"model": "claude-opus-5", "effort": "native-default"},
+                f"Native {group}: parent settings")
+        require(row["usage_complete"], f"Native {group}: incomplete usage")
+        for field in ("elapsed_seconds", "cost_usd"):
+            value = row[field]
+            require(type(value) in (int, float) and math.isfinite(value) and value > 0,
+                    f"Native {group}: invalid {field}")
+        for field in ("guidance_sha256", "candidate_patch_sha256", "native_trace_sha256"):
+            require(re.fullmatch(r"[0-9a-f]{64}", row[field]), f"Native {group}: {field}")
+        require(abs(row["cost_usd"] - sum(row["cost_by_role_usd"].values())) < 1e-8,
+                f"Native {group}: cost does not reconcile")
+        for role in ("parent", "scout"):
+            require(set(row["tokens"][role]) == {
+                "uncached_input", "cache_read", "cache_write", "output"
+            }, f"Native {group}: token buckets")
+            require(all(type(value) is int and value >= 0 for value in row["tokens"][role].values()),
+                    f"Native {group}: invalid token count")
+            require(row["cost_by_role_usd"][role] >= 0, f"Native {group}: negative role cost")
+        if row["scout_calls"] == 0:
+            require(sum(row["tokens"]["scout"].values()) == 0
+                    and row["cost_by_role_usd"]["scout"] == 0, f"Native {group}: unused scout")
+        require(row["independent_hidden_assertions"] == "passed", f"Native {group}: acceptance")
+        require(0 <= row["grade"]["score"] <= 10 and row["grade"]["rationale"],
+                f"Native {group}: grade")
+    current = next(row for row in rows if row["group"] == "current")
+    baseline = next(row for row in rows if row["group"] == "baseline")
+    require(baseline["scout_configured"] is None and baseline["guidance_words"] == 0
+            and baseline["guidance_sha256"] == hashlib.sha256(b"").hexdigest(),
+            "Native baseline has guidance or scout")
+    require(current["guidance_words"] == 349 and current["scout_calls"] == 1
+            and proposed["scout_calls"] == 0, "Native routing observations")
+    diagnosis = data["diagnosis"]
+    require(abs(sum(call["elapsed_seconds"] for call in diagnosis["changed"]["full_suite_calls"])
+                - diagnosis["changed"]["full_suite_elapsed_seconds"]) < 1e-8,
+            "Native full-suite timing does not reconcile")
+    require(abs(diagnosis["current"]["scout_cost_usd"]
+                - current["cost_by_role_usd"]["scout"]) < 1e-8, "Native scout cost mismatch")
+    grader = data["grader"]
+    require(grader["model"] == "gpt-6-astra" and grader["effort"] == "high"
+            and grader["blind"] and grader["quality_fixed_before_diagnosis"]
+            and grader["tool_calls"] == 0, "Native grader conditions")
+    require(grader["cost_usd"] is None and grader["cost_missing_reason"],
+            "Native missing grader cost must stay unknown")
+    for name in ("native-claude.json", "native-claude.md"):
+        require(not re.search(r"/Users/|/home/|(?:/private)?/var/folders/|repotracer-investigation-scratch-|sk-ant-",
+                              (ROOT / name).read_text()), f"{name}: private data")
+    print("Verified 3 native conditions, exact proposed guidance, costs, token buckets and grading metadata.")
+    print(f"Native proposed/current: cost={proposed['cost_usd'] / current['cost_usd']:.4f}, "
+          f"time={proposed['elapsed_seconds'] / current['elapsed_seconds']:.4f}, "
+          f"quality_delta={proposed['grade']['score'] - current['grade']['score']}")
+
+
 def main():
+    verify_native_followup()
     manifest = read("manifest.json")
     rows = read("results.json")
     host_paths = re.compile(r"/Users/|(?:/private)?/var/folders/|repotracer-investigation-scratch-")

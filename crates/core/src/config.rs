@@ -68,7 +68,7 @@ pub struct ModelSettings {
     pub executable: Option<String>,
     #[serde(default = "default_model")]
     pub model: String,
-    /// Optional API reasoning effort. Native providers use medium when empty.
+    /// Optional API reasoning effort. Native providers use their model default when empty.
     #[serde(default)]
     pub reasoning_effort: String,
     /// Permit one scout-requested continuation at a higher native-supported effort.
@@ -94,8 +94,16 @@ pub struct ModelSettings {
 impl ModelSettings {
     pub fn native_reasoning_effort(&self) -> &str {
         match self.reasoning_effort.trim() {
-            "" => "medium",
+            "" => self.automatic_native_reasoning_effort(),
             effort => effort,
+        }
+    }
+
+    pub fn automatic_native_reasoning_effort(&self) -> &'static str {
+        if self.is_claude() && is_opus_model(&self.model) {
+            "low"
+        } else {
+            "medium"
         }
     }
 
@@ -112,6 +120,11 @@ impl ModelSettings {
             .ok()
             .or_else(|| self.api_key.clone())
     }
+}
+
+fn is_opus_model(model: &str) -> bool {
+    let model = model.trim().to_ascii_lowercase();
+    model == "opus" || model.starts_with("claude-opus")
 }
 
 fn default_backend() -> String {
@@ -300,6 +313,17 @@ mod tests {
         let explicit: ModelSettings = toml::from_str("reasoning_effort = 'high'").unwrap();
         assert_eq!(explicit.reasoning_effort, "high");
         assert_eq!(explicit.native_reasoning_effort(), "high");
+
+        let opus: ModelSettings = toml::from_str("backend = 'claude-cli'\nmodel = 'opus'").unwrap();
+        assert_eq!(opus.automatic_native_reasoning_effort(), "low");
+        assert_eq!(opus.native_reasoning_effort(), "low");
+
+        let opus_manual: ModelSettings = toml::from_str(
+            "backend = 'claude-cli'\nmodel = 'claude-opus-5'\nreasoning_effort = 'high'",
+        )
+        .unwrap();
+        assert_eq!(opus_manual.automatic_native_reasoning_effort(), "low");
+        assert_eq!(opus_manual.native_reasoning_effort(), "high");
     }
 
     #[test]

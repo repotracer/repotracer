@@ -38,21 +38,19 @@ pub fn profile(base: &Path, parent: &str) -> PathBuf {
     ))
 }
 
-// Native CLIs require a concrete initial effort. Keep Auto in the wizard as
-// None, then use the config's existing conservative default at the boundary.
-const AUTOMATIC_NATIVE_EFFORT: &str = "medium";
-
 fn profile_reasoning_effort(cfg: &RepoTracerConfig) -> Option<String> {
     let effort = cfg.model.reasoning_effort.trim();
-    // Older profiles had no Auto marker. Treat the native default medium plus
-    // adaptive reasoning as Auto; explicit medium remains visible when the
-    // adaptive flag is disabled.
+    // Older profiles had no Auto marker. Treat the former native default of
+    // medium as Auto, along with the current model-specific default. An
+    // explicit effort remains visible when adaptive reasoning is disabled.
     let native = matches!(
         cfg.model.backend.to_ascii_lowercase().as_str(),
         "codex" | "codex-cli" | "claude" | "claude-cli"
     );
     if effort.is_empty()
-        || (native && cfg.model.adaptive_reasoning && effort == AUTOMATIC_NATIVE_EFFORT)
+        || (native
+            && cfg.model.adaptive_reasoning
+            && (effort == "medium" || effort == cfg.model.automatic_native_reasoning_effort()))
     {
         None
     } else {
@@ -144,7 +142,8 @@ fn apply_model_choice(
             cfg.model.reasoning_effort = effort.clone();
             cfg.model.adaptive_reasoning = false;
         } else {
-            cfg.model.reasoning_effort = AUTOMATIC_NATIVE_EFFORT.into();
+            cfg.model.reasoning_effort.clear();
+            cfg.model.reasoning_effort = cfg.model.native_reasoning_effort().to_string();
             cfg.model.adaptive_reasoning = true;
         }
     }
@@ -350,9 +349,11 @@ pub fn run(
             RepoTracerConfig::load_from(&path)?
         } else {
             let mut c = cfg.clone();
+            crate::config::normalize_legacy_max_turns(&mut c);
             select_provider(&mut c, parent);
             c
         };
+        crate::config::normalize_legacy_max_turns(&mut selected);
         let (provider, model) = if parent == "codex" {
             (&codex, &codex_model)
         } else {
@@ -399,6 +400,7 @@ pub fn run(
             bail!("Install Claude Code before configuring its MCP integration");
         }
     }
+    migrate_installed_configs(base, &state)?;
     for (parent, path, selected) in pending {
         let old_profile = match fs::read(&path) {
             Ok(bytes) => Some(bytes),
@@ -485,9 +487,11 @@ fn install_parent(parent: &str, profile: &Path, managed: bool) -> Result<()> {
 pub fn refresh(base: &Path) -> Result<bool> {
     let path = base.with_extension("integrations.json");
     if !path.exists() {
+        crate::config::migrate_legacy_max_turns(base)?;
         return Ok(false);
     }
     let state: InstallState = serde_json::from_slice(&fs::read(path)?)?;
+    migrate_installed_configs(base, &state)?;
     for parent in state.parents {
         if !matches!(parent.as_str(), "codex" | "claude") {
             bail!("invalid parent profile");
@@ -495,6 +499,19 @@ pub fn refresh(base: &Path) -> Result<bool> {
         install_parent(&parent, &profile(base, &parent), true)?;
     }
     Ok(true)
+}
+
+fn migrate_installed_configs(base: &Path, state: &InstallState) -> Result<()> {
+    for parent in &state.parents {
+        if !matches!(parent.as_str(), "codex" | "claude") {
+            bail!("invalid parent profile");
+        }
+    }
+    crate::config::migrate_legacy_max_turns(base)?;
+    for parent in &state.parents {
+        crate::config::migrate_legacy_max_turns(&profile(base, parent))?;
+    }
+    Ok(())
 }
 
 /// Detach one parent: its native registration, then the generated profile.
@@ -558,6 +575,53 @@ pub fn uninstall(base: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inspecting_settings_does_not_migrate_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("config.toml");
+        let original = "[explorer]\nmax_turns = 6\n";
+        fs::write(&base, original).unwrap();
+        let cfg = RepoTracerConfig::load_from(&base).unwrap();
+        for dry in [false, true] {
+            run(&base, &cfg, None, None, None, None, None, dry).unwrap();
+            assert_eq!(fs::read_to_string(&base).unwrap(), original);
+            assert!(!base.with_extension("toml.bak").exists());
+        }
+    }
+
+    #[test]
+    fn installed_base_and_parent_profiles_migrate_together() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("config.toml");
+        let codex = profile(&base, "codex");
+        let claude = profile(&base, "claude");
+        let legacy = "# keep\n[explorer]\nmax_turns = 6 # generated\n";
+        fs::write(&base, legacy).unwrap();
+        fs::write(&codex, legacy).unwrap();
+        fs::write(&claude, "[explorer]\nmax_turns = 9 # chosen\n").unwrap();
+        let state = InstallState {
+            parents: vec!["codex".into(), "claude".into()],
+        };
+
+        migrate_installed_configs(&base, &state).unwrap();
+        migrate_installed_configs(&base, &state).unwrap();
+
+        for path in [&base, &codex] {
+            let text = fs::read_to_string(path).unwrap();
+            assert!(text.contains("# keep"));
+            assert!(text.contains("max_turns = 0 # generated"));
+            assert_eq!(
+                fs::read_to_string(path.with_extension("toml.bak")).unwrap(),
+                legacy
+            );
+        }
+        assert!(fs::read_to_string(&claude)
+            .unwrap()
+            .contains("max_turns = 9 # chosen"));
+        assert!(!claude.with_extension("toml.bak").exists());
+    }
+
     #[test]
     fn tracer_choice_includes_an_explicit_subscription() {
         assert_eq!(
@@ -717,25 +781,39 @@ mod tests {
     }
 
     #[test]
-    fn native_auto_uses_conservative_config_effort_and_keeps_explicit_override() {
-        let choice = |reasoning_effort| crate::wizard::ParentModelChoice {
-            parent: "codex".into(),
-            model: crate::model_catalog::ModelChoice {
-                provider: "codex".into(),
-                id: "gpt-5.6-luna".into(),
-                label: "Luna".into(),
-            },
-            custom: None,
-            reasoning_effort,
-            fast_tier: Some(true),
+    fn native_auto_uses_model_default_and_keeps_explicit_override() {
+        let choice = |provider: &str, id: &str, reasoning_effort: Option<String>| {
+            crate::wizard::ParentModelChoice {
+                parent: provider.into(),
+                model: crate::model_catalog::ModelChoice {
+                    provider: provider.into(),
+                    id: id.into(),
+                    label: id.into(),
+                },
+                custom: None,
+                reasoning_effort,
+                fast_tier: (provider == "codex").then_some(true),
+            }
         };
         let mut cfg = RepoTracerConfig::default();
-        apply_model_choice(&mut cfg, &choice(None)).unwrap();
+        apply_model_choice(&mut cfg, &choice("codex", "gpt-5.6-luna", None)).unwrap();
         assert_eq!(cfg.model.reasoning_effort, "medium");
         assert_ne!(cfg.model.reasoning_effort, "auto");
         assert!(cfg.model.adaptive_reasoning);
 
-        apply_model_choice(&mut cfg, &choice(Some("max".into()))).unwrap();
+        apply_model_choice(&mut cfg, &choice("claude", "opus", None)).unwrap();
+        assert_eq!(cfg.model.reasoning_effort, "low");
+        assert!(cfg.model.adaptive_reasoning);
+
+        apply_model_choice(&mut cfg, &choice("claude", "opus", Some("high".into()))).unwrap();
+        assert_eq!(cfg.model.reasoning_effort, "high");
+        assert!(!cfg.model.adaptive_reasoning);
+
+        apply_model_choice(
+            &mut cfg,
+            &choice("codex", "gpt-5.6-luna", Some("max".into())),
+        )
+        .unwrap();
         assert_eq!(cfg.model.reasoning_effort, "max");
         assert!(!cfg.model.adaptive_reasoning);
     }
@@ -747,6 +825,12 @@ mod tests {
         cfg.model.reasoning_effort = "medium".into();
         cfg.model.adaptive_reasoning = true;
         assert_eq!(profile_reasoning_effort(&cfg), None);
+
+        let mut opus_auto = cfg.clone();
+        opus_auto.model.backend = "claude-cli".into();
+        opus_auto.model.model = "opus".into();
+        opus_auto.model.reasoning_effort = "low".into();
+        assert_eq!(profile_reasoning_effort(&opus_auto), None);
 
         let mut manual_medium = cfg.clone();
         manual_medium.model.adaptive_reasoning = false;

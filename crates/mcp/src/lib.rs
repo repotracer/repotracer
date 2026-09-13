@@ -23,6 +23,7 @@ pub struct McpServer {
     scout: Arc<dyn ScoutBackend>,
     root: PathBuf,
     conversations: Arc<conversations::Conversations>,
+    reasoning_efforts: Option<Vec<String>>,
 }
 
 impl McpServer {
@@ -31,7 +32,16 @@ impl McpServer {
             scout,
             root,
             conversations: Arc::new(conversations::Conversations::default()),
+            reasoning_efforts: None,
         }
+    }
+
+    /// Add capability evidence for the configured native scout to the tool
+    /// schema. The evidence is advisory. Request validation and the provider
+    /// remain responsible for rejecting unsupported manual overrides.
+    pub fn with_reasoning_efforts(mut self, efforts: Option<Vec<String>>) -> Self {
+        self.reasoning_efforts = efforts;
+        self
     }
 
     /// Serve MCP over stdin/stdout until EOF.
@@ -69,7 +79,7 @@ impl McpServer {
             }
             "ping" => Ok(json!({})),
             "tools/list" => {
-                let mut tool = repo_scout_tool_def();
+                let mut tool = repo_scout_tool_def_with_efforts(self.reasoning_efforts.as_deref());
                 let root = self
                     .root
                     .canonicalize()
@@ -488,7 +498,31 @@ fn append_evidence(
     evidence
 }
 
+#[cfg(test)]
 fn repo_scout_tool_def() -> Value {
+    repo_scout_tool_def_with_efforts(None)
+}
+
+fn repo_scout_tool_def_with_efforts(reasoning_efforts: Option<&[String]>) -> Value {
+    let effort_description = reasoning_efforts.map(|efforts| {
+        if efforts.is_empty() {
+            "No discovered native effort levels are available for this model. Omit reasoning_effort to use its configured behavior.".to_owned()
+        } else {
+            format!(
+                "Available native effort levels for this configured model: {}. Choose using the task context already known; omit reasoning_effort to use configured behavior.",
+                efforts.join(", ")
+            )
+        }
+    });
+    let effort_schema = reasoning_efforts.map(|efforts| json!({
+        "type": "string",
+        "enum": efforts,
+        "description": effort_description,
+    })).unwrap_or_else(|| json!({
+        "type":"string",
+        "enum":["low","medium","high","xhigh","max"],
+        "description":"Native subscription effort for this investigation only. Medium suits straightforward lookups; high suits diagnosis, indirect relationships, or cross-component change impact. Omit to use configured effort. Supported levels depend on the selected provider and model."
+    }));
     json!({
         "name": "repo_scout",
         "description": REPO_SCOUT_DESC,
@@ -515,9 +549,9 @@ fn repo_scout_tool_def() -> Value {
                 },
                 "investigation": {
                     "type": "object", "additionalProperties": false,
-                    "description": "Optional JSON object of investigation hints, for example {\"intent\":\"diagnose\",\"reasoning_effort\":\"high\"}. Query alone can request any repository investigation.",
+                    "description": format!("Optional JSON object of investigation hints, for example {{\"intent\":\"diagnose\",\"reasoning_effort\":\"high\"}}. Query alone can request any repository investigation.{}", effort_description.as_deref().map(|text| format!(" {text}")).unwrap_or_default()),
                     "properties": {
-                        "reasoning_effort": {"type":"string", "enum":["low","medium","high","xhigh","max"], "description":"Native subscription effort for this investigation only. Medium suits straightforward lookups; high suits diagnosis, indirect relationships, or cross-component change impact. Omit to use configured effort. Supported levels depend on the selected provider and model."},
+                        "reasoning_effort": effort_schema,
                         "intent": {"type":"string", "enum":["locate","explain","change_impact","diagnose","inventory"]},
                         "questions": {"type":"array", "maxItems":24, "items":{"type":"string"}},
                         "conversation_id": {"type":"string", "maxLength":128, "description":"Reuse a prior conversation when its context helps, including related assignments in another repository. Supply a new repository explicitly when changing target. Omit for independent work. Status reports resumed, fresh or unknown; include necessary context when history is unavailable."},
@@ -1000,6 +1034,19 @@ mod tests {
         assert!(description.contains("selected source"));
         assert!(description.contains("experimental evidence"));
         assert!(description.contains("Use either representation, not both"));
+    }
+
+    #[test]
+    fn configured_efforts_are_visible_in_tool_schema() {
+        let efforts = vec!["medium".to_owned(), "high".to_owned()];
+        let tool = repo_scout_tool_def_with_efforts(Some(&efforts));
+        let schema =
+            &tool["inputSchema"]["properties"]["investigation"]["properties"]["reasoning_effort"];
+        assert_eq!(schema["enum"], json!(efforts));
+        assert!(schema["description"]
+            .as_str()
+            .unwrap()
+            .contains("Available native effort levels"));
     }
 
     #[test]

@@ -18,6 +18,12 @@ on:
       - 'NOTICE'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/repository-hygiene.yml'
+      - 'SECURITY.md'
+      - 'packages/npm/README.md'
+      - 'AGENTS.md'
+      - 'tools/benchmarks/**'
+      - '.github/workflows/benchmark-tooling.yml'
   pull_request:
     paths-ignore:
       - 'README.md'
@@ -31,6 +37,12 @@ on:
       - 'NOTICE'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/repository-hygiene.yml'
+      - 'SECURITY.md'
+      - 'packages/npm/README.md'
+      - 'AGENTS.md'
+      - 'tools/benchmarks/**'
+      - '.github/workflows/benchmark-tooling.yml'
 
 concurrency:
   group: repotracer-ci-${{ github.ref }}

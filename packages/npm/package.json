@@ -1,6 +1,6 @@
 {
   "name": "repotracer",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Read-only repository investigations for Codex and Claude Code using a separately configured scout model.",
   "bin": {
     "repotracer": "bin/repotracer.js"

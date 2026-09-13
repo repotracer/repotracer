@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "study": "native-claude-exact-guidance",
+  "date": "2026-09-13",
+  "task": {
+    "dataset": "princeton-nlp/SWE-bench_Lite",
+    "dataset_revision": "6ec7bb89b9342f664a54a6e0a6ea6501d3437cc2",
+    "instance_id": "django__django-13158",
+    "base_commit": "7af8f4127397279d19ef7c7899e93018274e2f9b",
+    "prompt_sha256": "7939c5ed353c7d0a907dbaa7389c478cb1d18d44096c3c84f3a07a827d36ce0c",
+    "selection_seed": 20260913,
+    "independent_tasks": 1,
+    "solves_per_condition": 1,
+    "influenced_submitted_guidance": false
+  },
+  "runtime": {
+    "runner_commit": "d1527a327bc997d9d92fd83699e16f504789c287",
+    "repotracer_version": "2.1.1",
+    "repotracer_binary_sha256": "067cd6b2a274a105c321b6434453a3c8132bda82e882a5f253fbf7a291478426",
+    "current_guidance_commit": "d1527a327bc997d9d92fd83699e16f504789c287",
+    "proposed_guidance_commit": "90e11e4e0f8f3eb751a81266fe02e4fb0f1dbc1a",
+    "claude_cli": "2.1.268",
+    "codex_grader_cli": "0.154.0-alpha.6.2",
+    "platform": "macOS-arm64",
+    "python": "3.9.6",
+    "dependencies": {
+      "asgiref": "3.2.10",
+      "sqlparse": "0.4.4",
+      "pytz": "2025.2",
+      "pytest": "7.4.4"
+    },
+    "sequential": true,
+    "whole_task_deadline": null,
+    "cache_policy": "No cache flush. Order was shuffled by the native runner and retained privately.",
+    "conditions_share_binary": true,
+    "conditions_share_snapshot": true,
+    "ambient_configuration": "User guidance, hooks, auto-memory and unrelated MCPs excluded consistently; native project tools retained."
+  },
+  "cost_basis": "Native Claude Code API-price-equivalent totals, including parent, scout, cache and auxiliary native model usage. Not subscription invoices.",
+  "usage_granularity": "Primary messages plus explicit per-model auxiliary aggregates. Auxiliary request count and effort are unknown; billable token buckets and reported total cost reconcile.",
+  "conditions": [
+    {
+      "group": "baseline",
+      "guidance_words": 0,
+      "guidance_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "completed",
+      "parent": {
+        "model": "claude-opus-5",
+        "effort": "native-default"
+      },
+      "scout_configured": null,
+      "scout_calls": 0,
+      "actual_settings": [
+        {
+          "role": "parent",
+          "model": "claude-haiku-4-5-20251001",
+          "effort": "unknown"
+        },
+        {
+          "role": "parent",
+          "model": "claude-opus-5",
+          "effort": "native-default"
+        }
+      ],
+      "elapsed_seconds": 123.775,
+      "cost_usd": 0.5886514999999999,
+      "cost_by_role_usd": {
+        "parent": 0.5886514999999999,
+        "scout": 0.0
+      },
+      "tokens": {
+        "parent": {
+          "uncached_input": 1260,
+          "cache_read": 498959,
+          "cache_write": 16838,
+          "output": 6788
+        },
+        "scout": {
+          "uncached_input": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "output": 0
+        }
+      },
+      "usage_complete": true,
+      "grade": {
+        "score": 9,
+        "rationale": "Correctly fixes emptiness propagation and isolates cloned combined queries. Both acceptance checks pass, including the independent hidden regression. Minor deduction for broader cloning work on every Query.clone() call and narrower committed coverage: only union emptiness and preservation are tested, without intersection, difference, nesting, or individual input preservation. Agent-test records marked not_run do not establish additional verified passes."
+      },
+      "independent_hidden_assertions": "passed",
+      "candidate_patch_sha256": "ef5af6b48271c07f1da982dd06fa47e13393c565acd6d2dfb49399f774de0884",
+      "native_trace_sha256": "49bddf946bb00d915ff9dd637d7fba10857324d4f58177bd20f70c5f321bcba1",
+      "solving_launches": 1
+    },
+    {
+      "group": "current",
+      "guidance_words": 349,
+      "guidance_sha256": "de968f4e507c57677544192a6275d743eb2a635cb00c40449b06e0b8659519b7",
+      "status": "completed",
+      "parent": {
+        "model": "claude-opus-5",
+        "effort": "native-default"
+      },
+      "scout_configured": {
+        "model": "opus",
+        "effort": "auto-low-medium"
+      },
+      "scout_calls": 1,
+      "actual_settings": [
+        {
+          "role": "parent",
+          "model": "claude-haiku-4-5-20251001",
+          "effort": "unknown"
+        },
+        {
+          "role": "parent",
+          "model": "claude-opus-5",
+          "effort": "native-default"
+        },
+        {
+          "role": "scout",
+          "model": "claude-haiku-4-5-20251001",
+          "effort": "unknown"
+        },
+        {
+          "role": "scout",
+          "model": "claude-opus-5",
+          "effort": "medium"
+        }
+      ],
+      "elapsed_seconds": 302.909,
+      "cost_usd": 1.801853,
+      "cost_by_role_usd": {
+        "parent": 0.5854069999999999,
+        "scout": 1.216446
+      },
+      "tokens": {
+        "parent": {
+          "uncached_input": 1246,
+          "cache_read": 407260,
+          "cache_write": 24349,
+          "output": 5493
+        },
+        "scout": {
+          "uncached_input": 1786,
+          "cache_read": 685464,
+          "cache_write": 46585,
+          "output": 16250
+        }
+      },
+      "usage_complete": true,
+      "grade": {
+        "score": 9,
+        "rationale": "Correctly propagates emptiness and recursively clones combined queries to prevent mutation of the original queryset. Both acceptance checks pass. Tests verify empty results and preservation of the combined queryset for all three set operations. Minor deduction because recursive cloning affects every combined-query clone, beyond the operation requiring this fix, and nested combinations and individual input preservation lack explicit regression assertions."
+      },
+      "independent_hidden_assertions": "passed",
+      "candidate_patch_sha256": "5a0aca95889c6365bca5c452f6e373450ff8edc20b2a55b7ed178c7071291c29",
+      "native_trace_sha256": "994521da8b425545382d71218a96fd50bcd78cb76bca55878b80113eeff7046d",
+      "solving_launches": 1
+    },
+    {
+      "group": "changed",
+      "guidance_words": 132,
+      "guidance_sha256": "f3518ab90019f93878e69ee18058a319c8c286c068c59b3161444ce79efd4c89",
+      "status": "completed",
+      "parent": {
+        "model": "claude-opus-5",
+        "effort": "native-default"
+      },
+      "scout_configured": {
+        "model": "opus",
+        "effort": "auto-low-medium"
+      },
+      "scout_calls": 0,
+      "actual_settings": [
+        {
+          "role": "parent",
+          "model": "claude-haiku-4-5-20251001",
+          "effort": "unknown"
+        },
+        {
+          "role": "parent",
+          "model": "claude-opus-5",
+          "effort": "native-default"
+        }
+      ],
+      "elapsed_seconds": 607.024,
+      "cost_usd": 0.7868645000000001,
+      "cost_by_role_usd": {
+        "parent": 0.7868645000000001,
+        "scout": 0.0
+      },
+      "tokens": {
+        "parent": {
+          "uncached_input": 1270,
+          "cache_read": 702595,
+          "cache_write": 22655,
+          "output": 8315
+        },
+        "scout": {
+          "uncached_input": 0,
+          "cache_read": 0,
+          "cache_write": 0,
+          "output": 0
+        }
+      },
+      "usage_complete": true,
+      "grade": {
+        "score": 10,
+        "rationale": "Correctly empties combined queries recursively and clones components before mutation, preserving source querysets. Confines cloning to set_empty(), keeping the fix narrowly scoped. Tests cover union, intersection, difference, nested unions, and preservation of union inputs and results. Both acceptance checks pass, including the independent hidden regression. No existing tests are weakened."
+      },
+      "independent_hidden_assertions": "passed",
+      "candidate_patch_sha256": "b4398d8a7d118b6472c4643bfdd17e63e6f3bf0bf13557b12c4802a3c94f6881",
+      "native_trace_sha256": "7178bd35ded3b566ec044afb1c777c2fbfec3874cee0b881f67d0fae29618092",
+      "solving_launches": 1
+    }
+  ],
+  "calibration": {
+    "new_behavior_failures": 1,
+    "passing_tests": 29,
+    "skipped_backend_tests": 2
+  },
+  "grader": {
+    "model": "gpt-6-astra",
+    "effort": "high",
+    "blind": true,
+    "tool_calls": 0,
+    "quality_fixed_before_diagnosis": true,
+    "tokens": {
+      "uncached_input": 32253,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 558
+    },
+    "cost_usd": null,
+    "cost_missing_reason": "No reported cost or matching rate card for grader; excluded from solving cost.",
+    "pre_model_failed_launches": 2,
+    "packet_labels_preserved": true,
+    "packet_audit_sha256": "a9d4017ace9c4951aac67e4b589009829613c408550c4c8daba9d1b5a66a8cce"
+  },
+  "diagnosis": {
+    "current": {
+      "classification": "tradeoff",
+      "scout_duration_seconds": 227.423,
+      "scout_cost_usd": 1.216446,
+      "handoff_used": true,
+      "observation": "Early, relevant assignment. Scout reproduces the bug and source-query mutation risk; parent implements its recommendation. Both parents without a scout also find this risk."
+    },
+    "changed": {
+      "classification": "tradeoff",
+      "full_suite_calls": [
+        {
+          "elapsed_seconds": 242.841,
+          "purpose": "Run complete suite, retaining only output tail."
+        },
+        {
+          "elapsed_seconds": 243.843,
+          "purpose": "Run complete suite again to list failures."
+        }
+      ],
+      "full_suite_elapsed_seconds": 486.68399999999997,
+      "observed_full_suite_failures": 5,
+      "same_failures_reproduced_without_patch": true,
+      "observation": "No scout call. More focused fix and committed tests earn a higher blind grade. Most latency comes from running the complete test suite twice, then checking failures without the patch."
+    }
+  },
+  "measurement_adaptations": [
+    "Joined Claude message_delta usage to early assistant snapshots and reconciled cumulative native auxiliary model totals; original traces unchanged.",
+    "Collected Django runtests.py commands, ignored empty host-path redactions and redacted candidate identifiers before blind export.",
+    "Preserved original acceptance evidence. Executed identical hidden assertions under a unique method name in independent checkouts after detecting test-method shadowing; verified assertion AST unchanged.",
+    "Retained test output without numeric exit codes as not_run with visible evidence; independent acceptance checks provide explicit exit codes.",
+    "Replaced controllers while native solving processes continued; one launch per solving parent. Grader launcher failures produced no grades or model usage and remain separate.",
+    "Archived the ungraded draft packet; finalized evidence before grading with unchanged candidate labels and review order. Used native Codex directly after detecting a legacy CLI shim."
+  ],
+  "local_runner_validation": {
+    "unit_tests_passed": 50,
+    "scope": "Local measurement adaptations, not changes to the RepoTracer binary or tooling shipped in this PR."
+  },
+  "publication_scope": "Sanitized summary and hashes only. Raw runs, candidate patches, hidden test source, blind label key, account data and local runner adaptations remain outside tracked files.",
+  "limitations": [
+    "One historical public task, one solve per condition. No estimate of run-to-run variance.",
+    "Conditions and scoring differ from the earlier 76-word pilot; results are not pooled.",
+    "Higher blind quality is a grader judgment on this case, not proof of a general improvement.",
+    "Zero scout calls under the proposed text does not demonstrate improved use of scout findings.",
+    "Hypothetically removing wait or testing time is not a measured faster run."
+  ]
+}

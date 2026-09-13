@@ -1,5 +1,10 @@
 # Parent guidance pilot
 
+A later [native Claude follow-up](native-claude.md) tests the exact 132-word
+proposal. It finds a higher blind grade and lower cost than the current guidance
+on one task, but twice the elapsed time. That study remains separate from this
+18-trial pilot and its 76-word candidate.
+
 The measured short guidance retained scout use in all six assisted trials and
 matched or improved the number of fully passing patches in each parent harness.
 The traces also show that calling the scout is only part of the problem: an
@@ -20,7 +25,7 @@ same RepoTracer v2.1.0 binary. Baseline had no RepoTracer tool or guidance.
 | --- | ---: | --- |
 | [v2.1.0 long](guidance/long.md) | 333 | Measured |
 | [Short candidate](guidance/short.md) | 76 | Measured |
-| [Proposed routing text](../../../crates/cli/src/agents.rs) | 132 | Revised after trace review; not benchmarked |
+| [Proposed routing text](../../../crates/cli/src/agents.rs) | 132 | Revised after this pilot; measured separately in the [native follow-up](native-claude.md) |
 
 Word counts use whitespace splitting, including any Markdown headings in the
 frozen benchmark inputs. The proposed routing body has no heading.
@@ -75,11 +80,11 @@ tool-discovery/output fallback instructions. The MCP schema continues to documen
 the full interface. It changes the shared text installed for Codex and Claude
 Code, with no hook or runtime enforcement.
 
-The evidence supports trying this revision, not claiming it has already beaten
-the measured candidate. A follow-up should run the exact proposed text, add a
-small direct-lookup control, and check whether handoffs replace enough parent
-exploration. These three tasks cannot establish statistical significance or
-general routing accuracy.
+The later [native follow-up](native-claude.md) runs the exact proposal on a new
+task. Its mixed cost, time and quality result adds evidence without establishing
+a general improvement. Further comparisons would need to check when handoffs
+replace enough parent exploration. These three pilot tasks cannot establish
+statistical significance or general routing accuracy.
 
 ## Audit the data
 

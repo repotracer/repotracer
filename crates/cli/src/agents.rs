@@ -19,10 +19,13 @@ pub(crate) const ROUTING_INSTRUCTIONS: &str = concat!(
 const REPOTRACER_NAMESPACE: &str = "mcp__repotracer";
 const MIN_TESTED_CODEX_VERSION: (u64, u64, u64) = (0, 153, 4);
 const CODEX_VERSION_TIMEOUT: Duration = Duration::from_secs(2);
-// A caller allowance, not a scout turn limit. The prior 120-second benchmark
-// setting cut off live investigations and caused the parent to repeat them.
-// This operational default is configurable; preserve any explicit user value.
-const SCOUT_TOOL_TIMEOUT_SECS: i64 = 600;
+// Codex always applies a caller deadline: omission restores its default and
+// zero expires immediately. It currently has no unlimited-wait setting.
+// Use a portable signed-32-bit allowance (~68 years) so ordinary investigations
+// are governed by cancellation / the native stream-inactivity watchdog instead.
+// This is a finite host compatibility workaround, not an inactivity timeout.
+const SCOUT_TOOL_TIMEOUT_SECS: i64 = i32::MAX as i64;
+const LEGACY_SCOUT_TOOL_TIMEOUT_SECS: i64 = 600;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInfo {
@@ -255,10 +258,22 @@ fn configure_mcp_server(
     server.insert("command", value(binary.display().to_string()));
     let args_value: Value = args.iter().cloned().collect();
     server.insert("args", Item::Value(args_value));
-    server
-        .entry("tool_timeout_sec")
-        .or_insert(value(SCOUT_TOOL_TIMEOUT_SECS));
+    configure_scout_caller_timeout(server);
     Ok(())
+}
+
+fn configure_scout_caller_timeout(server: &mut dyn TableLike) {
+    let timeout = server.get("tool_timeout_sec");
+    // Both new setup and updater refresh reach this function. Merely changing
+    // the default would leave every existing 600-second installation broken.
+    // TOML permits 600 and 600.0; both represent the old managed default.
+    let old_default = timeout.is_some_and(|item| {
+        item.as_integer() == Some(LEGACY_SCOUT_TOOL_TIMEOUT_SECS)
+            || item.as_float() == Some(LEGACY_SCOUT_TOOL_TIMEOUT_SECS as f64)
+    });
+    if timeout.is_none() || old_default {
+        server.insert("tool_timeout_sec", value(SCOUT_TOOL_TIMEOUT_SECS));
+    }
 }
 
 const REPOTRACER_SERVER_NAME: &str = "repotracer";
@@ -857,6 +872,63 @@ mcp_servers = { repotracer = { command = "old" }, other = { command = "keep" } }
                 Some(explicit.unwrap_or(SCOUT_TOOL_TIMEOUT_SECS))
             );
         }
+    }
+
+    #[test]
+    fn scout_caller_timeout_migrates_old_default_in_every_supported_table_form() {
+        for timeout in ["600", "600.0"] {
+            for input in [
+                format!("[mcp_servers.repotracer]\ntool_timeout_sec = {timeout}\n"),
+                format!("[mcp_servers]\nrepotracer = {{ tool_timeout_sec = {timeout}, enabled = false }}\n"),
+                format!("mcp_servers = {{ repotracer = {{ tool_timeout_sec = {timeout} }}, other = {{ tool_timeout_sec = 600 }} }}\n"),
+            ] {
+                let once = update_codex_config(&input, &["serve".into()]);
+                let twice = update_codex_config(&once, &["serve".into()]);
+                assert_eq!(once, twice, "migration must be idempotent");
+                let parsed: toml::Value = once.parse().unwrap();
+                assert_eq!(
+                    parsed["mcp_servers"]["repotracer"]["tool_timeout_sec"].as_integer(),
+                    Some(SCOUT_TOOL_TIMEOUT_SECS)
+                );
+                if let Some(other) = parsed["mcp_servers"].get("other") {
+                    assert_eq!(other["tool_timeout_sec"].as_integer(), Some(600));
+                }
+                if let Some(enabled) = parsed["mcp_servers"]["repotracer"].get("enabled") {
+                    assert_eq!(enabled.as_bool(), Some(false));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn integration_refresh_migrates_timeout_without_losing_user_configuration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let original = "model = \"user-model\"\n[mcp_servers.repotracer]\ncommand = \"old\"\ntool_timeout_sec = 600\nstartup_timeout_sec = 9\n[mcp_servers.other]\ncommand = \"keep\"\ntool_timeout_sec = 600\n";
+        fs::write(&path, original).unwrap();
+        // The same installer is used by settings::refresh after binary updates.
+        install_codex_config(&path, Path::new("new-binary"), &["serve".into()]).unwrap();
+        let first = fs::read_to_string(&path).unwrap();
+        install_codex_config(&path, Path::new("new-binary"), &["serve".into()]).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), first);
+        let updated: toml::Value = first.parse().unwrap();
+        assert_eq!(updated["model"].as_str(), Some("user-model"));
+        assert_eq!(
+            updated["mcp_servers"]["repotracer"]["startup_timeout_sec"].as_integer(),
+            Some(9)
+        );
+        assert_eq!(
+            updated["mcp_servers"]["repotracer"]["tool_timeout_sec"].as_integer(),
+            Some(SCOUT_TOOL_TIMEOUT_SECS)
+        );
+        assert_eq!(
+            updated["mcp_servers"]["other"]["tool_timeout_sec"].as_integer(),
+            Some(600)
+        );
+        assert_eq!(
+            fs::read_to_string(path.with_extension("toml.bak")).unwrap(),
+            original
+        );
     }
 
     #[test]

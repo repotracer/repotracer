@@ -628,7 +628,7 @@ impl App {
         }
     }
 
-    fn known_efforts(&self, index: usize) -> Option<&Vec<String>> {
+    fn known_efforts(&self, index: usize) -> Option<Vec<String>> {
         let model = self.choices[index].as_ref()?;
         let key = model_catalog::model_key(&model.provider, &model.id);
         if model.provider == "openai-compatible" {
@@ -636,9 +636,12 @@ impl App {
             if self.custom[index].as_ref() != Some(connection) {
                 return None;
             }
-            efforts.get(&key)
+            efforts.get(&key).cloned()
         } else {
-            self.catalog.reasoning_efforts.get(&key)
+            let discovered = self.catalog.reasoning_efforts.get(&key).map(Vec::as_slice);
+            // Keep the picker aligned with the same model-specific effort
+            // policy advertised to the parent agent through MCP.
+            model_catalog::advertised_reasoning_efforts(&model.provider, &model.id, discovered)
         }
     }
 
@@ -688,7 +691,7 @@ impl App {
     }
 
     fn effort_candidates_for(&self, index: usize) -> Vec<String> {
-        self.known_efforts(index).cloned().unwrap_or_default()
+        self.known_efforts(index).unwrap_or_default()
     }
 
     fn open_effort(&mut self, index: usize) {
@@ -1849,9 +1852,20 @@ mod tests {
         app.focus = app.field_focus(0, Field::Effort);
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.page, Page::Effort);
-        assert_eq!(app.effort_options(), vec![None, Some("max".into())]);
-        assert_eq!(app.picker.selected(), Some(1));
-        key(&mut app, KeyCode::Up);
+        assert_eq!(
+            app.effort_options(),
+            vec![
+                None,
+                Some("medium".into()),
+                Some("high".into()),
+                Some("xhigh".into()),
+                Some("max".into())
+            ]
+        );
+        assert_eq!(app.picker.selected(), Some(4));
+        for _ in 0..4 {
+            key(&mut app, KeyCode::Up);
+        }
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.selected_efforts[0], None);
     }

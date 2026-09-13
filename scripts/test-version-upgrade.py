@@ -10,11 +10,19 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import socketserver
 import subprocess
+import sys
 import tempfile
 import threading
+
+
+if sys.version_info < (3, 11):
+    raise SystemExit("scripts/test-version-upgrade.py requires Python 3.11 or newer")
+
+import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -125,13 +133,30 @@ def main() -> None:
         }
         run(managed, "config", "--init", env=environment)
         run(managed, "__refresh-integration", env=environment)
-        old_config_hash = hashlib.sha256(app_config.read_bytes()).digest()
+        # Reproduce the 2.1.0 managed default even when starting from an older
+        # tag which did not write a caller timeout. The updater must migrate it.
+        text = codex_config.read_text()
+        section = re.search(r"(?m)^\[mcp_servers\.repotracer\]\s*$", text)
+        if section is None:
+            raise RuntimeError("historical setup did not write the expected MCP section")
+        following = re.search(r"(?m)^\[", text[section.end():])
+        end = section.end() + following.start() if following else len(text)
+        body = text[section.end():end]
+        body = re.sub(r"(?m)^tool_timeout_sec\s*=.*\n?", "", body)
+        codex_config.write_text(text[:section.end()] + "\ntool_timeout_sec = 600\n" + body + text[end:])
+        with app_config.open("a") as config:
+            config.write("\n# upgrade fixture comment\n[upgrade_fixture]\nkeep = 'yes'\n")
+        old_app_config = app_config.read_bytes()
 
         payload = release_binary.read_bytes()
         digest = hashlib.sha256(payload).hexdigest()
         asset = asset_name()
         routes = {
-            "/releases/latest": json.dumps({"tag_name": f"v{to_version}"}).encode(),
+            # The old updater reads tag_name from its release override. The
+            # current updater reads latest from the npm dist-tags override.
+            "/dist-tags": json.dumps(
+                {"latest": to_version, "tag_name": f"v{to_version}"}
+            ).encode(),
             "/SHA256SUMS": f"{digest}  ./{asset}/{asset}\n".encode(),
             f"/{asset}": payload,
         }
@@ -157,7 +182,8 @@ def main() -> None:
         base = f"http://127.0.0.1:{server.server_address[1]}"
         update_environment = {
             **environment,
-            "REPOTRACER_RELEASE_API": f"{base}/releases/latest",
+            "REPOTRACER_NPM_DIST_TAGS_API": f"{base}/dist-tags",
+            "REPOTRACER_RELEASE_API": f"{base}/dist-tags",
             "REPOTRACER_RELEASE_BASE_URL": base,
         }
         try:
@@ -170,14 +196,24 @@ def main() -> None:
             raise RuntimeError(f"unexpected updater output: {update.stdout}")
         if managed.read_bytes() != payload or version(managed, environment) != to_version:
             raise RuntimeError("the managed binary was not replaced")
-        if hashlib.sha256(app_config.read_bytes()).digest() != old_config_hash:
-            raise RuntimeError("the updater changed the existing RepoTracer config")
+        migrated_app_config = app_config.read_text()
+        parsed_app_config = tomllib.loads(migrated_app_config)
+        if parsed_app_config["explorer"]["max_turns"] != 0:
+            raise RuntimeError("the updater did not migrate the legacy six-turn ceiling")
+        if "# upgrade fixture comment" not in migrated_app_config:
+            raise RuntimeError("the updater removed an existing RepoTracer config comment")
+        if parsed_app_config["upgrade_fixture"]["keep"] != "yes":
+            raise RuntimeError("the updater removed unrelated RepoTracer configuration")
+        if app_config.with_suffix(".toml.bak").read_bytes() != old_app_config:
+            raise RuntimeError("the updater did not preserve the pre-migration config backup")
         run(managed, "--json", "status", env=environment)
         run(managed, "--mock", "--root", ROOT, "scout", "where is routing handled?", env=environment)
 
         refreshed_config = codex_config.read_text()
         refreshed_agents = agents.read_text()
         checks = {
+            "legacy caller timeout migrated": tomllib.loads(refreshed_config)
+            ["mcp_servers"]["repotracer"]["tool_timeout_sec"] == 2_147_483_647,
             "user Codex config": 'model = "user-choice"' in refreshed_config
             and "[user_settings]" in refreshed_config,
             "single MCP entry": refreshed_config.count("[mcp_servers.repotracer]") == 1,

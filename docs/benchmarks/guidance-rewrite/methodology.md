@@ -9,7 +9,9 @@ base commits, prompt hashes, image digests and scheduled conditions.
 
 Each task received long, short and baseline trials in both parent harnesses,
 with one repeat. Guidance was frozen before scoring. The proposed 132-word
-revision was written after reviewing the results and is not a measured arm.
+revision was written after reviewing the results and is not a measured arm of
+this pilot. A later [native Claude follow-up](native-claude.md) tests that exact
+revision under different conditions; the two studies are not pooled.
 
 ## Models and isolation
 

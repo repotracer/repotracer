@@ -75,8 +75,9 @@ send the objective, relevant requirements and questions the investigation must
 answer, work on independent parts while waiting, and continue from the returned
 evidence. It adds no hook or enforced investigation limit.
 
-The [guidance pilot](benchmarks/guidance-rewrite/README.md) records the comparison
-and the distinction between the measured candidate and this revision.
+The [guidance studies](benchmarks/guidance-rewrite/README.md) distinguish the
+original 76-word pilot candidate from the later native comparison of this exact
+132-word revision, including its mixed cost, time and quality results.
 
 A focused edit can stay direct:
 
