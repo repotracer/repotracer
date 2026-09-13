@@ -30,7 +30,9 @@ jobs:
               ["git", "log", revision, "--diff-filter=ACMR", "--format=", "--name-only"],
               text=True,
           ).splitlines()
-          forbidden = re.compile(r"(^|/)(research|benchmarks)/|^crates/bench/|^docs/(\.internal|launch)/|^BENCHMARKS\.md$|^benchmarks\.html$|^scripts/summarize-results(?:\.py)?$|^assets/(button-benchmarks\.svg|benchmark-card\.png|results-proof\.png)$")
+          # Public benchmark docs and artifacts (BENCHMARKS.md, benchmarks/,
+          # docs/benchmarks/) and the launch article are allowed.
+          forbidden = re.compile(r"(^|/)research/|^crates/bench/|^docs/\.internal/|^benchmarks\.html$|^scripts/summarize-results(?:\.py)?$|^assets/(button-benchmarks\.svg|benchmark-card\.png|results-proof\.png)$")
           found = sorted({path for path in paths if forbidden.search(path)})
           if found:
               raise SystemExit(
@@ -38,5 +40,5 @@ jobs:
                   + "\n".join(found)
                   + "\n(this check reads only the commits under review, not the whole history)"
               )
-          print("No private research or benchmark files were added or modified by this change.")
+          print("No private research files were added or modified by this change.")
           PY
