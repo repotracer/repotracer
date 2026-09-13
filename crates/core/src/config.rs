@@ -374,7 +374,9 @@ mod tests {
     fn whole_run_timeouts_are_opt_in() {
         let config = RepoTracerConfig::default();
         assert_eq!(config.model.timeout_ms, 0);
-        assert_eq!(config.model.service_tier, "fast");
+        // Only the Codex backend has a tier, so the shared default carries
+        // none and a profile that never sets one writes none.
+        assert_eq!(config.model.service_tier, "");
         assert_eq!(config.explorer.total_timeout(), None);
         assert_eq!(config.explorer.max_turns, 0);
         let explicit: RepoTracerConfig = toml::from_str("[explorer]\nmax_turns = 6\n").unwrap();
