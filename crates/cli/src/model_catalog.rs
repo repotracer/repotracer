@@ -44,6 +44,40 @@ pub fn model_key(provider: &str, model: &str) -> String {
     format!("{}:{model}", provider.to_ascii_lowercase())
 }
 
+/// Return the effort levels that should be offered to a parent agent for a
+/// configured native model. Capability discovery remains the source of truth
+/// for ordinary models. The two recommended models have narrower, documented
+/// choices: Luna starts at medium and does not offer low, while Opus offers
+/// low and medium for task-dependent selection.
+pub fn advertised_reasoning_efforts(
+    provider: &str,
+    model: &str,
+    discovered: Option<&[String]>,
+) -> Option<Vec<String>> {
+    let provider = provider.to_ascii_lowercase();
+    let model = model.trim().to_ascii_lowercase();
+    let allowed: Option<&[&str]> = if provider == "codex-cli" || provider == "codex" {
+        (model == "gpt-5.6-luna").then_some(&["medium", "high", "xhigh", "max"] as &[&str])
+    } else if provider == "claude-cli" || provider == "claude" {
+        (model == "opus" || model.starts_with("claude-opus")).then_some(&["low", "medium"])
+    } else {
+        None
+    };
+    match (allowed, discovered) {
+        (Some(allowed), Some(levels)) => {
+            let filtered = levels
+                .iter()
+                .filter(|level| allowed.contains(&level.as_str()))
+                .cloned()
+                .collect::<Vec<_>>();
+            (!filtered.is_empty()).then_some(filtered)
+        }
+        (Some(allowed), None) => Some(allowed.iter().map(|level| (*level).to_owned()).collect()),
+        (None, Some(levels)) => Some(levels.to_vec()),
+        (None, None) => None,
+    }
+}
+
 /// A model advertised by an OpenAI-compatible `/models` endpoint.
 pub async fn discover_openai_models(
     base_url: &str,
@@ -1446,6 +1480,61 @@ mod tests {
         assert_eq!(
             efforts.get(&model_key("openai-compatible", "vendor/reasoner.v9")),
             Some(&vec!["medium".into(), "max".into()])
+        );
+    }
+
+    #[test]
+    fn advertised_efforts_narrow_only_recommended_models() {
+        let discovered = vec![
+            "low".into(),
+            "medium".into(),
+            "high".into(),
+            "xhigh".into(),
+            "max".into(),
+        ];
+        assert_eq!(
+            advertised_reasoning_efforts("codex-cli", "gpt-5.6-luna", Some(&discovered)),
+            Some(
+                vec!["medium", "high", "xhigh", "max"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect()
+            )
+        );
+        assert_eq!(
+            advertised_reasoning_efforts("claude", "opus", Some(&discovered)),
+            Some(
+                vec!["low", "medium"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect()
+            )
+        );
+        assert_eq!(
+            advertised_reasoning_efforts("codex", "other", Some(&discovered)),
+            Some(discovered)
+        );
+        assert_eq!(
+            advertised_reasoning_efforts("codex", "gpt-5.6-luna", None),
+            Some(
+                vec!["medium", "high", "xhigh", "max"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect()
+            )
+        );
+        assert_eq!(
+            advertised_reasoning_efforts("claude", "opus", None),
+            Some(
+                vec!["low", "medium"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect()
+            )
+        );
+        assert_eq!(
+            advertised_reasoning_efforts("claude", "opus", Some(&[])),
+            None
         );
     }
 
