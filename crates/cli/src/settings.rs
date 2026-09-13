@@ -186,9 +186,6 @@ pub fn run(
     } else {
         InstallState::default()
     };
-    if !dry {
-        migrate_installed_configs(base, &state)?;
-    }
     let mut installed = InstallState {
         parents: state.parents.clone(),
     };
@@ -356,6 +353,7 @@ pub fn run(
             select_provider(&mut c, parent);
             c
         };
+        crate::config::normalize_legacy_max_turns(&mut selected);
         let (provider, model) = if parent == "codex" {
             (&codex, &codex_model)
         } else {
@@ -402,6 +400,7 @@ pub fn run(
             bail!("Install Claude Code before configuring its MCP integration");
         }
     }
+    migrate_installed_configs(base, &state)?;
     for (parent, path, selected) in pending {
         let old_profile = match fs::read(&path) {
             Ok(bytes) => Some(bytes),
@@ -576,6 +575,20 @@ pub fn uninstall(base: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inspecting_settings_does_not_migrate_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("config.toml");
+        let original = "[explorer]\nmax_turns = 6\n";
+        fs::write(&base, original).unwrap();
+        let cfg = RepoTracerConfig::load_from(&base).unwrap();
+        for dry in [false, true] {
+            run(&base, &cfg, None, None, None, None, None, dry).unwrap();
+            assert_eq!(fs::read_to_string(&base).unwrap(), original);
+            assert!(!base.with_extension("toml.bak").exists());
+        }
+    }
 
     #[test]
     fn installed_base_and_parent_profiles_migrate_together() {

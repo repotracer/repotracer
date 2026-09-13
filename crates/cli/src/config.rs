@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use repotracer_core::RepoTracerConfig;
 use std::{
     fs,
+    io::Write,
     path::{Path, PathBuf},
 };
 use toml_edit::{DocumentMut, Formatted, Item, Value};
@@ -59,7 +60,18 @@ pub fn migrate_legacy_max_turns(path: &Path) -> Result<bool> {
     }
 
     backup_file(path)?;
-    fs::write(path, document.to_string())
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+    temporary
+        .as_file()
+        .set_permissions(fs::metadata(path)?.permissions())?;
+    temporary.write_all(document.to_string().as_bytes())?;
+    temporary.as_file().sync_all()?;
+    temporary
+        .persist(path)
         .with_context(|| format!("write migrated RepoTracer config {}", path.display()))?;
     Ok(true)
 }
