@@ -1,5 +1,6 @@
 mod adaptive;
 mod agents;
+mod benchmark_ui;
 mod claude;
 mod config;
 mod doctor;
@@ -132,6 +133,15 @@ enum Commands {
     },
     /// Diagnose installation and connectivity
     Doctor,
+    /// Open the native benchmark task and reporting TUI
+    Benchmarks {
+        /// Directory where benchmark configuration, runs, and reports are saved
+        #[arg(long)]
+        state_dir: Option<PathBuf>,
+        /// Python workflow backend (defaults to tools/benchmarks/workflow.py)
+        #[arg(long)]
+        engine: Option<PathBuf>,
+    },
     /// Show current configuration
     Status,
     /// Show or write configuration
@@ -314,6 +324,9 @@ async fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
         Commands::Doctor => doctor::run(&root, &cfg, cli.json).await,
+        Commands::Benchmarks { state_dir, engine } => {
+            benchmark_ui::run(benchmark_ui::BenchmarkOptions { state_dir, engine })
+        }
         Commands::Status => cmd_status(&root, &cfg_path, &cfg, cli.json),
         Commands::Config { init, path } => {
             if path {
