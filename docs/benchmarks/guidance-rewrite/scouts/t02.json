@@ -1,0 +1,119 @@
+[
+  {
+    "wire_request_line": 6,
+    "wire_response_line": 7,
+    "arguments": {
+      "repository": "<checkout>",
+      "query": "Investigate implementation points for adding # nosec-begin / # nosec-end region suppression and # nosec-next-line next-statement suppression. Work only within supplied checkout, no network or other directories. Need existing nosec handling, statement ranges, enabled tests, metrics and testing conventions. Requirements: case-insensitive directive keywords; optional selectors (empty/all blanket, none no effect, test IDs/names, ID prefix globs, spaces/commas union, | & - ! parentheses with fallback whitespace/comma union on invalid parse). Begin only subsequent physical lines; indented unended region auto ends on later dedent using leading whitespace; end pops most recent active region before its line, extra text ignored; statement-wide suppression if any line overlaps. Next statement skips blank/comments/grouping-only tokens/semicolon/ellipsis lines. Combine all applicable selectors, blanket dominates; ignore-nosec disables all. Resolved blanket increments nosec, nonempty specific skipped_tests. Identify minimal correct architecture and relevant existing tests, do not edit."
+    },
+    "latency_seconds": 73.27,
+    "is_error": false,
+    "stats": {
+      "cache_write_prompt_tokens": 0,
+      "cached_prompt_tokens": 332288,
+      "completion_tokens": 4705,
+      "duration_ms": 73318,
+      "index_usage": {
+        "available": true,
+        "calls": 0,
+        "duration_ms": 0,
+        "failed_calls": 0,
+        "incomplete_calls": 0,
+        "output_bytes": 0,
+        "parsed_files": 0,
+        "reused_files": 0
+      },
+      "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+      "prompt_tokens": 386696,
+      "reasoning_effort": "medium",
+      "reasoning_output_tokens": 589,
+      "thread_turn": 1,
+      "tool_calls": 17,
+      "total_tokens": 391401,
+      "turns": 18,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 332288,
+        "input_tokens": 386696,
+        "output_tokens": 4705,
+        "reasoning_output_tokens": 589,
+        "total_tokens": 391401
+      },
+      "usage_status": "complete",
+      "warm_process": false
+    },
+    "report": "Existing ownership is concentrated in `bandit/core/manager.py`, `bandit/core/tester.py`, and `bandit/core/utils.py`.\n\n`BanditManager._parse_file()` tokenizes each file and currently builds `nosec_lines: dict[int, set[str] | None]`. Every comment token is inserted, with non-`nosec` comments mapping to `None`; `_parse_nosec_comment()` recognizes only lowercase `nosec`, accepts optional `:` and parses comma/whitespace-separated IDs or names. Unknown selectors are logged and discarded. This parser must be replaced or extended to recognize case-insensitive `nosec`, `nosec-begin`, `nosec-end`, and `nosec-next-line`, while preserving the distinction between no directive and an active blanket directive. The current empty set means blanket suppression, so `none` must be represented as an explicit no-effect result rather than an empty set.\n\nThe cleanest architecture is to keep token scanning in the manager, but produce a resolved per-line suppression map before AST traversal. Maintain a stack of active regions while iterating physical source lines or comment tokens. A begin directive applies only to lines after its own line. An end directive removes the most recent matching active region before its own line, and extra text after `nosec-end` can be ignored. For indented regions, store the begin line's leading indentation and implicitly close the region when a later physical line has less leading whitespace. Resolve nested regions by unioning selectors, with any blanket selector taking precedence. `ignore_nosec` should bypass all directive resolution and pass an empty map, as it currently bypasses comment processing.\n\n`nosec-next-line` needs token/line resolution, not simply `lineno + 1`: after the directive, skip physical lines that contain only whitespace, comments, grouping punctuation, semicolons, or ellipsis. The first actual statement line should receive the directive's selector, and multiline AST statements should then be suppressed by line overlap. A practical implementation is to identify the first statement-bearing token after the comment, ignoring `NL`, `NEWLINE`, comments, `INDENT`/`DEDENT`, delimiters, `;`, and `...`, then attach the selector to that line or to all lines of the statement once AST ranges are available.\n\nAt test time, `BanditTester._get_nosecs_from_contexts()` currently checks the reported issue line plus `utils.get_nosec(context)`, but `utils.get_nosec()` returns on the first matching line. This violates the requested union semantics and statement-wide rule. Change this path to inspect every line in the issue's effective range, union all applicable selectors, and return blanket immediately if any matching entry is blanket. The existing tester already distinguishes `None` as no suppression from an empty set as blanket suppression. Specific selector matches increment `skipped_tests`, while blanket matches increment `nosec`; retain that accounting behavior for each skipped finding. The issue's effective range is populated from `result.linerange` or the AST context before suppression, and AST ranges already use `node.lineno` through `node.end_lineno`, so overlap can be implemented centrally without changing plugins.\n\nThere is an unused `Context.statement` property, but no visitor code populates `context[\"statement\"]`. Do not base this feature on that property. The visitor does populate `context[\"linerange\"]` from `utils.linerange(node)`, and string/bytes checks deliberately replace their range with the parent statement's range. That existing range behavior is the right suppression input and already covers multiline calls and statements.\n\nTesting conventions are primarily functional example files plus aggregate metric assertions. `tests/functional/test_functional.py::test_skip` and `test_ignore_skip` exercise baseline blanket line suppression and `ignore_nosec`; `test_multiline_sql_statements` checks both issue counts and `nosec`/`skipped_tests`; `test_metric_gathering` checks the standard `skip.py` metrics. There are currently no focused unit tests for `_parse_nosec_comment`, `get_nosec`, or region handling. Add a dedicated unit test module for selector parsing and line-state resolution, plus a functional example covering nested/indented regions, end-line exclusion, next-statement blank/comment skipping, multiline overlap, selector unions, invalid-expression fallback, and ignore-nosec metrics. Existing examples confirm the accepted legacy forms: bare `# nosec`, `# nosec: B607, B602`, names, and comments where the directive appears later in a line.\n\nOne subtle existing behavior to preserve or explicitly test: `_parse_file()` stores every comment token, including non-nosec comments, but the tester treats `None` as no suppression. Also, file-level tests run with `lineno: 0` and `linerange: [0, 1]`; any new centralized resolver should decide whether line-1 directives apply to File checks, rather than accidentally changing this current behavior.\nInvestigation limitations:\n- Source could not be attached: bandit/core/utils.py:393-402 (unavailable file or invalid range).\n",
+    "citations": [
+      {
+        "end_line": 29,
+        "path": "bandit/core/manager.py",
+        "reason": "Current nosec regex definitions and existing case-sensitive parser configuration.",
+        "source_status": "included",
+        "start_line": 26
+      },
+      {
+        "end_line": 322,
+        "path": "bandit/core/manager.py",
+        "reason": "Tokenization entry point and current per-line nosec map construction, including ignore-nosec bypass.",
+        "source_status": "included",
+        "start_line": 301
+      },
+      {
+        "end_line": 499,
+        "path": "bandit/core/manager.py",
+        "reason": "Current selector parsing, ID/name lookup, unknown-selector handling, and blanket empty-set representation.",
+        "source_status": "included",
+        "start_line": 464
+      },
+      {
+        "end_line": 154,
+        "path": "bandit/core/tester.py",
+        "reason": "Suppression decision and metric accounting, including the None versus empty-set contract and current union of only two lookup results.",
+        "source_status": "included",
+        "start_line": 55
+      },
+      {
+        "end_line": 154,
+        "path": "bandit/core/tester.py",
+        "reason": "Central helper that should be changed to collect all overlapping line directives and blanket precedence.",
+        "source_status": "included",
+        "start_line": 127
+      },
+      {
+        "end_line": 270,
+        "path": "bandit/core/utils.py",
+        "reason": "AST and parent-statement line-range calculation, including end_lineno and multiline fallback behavior.",
+        "source_status": "included",
+        "start_line": 199
+      },
+      {
+        "end_line": 216,
+        "path": "bandit/core/node_visitor.py",
+        "reason": "Visitor context construction showing that linerange is populated, while statement is not.",
+        "source_status": "included",
+        "start_line": 189
+      },
+      {
+        "end_line": 296,
+        "path": "bandit/core/node_visitor.py",
+        "reason": "Traversal and file-level test context, relevant to statement ranges and line-1/file checks.",
+        "source_status": "included",
+        "start_line": 278
+      },
+      {
+        "end_line": 452,
+        "path": "tests/functional/test_functional.py",
+        "reason": "Existing functional suppression and metric test conventions, including multiline metrics.",
+        "source_status": "included",
+        "start_line": 389
+      },
+      {
+        "end_line": 723,
+        "path": "tests/functional/test_functional.py",
+        "reason": "Existing aggregate metric assertions for blanket nosec and skipped tests.",
+        "source_status": "included",
+        "start_line": 711
+      }
+    ]
+  }
+]

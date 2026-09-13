@@ -1,0 +1,284 @@
+{
+  "seed": 20260913,
+  "corpus_commit": "0b9fabbb63b9104d678fe965e1632f2dd9eaa2ea",
+  "arms": [
+    "baseline",
+    "long",
+    "short"
+  ],
+  "parents": {
+    "codex": {
+      "model": "gpt-6-astra",
+      "effort": "high"
+    },
+    "claude": {
+      "model": "opus[1m]",
+      "effort": "xhigh"
+    }
+  },
+  "repotracer_version": "2.1.0",
+  "repeats": 1,
+  "timeout_seconds": 1200,
+  "limitations": [
+    "Small exploratory pilot, no statistical significance claim.",
+    "Solvers use macOS native CLI, verifiers use pinned Linux images.",
+    "Subscription tokens reported by provider and scout; dollar equivalents only if rates can be verified.",
+    "Three initial Codex attempts were aborted uniformly because the harness sandbox blocked local Git writes. Preserved as unscored setup attempts; unchanged guidance restarts with Git writes available."
+  ],
+  "tasks": [
+    {
+      "id": "bandit-structured-nosec-directives",
+      "ext_id": "kh757d8ggvnfaszv8zcav3msy982ma7f",
+      "task_id": "bandit-structured-nosec-directives",
+      "display_title": "Add structured nosec directives for regions and next line",
+      "display_description": "Add region and next-line nosec directives with selector expressions and ignore-nosec handling.",
+      "original_title": "Structured nosec suppression directives for region and next-line scopes",
+      "category": "feature_request",
+      "language": "python",
+      "repository_url": "https://github.com/PyCQA/bandit.git",
+      "base_commit_hash": "b46fa3a2723635aa29cc012538df4867ac2ac006",
+      "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh757d8ggvnfaszv8zcav3msy982ma7f-v1.1",
+      "prompt_sha256": "310eeb36b46c3aece39ab187817b87764f0a428affe5e8a1688e0c92f7b92f9d"
+    },
+    {
+      "id": "prometheus-typed-label-sorting",
+      "ext_id": "kh76dadw64v8013j689380xsg182yhfc",
+      "task_id": "prometheus-typed-label-sorting",
+      "display_title": "Fix PromQL label sorting across typed and untyped values",
+      "display_description": "PromQL label sorting must order mixed typed and untyped label values with stable typed comparison rules.",
+      "original_title": "sort_by_label scientific-notation numeric ordering in PromQL",
+      "category": "bugfix",
+      "language": "go",
+      "repository_url": "https://github.com/prometheus/prometheus",
+      "base_commit_hash": "8b25b26a7653d9c7444f217a7f2ae9b327bda921",
+      "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh76dadw64v8013j689380xsg182yhfc-v1.1",
+      "prompt_sha256": "02ffc5959762f9358d2b6a046c808e1468cc5afdf52bdcd7c36c6020b8b748df"
+    },
+    {
+      "id": "textual-richlog-follow-state",
+      "ext_id": "kh70247kxfz01g03p1dpz9fqv183g47e",
+      "task_id": "textual-richlog-follow-state",
+      "display_title": "Restore RichLog follow-state parity and expand reflow behavior",
+      "display_description": "Restore RichLog follow-mode parity with Log and preserve expand reflow behavior for justified writes.",
+      "original_title": "Restore RichLog follow-mode parity with Log and fix expand reflow for justified writes",
+      "category": "feature_request",
+      "language": "python",
+      "repository_url": "https://github.com/Textualize/textual",
+      "base_commit_hash": "0f0849fd37fbd0d4d6f81889476c22340129df67",
+      "image": "public.ecr.aws/d3j8x8q7/swe-bench-202605:kh70247kxfz01g03p1dpz9fqv183g47e-v1.1",
+      "prompt_sha256": "bdfdf82ddd71a833695c99e1320b1ad564f8678711a9d5744c5f4666c80e5565"
+    }
+  ],
+  "guidance_sha256": {
+    "baseline": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "long": "e78e95b14fd306d67546f320decdf136b1caac2d05f7d82a135ae1445f005b89",
+    "short": "3e302acfd98cb307c525d29525d37bc237ee747c29e2abf7cb8d6877bb78f51a"
+  },
+  "binary_sha256": "d16986395f70bff5fac71a2c672327b0dff537ec7b125cff7230b015d0b070b0",
+  "verifier_adaptations": [
+    "Replace per-file Git checkout and recursive deletion with git show and preservation in preimage-backups.",
+    "Move preexisting Bandit .stestr directory instead of removing it. Tests and grading criteria are unchanged."
+  ],
+  "isolation": [
+    "Parents exclude global guidance, skills, hooks and unrelated MCPs.",
+    "Scout executable wrappers exclude global guidance, skills, hooks and unrelated MCPs, and record native protocol.",
+    "Long/short use the same installed binary and automatic scout profiles.",
+    "Parents use workspace-local checkouts and instructions; this is not a hardened adversarial isolation boundary."
+  ],
+  "calibration": {
+    "excluded_from_scores": true,
+    "codex_and_claude_tool_and_commit_smoke_passed": true,
+    "three_initial_codex_attempts_aborted_for_git_write_sandbox_failure": true,
+    "pristine_verifier_checks": [
+      {
+        "id": "nop1",
+        "grade": {
+          "reward": 0,
+          "f2p_total": 69,
+          "f2p_passed": 0,
+          "p2p_total": 282,
+          "p2p_passed": 282,
+          "f2p": 0.0,
+          "p2p": 1.0,
+          "partial": 0.8034188034188035
+        }
+      },
+      {
+        "id": "nop2",
+        "grade": {
+          "reward": 0,
+          "f2p_total": 17,
+          "f2p_passed": 0,
+          "p2p_total": 28,
+          "p2p_passed": 28,
+          "f2p": 0.0,
+          "p2p": 1.0,
+          "partial": 0.6222222222222222
+        }
+      },
+      {
+        "id": "nop3",
+        "grade": {
+          "reward": 0,
+          "f2p_total": 20,
+          "f2p_passed": 0,
+          "p2p_total": 6,
+          "p2p_passed": 6,
+          "f2p": 0.0,
+          "p2p": 1.0,
+          "partial": 0.23076923076923078
+        }
+      }
+    ]
+  },
+  "trace_review": "methodology.md",
+  "max_concurrent_trials": 6,
+  "python_environment": "uv Python 3.11 seeded venv, task dependencies preinstalled in every checkout",
+  "cli_versions": {
+    "codex": "codex-cli 0.154.0",
+    "claude": "2.1.268 (Claude Code)"
+  },
+  "image_digests": {
+    "bandit-structured-nosec-directives": [
+      "public.ecr.aws/d3j8x8q7/swe-bench-202605@sha256:2f6978cf88228baa0d3323e4f139ee222f5886218d86ca1d327bcae3711f4b6a"
+    ],
+    "prometheus-typed-label-sorting": [
+      "public.ecr.aws/d3j8x8q7/swe-bench-202605@sha256:3139157bed16d3b4e0ecc15f9e0bead0b4f95d3beb7ffae37eeb3cb05c50cd95"
+    ],
+    "textual-richlog-follow-state": [
+      "public.ecr.aws/d3j8x8q7/swe-bench-202605@sha256:4320874bd134826ff13721acf5a30eb8f58431928dcac97022d56aefbc496c8c"
+    ]
+  },
+  "runner_sha256": {
+    "run_guidance_three_way.py": "f0275570e7980545553b4f7556636ef81c84c4dbcd2a3134095ffb0b25a2df65",
+    "verify_guidance_three_way.py": "24fbc61d891ee0d51d4ca71a499d8544dde99f2aeba7d9b3834f6e7b17d9ea94"
+  },
+  "guidance_word_counts": {
+    "baseline": 0,
+    "long": 333,
+    "short": 76
+  },
+  "corpus_url": "https://github.com/datacurve-ai/deep-swe",
+  "scout_profiles": {
+    "codex": {
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "medium",
+      "adaptive_reasoning": true
+    },
+    "claude": {
+      "model": "opus",
+      "reasoning_effort": "medium",
+      "adaptive_reasoning": true
+    }
+  },
+  "schedule": [
+    {
+      "id": "t01",
+      "parent": "codex",
+      "arm": "long",
+      "task": "bandit-structured-nosec-directives"
+    },
+    {
+      "id": "t02",
+      "parent": "codex",
+      "arm": "short",
+      "task": "bandit-structured-nosec-directives"
+    },
+    {
+      "id": "t03",
+      "parent": "codex",
+      "arm": "baseline",
+      "task": "bandit-structured-nosec-directives"
+    },
+    {
+      "id": "t04",
+      "parent": "claude",
+      "arm": "short",
+      "task": "bandit-structured-nosec-directives"
+    },
+    {
+      "id": "t05",
+      "parent": "claude",
+      "arm": "long",
+      "task": "bandit-structured-nosec-directives"
+    },
+    {
+      "id": "t06",
+      "parent": "claude",
+      "arm": "baseline",
+      "task": "bandit-structured-nosec-directives"
+    },
+    {
+      "id": "t07",
+      "parent": "codex",
+      "arm": "baseline",
+      "task": "prometheus-typed-label-sorting"
+    },
+    {
+      "id": "t08",
+      "parent": "codex",
+      "arm": "short",
+      "task": "prometheus-typed-label-sorting"
+    },
+    {
+      "id": "t09",
+      "parent": "codex",
+      "arm": "long",
+      "task": "prometheus-typed-label-sorting"
+    },
+    {
+      "id": "t10",
+      "parent": "claude",
+      "arm": "short",
+      "task": "prometheus-typed-label-sorting"
+    },
+    {
+      "id": "t11",
+      "parent": "claude",
+      "arm": "baseline",
+      "task": "prometheus-typed-label-sorting"
+    },
+    {
+      "id": "t12",
+      "parent": "claude",
+      "arm": "long",
+      "task": "prometheus-typed-label-sorting"
+    },
+    {
+      "id": "t13",
+      "parent": "codex",
+      "arm": "baseline",
+      "task": "textual-richlog-follow-state"
+    },
+    {
+      "id": "t14",
+      "parent": "codex",
+      "arm": "short",
+      "task": "textual-richlog-follow-state"
+    },
+    {
+      "id": "t15",
+      "parent": "codex",
+      "arm": "long",
+      "task": "textual-richlog-follow-state"
+    },
+    {
+      "id": "t16",
+      "parent": "claude",
+      "arm": "long",
+      "task": "textual-richlog-follow-state"
+    },
+    {
+      "id": "t17",
+      "parent": "claude",
+      "arm": "short",
+      "task": "textual-richlog-follow-state"
+    },
+    {
+      "id": "t18",
+      "parent": "claude",
+      "arm": "baseline",
+      "task": "textual-richlog-follow-state"
+    }
+  ]
+}

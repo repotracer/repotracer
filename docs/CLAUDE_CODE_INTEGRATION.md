@@ -70,7 +70,13 @@ Native model catalogs and accepted reasoning settings come from the installed CL
 
 RepoTracer registers an MCP server with the selected parent and adds the instructions that tell the parent when `repo_scout` is useful.
 
-The parent still decides whether to call the tool.
+The parent still decides whether to call the tool. The managed guidance asks it to
+send the objective, relevant requirements and questions the investigation must
+answer, work on independent parts while waiting, and continue from the returned
+evidence. It adds no hook or enforced investigation limit.
+
+The [guidance pilot](benchmarks/guidance-rewrite/README.md) records the comparison
+and the distinction between the measured candidate and this revision.
 
 A focused edit can stay direct:
 

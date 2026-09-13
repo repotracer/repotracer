@@ -1,0 +1,118 @@
+{
+  "reward": {
+    "reward": 0,
+    "f2p_total": 20,
+    "f2p_passed": 0,
+    "p2p_total": 6,
+    "p2p_passed": 6,
+    "f2p": 0.0,
+    "p2p": 1.0,
+    "partial": 0.23076923076923078
+  },
+  "tests": [
+    {
+      "name": "[p2p] tests.test_log.test_disabled_log_no_attribute_error",
+      "status": "passed"
+    },
+    {
+      "name": "[p2p] tests.test_log.test_process_line",
+      "status": "passed"
+    },
+    {
+      "name": "[p2p] tests.test_rich_log_follow_state.test_log_scrolling_updates_visible_viewport_and_scrollbar_position",
+      "status": "passed"
+    },
+    {
+      "name": "[p2p] tests.test_rich_log_follow_state.test_rich_log_expand_deferred_write_honors_width_and_justification",
+      "status": "passed"
+    },
+    {
+      "name": "[p2p] tests.test_rich_log_follow_state.test_rich_log_expand_explicit_write_honors_width_and_justification",
+      "status": "passed"
+    },
+    {
+      "name": "[p2p] tests.test_rich_log_follow_state.test_rich_log_scrolling_updates_visible_viewport_and_scrollbar_position",
+      "status": "passed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_example_append_buttons_and_clear_events_work",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_example_script_exists_and_boots",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_example_write_expanded_appends_to_primary_rich_log",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_log_exposes_follow_api",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_log_follow_changed_message_fields_are_public",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_log_follow_changed_posts_only_when_boolean_changes",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_log_follow_end_scrolls_to_latest_output",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_log_max_lines_pruning_keeps_viewport_stable_when_not_following",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_log_write_matches_rich_log_when_scrolled_away",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_rich_log_does_not_snap_to_end_when_scrolled_away",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_rich_log_expand_entries_reflow_after_min_width_change",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_rich_log_expand_entries_reflow_after_resize",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_rich_log_exposes_follow_api",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_rich_log_follow_changed_message_fields_are_public",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_rich_log_follow_changed_posts_only_when_boolean_changes",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_rich_log_follow_end_scrolls_to_latest_output",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_rich_log_max_lines_pruning_keeps_viewport_stable_when_not_following",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_scrolling_back_to_end_restores_follow_automatically",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_widgets_start_following_end_when_auto_scroll_is_enabled",
+      "status": "failed"
+    },
+    {
+      "name": "[f2p] tests.test_rich_log_follow_state.test_writes_do_not_emit_follow_changed_when_state_does_not_change",
+      "status": "failed"
+    }
+  ]
+}

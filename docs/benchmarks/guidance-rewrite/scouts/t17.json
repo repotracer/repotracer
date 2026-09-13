@@ -1,0 +1,189 @@
+[
+  {
+    "wire_request_line": 8,
+    "wire_response_line": 9,
+    "arguments": {
+      "query": "I need a detailed map of the Log and RichLog widget implementations in this Textual repo, to add follow-end state tracking and fix RichLog expand=True rendering.\n\nSpecifically:\n1. Where are Log and RichLog defined? Full structure: attributes, reactives, auto_scroll handling, write/write_line(s) methods, max_lines pruning, scrolling logic (scroll_end etc.), virtual_size updates, refresh_lines, render_line.\n2. How does RichLog currently handle `expand` and `shrink` in write()? How does it render segments, and where is min_width used? What is the deferred-write path (writes before the widget has a size)?\n3. How do these widgets learn about resizes (on_resize / _on_resize) and what happens on container size change?\n4. What scroll APIs exist on ScrollView/Widget: scroll_end, scroll_to, is_vertical_scroll_end or similar, max_scroll_y, scroll_y, scroll_offset. Any existing \"follow\"/\"tail\" mechanism?\n5. Where are widget Messages defined conventionally (e.g. class FollowChanged(Message) patterns in other widgets), including bubbling/control property conventions.\n6. What do the tests for Log/RichLog look like and where do they live (tests/, snapshot tests)? Any existing examples/ dir conventions (e.g. examples/*.py apps)?\n\nPlease give me concrete file paths and line numbers plus relevant code excerpts.",
+      "investigation": {
+        "intent": "explain",
+        "reasoning_effort": "high",
+        "target_paths": [
+          "src/textual/widgets/_log.py",
+          "src/textual/widgets/_rich_log.py",
+          "src/textual/scroll_view.py",
+          "examples",
+          "tests"
+        ]
+      }
+    },
+    "latency_seconds": 398.27,
+    "is_error": false,
+    "stats": {
+      "cache_write_prompt_tokens": 81095,
+      "cached_prompt_tokens": 2596693,
+      "completion_tokens": 30624,
+      "duration_ms": 398248,
+      "index_usage": {
+        "available": false,
+        "calls": 0,
+        "duration_ms": 0,
+        "failed_calls": 0,
+        "incomplete_calls": 0,
+        "output_bytes": 0,
+        "parsed_files": 0,
+        "reused_files": 0
+      },
+      "model": "Claude Code (opus)",
+      "prompt_tokens": 2677866,
+      "reasoning_effort": "high",
+      "reported_cost_usd": 2.8772385,
+      "thread_turn": 1,
+      "tool_calls": 55,
+      "turns": 56,
+      "usage": {
+        "cache_write_input_tokens": 81095,
+        "cached_input_tokens": 2596693,
+        "input_tokens": 2677866,
+        "output_tokens": 30624
+      },
+      "usage_status": "partial",
+      "warm_process": false
+    },
+    "report": "## Map of `Log` / `RichLog` in this checkout\n\nCheckout: `<checkout>` (Textual 8.1.1, single squashed commit `0f0849f`, so `git log`/`git blame` give no history).\n\n---\n\n### 1. Where the widgets live and how they're structured\n\nBoth are `ScrollView` subclasses (`ScrollView` → `ScrollableContainer` → `Widget`), both `can_focus=True`, both Line-API widgets (`render_line`, no children).\n\n**`Log` — `src/textual/widgets/_log.py` (362 lines)**\n\n| Piece | Lines |\n|---|---|\n| class + `DEFAULT_CSS` (`overflow: scroll`, `ALLOW_SELECT = True`) | 26–39 |\n| reactives: `max_lines: var[int\\|None]`, `auto_scroll: var[bool]` | 41–45 |\n| `__init__` — `highlight`, `_lines: list[str]`, `_width`, `_updates`, `_render_line_cache: LRUCache[int, Strip](1024)`, `highlighter`, `_clear_y` | 47–79 |\n| `lines` read-only property, `notify_style_update` (clears cache) | 81–98 |\n| `_update_maximum_width(updates, size)` → `virtual_size = Size(self._width, self.line_count)` | 100–109 |\n| `line_count` (len minus trailing `\"\"`) | 111–116 |\n| `_process_line` (expandtabs + control-char scrub) | 118–128 |\n| `_update_size` — `@work(thread=True)` background width measurement, calls back via `app.call_from_thread` | 130–141 |\n| `_prune_max_lines()` — deletes from the front and **re-keys** `_render_line_cache` by `y - remove_lines` | 143–160 |\n| `write(data, scroll_end=None)` | 162–196 |\n| `write_line` / `write_lines` | 198–249 |\n| `clear()` (bumps `_updates`, `virtual_size = Size(0,0)`) | 251–263 |\n| `get_selection` / `selection_updated` | 265–279 |\n| `render_line` / `_render_line` / `_render_line_strip` | 281–351 |\n| `refresh_lines` override (discards cache, then `super()`) | 353–362 |\n\n**`RichLog` — `src/textual/widgets/_rich_log.py` (320 lines)**\n\n| Piece | Lines |\n|---|---|\n| `DeferredRender` NamedTuple — exactly the `write()` signature minus `animate` | 27–44 |\n| class + `DEFAULT_CSS` (`overflow-y: scroll` only — no horizontal scrollbar by default) | 47–59 |\n| reactives: `max_lines`, `min_width` (78), `wrap`, `highlight`, `markup`, `auto_scroll` — all `var` | 61–66 |\n| `__init__` — `_start_line`, `lines: list[Strip]`, `_line_cache: LRUCache[(y,scroll_x,width,widest), Strip](1024)`, `_deferred_renders: deque`, `highlighter`, `_widest_line_width`, `_size_known` | 68–126 |\n| `notify_style_update` | 128–130 |\n| `on_resize` — flushes deferred renders | 132–139 |\n| `get_content_width` override (returns `virtual_size.width` once size known, else `container.width`) | 141–145 |\n| `_make_renderable` (Pretty / markup / highlight / expand_tabs) | 147–173 |\n| `write(...)` | 175–284 |\n| `clear()` | 286–299 |\n| `render_line` / `_render_line` | 301–320 |\n\nNeither file defines a single `watch_*` method, so `max_lines`, `auto_scroll`, `min_width`, `wrap` etc. have **no watchers** — changing `max_lines` at runtime only takes effect on the next `write`. `var` is `Reactive(..., layout=False, repaint=False)` (`src/textual/reactive.py:475–502`), i.e. assigning them does not refresh.\n\n**Pruning.** `Log._prune_max_lines` (143–160) is called from `write` (190–191) and `write_lines` (236–237); it deletes from the head and shifts the render-line cache. `RichLog` prunes inline in `write` (264–267): it bumps `_start_line` (which is only used as part of the `_line_cache` key at line 313, to invalidate stale entries), calls `self.refresh()`, and slices `self.lines`.\n\n**Virtual size.** `Log.write` sets `Size(self._width, self.line_count)` (188) but `Log.write_lines` sets `Size(self._width, len(self._lines))` (238) — an inconsistency of one line when the buffer ends in `\"\"`. `RichLog.write` sets `Size(self._widest_line_width, len(self.lines))` (279). `virtual_size` is `Reactive(Size(0,0), layout=True)` (`widget.py:356`), so assigning it is what triggers repaint/layout; `RichLog.write` relies on that instead of calling `refresh()`.\n\n`_widest_line_width` is monotonically non-decreasing — there is an explicit `TODO` at `_rich_log.py:269–271` noting that trimming long lines can't shrink it.\n\n**Dead/odd code worth knowing before you edit:**\n- `Log.write` line 176 computes `is_vertical_scroll_end = self.is_vertical_scroll_end` and **never uses it**; the scroll at 193–195 is unconditional on `auto_scroll`. `write_lines` (229, 241–245) *does* use it. This is a half-implemented follow-state check and is almost certainly the seam the parent's feature belongs in.\n- `Log._clear_y` (79, 262, 337) is only ever `0`; it is subtracted in the selection-span lookup but never advanced when lines are pruned.\n\n---\n\n### 2. `expand` / `shrink` in `RichLog.write` — and a reproduced rendering bug\n\nThe width calculation is `_rich_log.py:215–249`:\n\n- `render_options = console.options`; if the renderable is a `Text` and `self.wrap` is `False` → `render_options.update(overflow=\"ignore\", no_wrap=True)` (221–222).\n- If `width` is given it wins outright (`expand`, `shrink`, **and `min_width`** are all ignored) (224–228).\n- Otherwise `renderable_width = measure_renderables(...).maximum`; `expand` raises it to `scrollable_content_region.width`, `shrink` lowers it to that same width (230–244); then `render_width = max(render_width, self.min_width)` (247) — so `min_width` can push the line *wider* than the region, which is the documented behaviour that `test_richlog_min_width` pins.\n- `scrollable_content_region` = `region.shrink(gutter).shrink(scrollbar_gutter)` (`widget.py:2218–2227`), i.e. it already excludes the scrollbar.\n\nSegments → strips at 252–262: `console.render` → `Segment.split_lines` → `Strip.from_lines` → `self.lines.extend(strips)`. Empty render ⇒ one `Strip.blank(render_width)` (255–257).\n\n**Two independent defects make `expand=True` a no-op today.**\n\n*(a) The padding is thrown away.* Line 261 is `strip.adjust_cell_length(render_width)` inside a `for` loop with no assignment. `Strip.adjust_cell_length` returns a **new** Strip (`src/textual/strip.py:359–371`); the loop mutates nothing. Verified:\n\n```\nafter discarded adjust: [10]\nif assigned:            [18]\n```\n\n*(b) rich 15 stopped justifying when `overflow=\"ignore\"`.* `Text.wrap` in rich 15.0.0 short-circuits `if no_wrap: if overflow == \"ignore\": lines.append(line); continue`, skipping `new_lines.justify(...)`. rich 14.2.0 (which `pyproject.toml:51` still allows via `rich = \">=14.2.0\"`) has no such `continue` and does justify. Direct A/B with the *identical* options RichLog builds:\n\n```\n# rich 15.0.0 (installed in .venv)\noverflow=ignore + no_wrap  -> [['0123456789']]\nno_wrap only               -> [['        0123456789']]\noverflow=crop + no_wrap    -> [['        0123456789']]\n\n# rich 14.2.0 (wheel unpacked to /tmp/richdl/r14, run via PYTHONPATH)\noverflow=ignore + no_wrap  -> [['        0123456789']]\n```\n\nEnd-to-end reproduction of the snapshot app `test_richlog_deferred_render_expand` at `terminal_size=(20,6)` (script: `<scratch>/exp4.py`):\n\n```\nrendered line0 segments: [('0123456789', red), ('        ', #272727 /* $surface */)]\n```\n\ni.e. left-aligned text plus widget-background filler supplied by `crop_extend` in `_render_line` (317). The committed snapshot `tests/snapshot_tests/__snapshots__/test_snapshots/test_richlog_deferred_render_expand.svg` contains `&#160;`×8 + `0123456789` — right-justified with the renderable's own style. **So the stored snapshot disagrees with current behaviour and `test_richlog_deferred_render_expand` should be failing.** The same applies to `test_richlog_min_width.svg` and `test_richlog_width.svg`, whose stored text also begins with justification padding.\n\nI could not execute the snapshot suite to confirm the failures: `pytest-textual-snapshot` is **not installed** in `.venv`, so all 14 richlog/log snapshot tests error with `fixture 'snap_compare' not found`. The evidence above is from direct `run_test()` rendering, not from the snapshot runner.\n\nCaveat for the fix (measured, not assumed): you cannot simply swap `overflow=\"ignore\"` → `\"crop\"` unconditionally. With `no_wrap=True`, a 100-cell `Text` at `render_width=20` yields `[100]` cells under `ignore` and `[20]` under `crop` — `ignore` is what keeps long lines intact so `_widest_line_width` and horizontal scrolling work. A width-conditional choice (use `crop`/default only when `renderable_width < render_width`, where truncation cannot bite) restores justification without losing long lines; assigning `adjust_cell_length`'s result additionally guarantees the strip reaches `render_width` for non-`Text` renderables. Both are my inference from the measurements, not existing code.\n\n**Deferred-write path.** `_size_known` starts `False` (124–126). Every `write` before the first non-zero-width `Resize` is queued wholesale into `_deferred_renders` (205–213) — including `Text.copy()` to snapshot mutable content — precisely so ordering is preserved. `on_resize` (132–139) flips `_size_known` on the first `event.size.width` truthy and replays the queue by `self.write(*deferred_render)`; the NamedTuple field order matches `write`'s positional parameters, so adding a positional parameter to `write` before `animate` would silently mis-bind. Instrumented trace confirming the two-phase call:\n\n```\nWRITE ... size_known=False scr_region=Region(0,0,0,0)   # from compose\nWRITE ... size_known=True  scr_region=Region(0,0,18,6)  # replayed from on_resize\n```\n\n`clear()` also empties `_deferred_renders` (296) but does **not** reset `_size_known`.\n\n---\n\n### 3. Resize plumbing\n\n`Screen._refresh_layout` (`src/textual/screen.py:1318–1370`) walks compositor layers, calls `widget._size_updated(region.size, virtual_size, container_size)` and posts `events.Resize(size, virtual_size, container_size)` only to widgets in `shown | resized` (or `exposed_widgets` on the scroll-only path). `events.Resize` is `bubble=False` with `can_replace` collapsing consecutive resizes (`src/textual/events.py:100–150`).\n\n`ScrollView._size_updated` (`scroll_view.py:86–113`) deliberately **keeps its own `virtual_size`** (line 109 overwrites the passed-in value) and calls `_scroll_update(virtual_size)`; `Widget._scroll_update` (`widget.py:4107–4128`) refreshes scrollbars and re-clamps `scroll_x`/`scroll_y` through the validators. That re-clamp is what silently changes `scroll_y` when a container shrinks.\n\n`RichLog.on_resize` is the **only** resize handler on either widget, and it does nothing after the first sizing — already-rendered strips are never re-rendered, so `expand`ed lines keep whatever width was current when they were written. My resize experiment (`<scratch>/exp_expand.py`) confirms existing strips are untouched across `resize_terminal(40→70→20)`. Note it is spelled `on_resize` (public) rather than the `_on_resize` used by `DataTable` (`_data_table.py:1133`), `Tree` (`_tree.py:1440`), `OptionList` (`_option_list.py:712`), `TextArea` (`_text_area.py:1084`) — a subclass overriding `on_resize` would clobber the deferred-render flush.\n\n---\n\n### 4. Scroll APIs and the existing \"follow/tail\" mechanism\n\nOn `Widget`:\n- reactives `scroll_x`/`scroll_y` (`widget.py:365–371`) plus `scroll_target_x`/`scroll_target_y` (animation targets), validated by `validate_scroll_y` → `clamp(value, 0, max_scroll_y)` (1946–1950).\n- `max_scroll_x` / `max_scroll_y` (1959–1975) — `virtual_size.height - (container_size.height - scrollbar_size_horizontal)`.\n- `is_vertical_scroll_end` / `is_horizontal_scroll_end` (1970–1979) — note `is_vertical_scroll_end` returns **`True` when `not self.size`**, i.e. an unsized widget reads as \"at the end\". `is_vertical_scrollbar_grabbed` / `is_horizontal_scrollbar_grabbed` (1980–1987).\n- `scroll_offset` → `Offset(round(scroll_x), round(scroll_y))` (2348–2355).\n- `scroll_end(...)` (2975–3045) — defers via `call_after_refresh` unless `immediate=True`, so `max_scroll_y` is read *after* layout; calls `_scroll_to(..., release_anchor=False)`.\n- `_scroll_to(..., release_anchor=True)` (2682–2784) — **every** public scroll (`scroll_to`, `scroll_up/down`, `scroll_home`, page scrolls, mouse wheel via `_on_mouse_scroll_up/down` at 4734–4752) funnels through here and calls `release_anchor()` first.\n- `ScrollView.scroll_to` (`scroll_view.py:126–166`) overrides `Widget.scroll_to` to skip the `call_after_refresh` indirection and ignores its own `immediate` argument.\n\n**There is already a tail mechanism: anchoring.** `Widget.anchor(anchor=True)` / `release_anchor()` / `_check_anchor()` / `is_anchored` (`widget.py:638–644`, `772–803`, `518–520`). Semantics: an anchored widget is pinned to the bottom; any user scroll sets `_anchor_released = True`; `watch_scroll_y` (1933–1937) calls `_check_anchor`, which re-arms the anchor once `scroll_y >= max_scroll_y`. The pin itself is applied in the compositor during reflow — `_compositor.py:609–616` (container branch) and `_compositor.py:693–700` (the line-API branch that `Log`/`RichLog` would take), which sets `scroll_y`/`scroll_target_y`/`vertical_scrollbar.position` from `virtual_size.height - (container_size.height - scrollbar_size_horizontal)`. Because it runs in reflow, anchoring survives resizes, which the widget-level `auto_scroll` path does not. `Footer` is the only widget that calls `release_anchor` itself (`_footer.py:337–348`). **Neither `Log` nor `RichLog` uses anchoring at all** — they re-implement tailing with `auto_scroll` + `scroll_end`.\n\nObserved follow behaviour (script `<scratch>/exp_follow.py`, 50 lines, viewport 40×20, scrolled to top, then one more write):\n\n```\nafter write_lines:    log scroll_y 0   -> follow state respected\nafter RichLog.write:  rl  scroll_y 41  -> jumps to end regardless\nafter Log.write:      log scroll_y 42  -> jumps to end regardless\n```\n\nSo `Log.write_lines` is the only one of the three that honours \"user scrolled away\"; `Log.write` and `RichLog.write` both force the scroll. Matching all three is the natural core of the follow-state feature.\n\n---\n\n### 5. Message conventions\n\nMessages are nested classes on the widget, so adding one needs **no change** to `src/textual/widgets/__init__.py` / `.pyi` (which lazily map `\"Log\"`/`\"RichLog\"` to their modules at lines 30/39 and 71/81).\n\nTwo idioms are in use:\n- Plain class with explicit `__init__` + a `control` alias — `Switch.Changed` (`_switch.py:105–124`), posted from `watch_value` (156–167). This is the closest template for a `FollowChanged(Message)` driven by a reactive.\n- `@dataclass`-decorated message — `Input.Changed` / `Input.Submitted` (`_input.py:276–320`), relying on `Message.__post_init__` (`message.py:48–56`).\n- Subclass-hierarchy idiom for related events — `Collapsible.Toggled` → `Expanded`/`Collapsed` (`_collapsible.py:125–150`).\n\n`Message.__init_subclass__` (`message.py:60–86`) accepts `bubble=`, `verbose=`, `no_dispatch=`, `namespace=` and derives `handler_name` from the last two qualname parts, so a nested `RichLog.FollowChanged` auto-generates `on_rich_log_follow_changed`. `bubble` defaults to `True`; `control` defaults to `None` (88–91) and is what `@on(..., \"#id\")` selector matching uses, alongside `ALLOW_SELECTOR_MATCH` (34–38).\n\nDocs convention: `docs/widgets/log.md:40–42` and `docs/widgets/rich_log.md` both currently say \"This widget posts no messages\" / \"sends no messages\" — those tables (and the Reactive Attributes tables) need updating if you add a message or a reactive.\n\n---\n\n### 6. Tests and examples\n\n- `tests/test_log.py` (25 lines) — unit-level: `_process_line`, plus a `run_test()` regression for `disabled=True`.\n- `tests/test_textlog.py` (11 lines) — the `RichLog` unit test file, still under the old name; contains `test_make_renderable_expand_tabs`.\n- Snapshot tests live in `tests/snapshot_tests/test_snapshots.py` with the `snap_compare` fixture, SVGs in `tests/snapshot_tests/__snapshots__/test_snapshots/`. Apps are either inline `App` subclasses passed as instances (`snap_compare(RichLogExpand(), terminal_size=(20,6))`, lines 838–960) or files under `tests/snapshot_tests/snapshot_apps/` referenced by path (`richlog_scroll.py`, `richlog_width.py`, `richlog_max_lines.py`, `log_write.py`, `log_write_lines.py`). `snap_compare` also accepts `press=[...]` and `run_before=async pilot fn` (see `test_pilot_resize_terminal` at 973–981 for the `await pilot.resize_terminal(w, h)` pattern you'd want for a resize/expand test).\n- Message-assertion convention in unit tests: a `nonlocal`/class-level `messages: list` plus an `@on(Widget.Message)` handler on the test `App` — `tests/test_markdown.py:146–167`.\n- `examples/` at the repo root is a flat set of runnable demo apps (`*.py` + optional matching `*.tcss`), documented by `examples/README.md` (\"cd textual/examples; python pride.py\"); there is no per-widget example there. Per-widget examples live in `docs/examples/widgets/` (`log.py`, `rich_log.py`), each ending with the `if __name__ == \"__main__\": app = XApp(); app.run()` idiom and pulled into `docs/widgets/*.md` via `--8<--` includes.\n- `Makefile` runs `poetry run pytest tests/ -n 16 --dist=loadgroup`; `make test-snapshot-update` adds `--snapshot-update`. `CHANGELOG.md` follows Keep-a-Changelog with a PR link per entry.\n\n**Environment caveats for reproducing my results:** `.venv` has `rich 15.0.0` and **no `pytest-textual-snapshot`**, so snapshot tests cannot run here; I unpacked `rich 14.2.0` to `/tmp/richdl/r14` (outside the repo) purely to read/execute its `Text.wrap` for the A/B above. No product files were modified — all instrumentation was monkeypatching inside scratch scripts (`exp_expand.py`, `exp2.py`, `exp3.py`, `exp4.py`, `exp_follow.py` in the conversation scratch directory).",
+    "citations": [
+      {
+        "end_line": 116,
+        "path": "src/textual/widgets/_log.py",
+        "reason": "Log class definition, DEFAULT_CSS, the max_lines/auto_scroll reactives, all instance attributes and the virtual-size/line_count helpers the follow feature must hook into.",
+        "source_status": "included",
+        "start_line": 26
+      },
+      {
+        "end_line": 263,
+        "path": "src/textual/widgets/_log.py",
+        "reason": "max_lines pruning plus write/write_line/write_lines/clear; shows the unused is_vertical_scroll_end at 176 and the follow-aware branch at 241-245 that write() lacks.",
+        "source_status": "included",
+        "start_line": 143
+      },
+      {
+        "end_line": 362,
+        "path": "src/textual/widgets/_log.py",
+        "reason": "render_line/_render_line/_render_line_strip and the refresh_lines override with its cache invalidation.",
+        "source_status": "included",
+        "start_line": 281
+      },
+      {
+        "end_line": 145,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "DeferredRender tuple (positional-compatible with write), RichLog reactives/attributes, _size_known, the on_resize deferred-render flush and the get_content_width override.",
+        "source_status": "included",
+        "start_line": 27
+      },
+      {
+        "end_line": 284,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "The write() path: deferred queueing, overflow=ignore/no_wrap option update, expand/shrink/min_width width computation, the discarded adjust_cell_length at 261, max_lines pruning, virtual_size update and auto_scroll.",
+        "source_status": "included",
+        "start_line": 175
+      },
+      {
+        "end_line": 320,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "render_line/_render_line: the line cache key including _start_line and _widest_line_width, and the crop_extend that pads with the widget style rather than the renderable's.",
+        "source_status": "included",
+        "start_line": 301
+      },
+      {
+        "end_line": 400,
+        "path": "src/textual/strip.py",
+        "reason": "Strip.adjust_cell_length returns a new Strip, proving the RichLog loop at _rich_log.py:261 is a no-op.",
+        "source_status": "included",
+        "start_line": 355
+      },
+      {
+        "end_line": 196,
+        "path": "src/textual/scroll_view.py",
+        "reason": "ScrollView._size_updated (keeps its own virtual_size, calls _scroll_update), the scroll_to override, refresh_line and refresh_lines.",
+        "source_status": "included",
+        "start_line": 86
+      },
+      {
+        "end_line": 1990,
+        "path": "src/textual/widget.py",
+        "reason": "scroll_y watcher with anchor check, scroll validators, max_scroll_x/max_scroll_y, is_vertical_scroll_end (True when unsized) and is_vertical_scrollbar_grabbed.",
+        "source_status": "included",
+        "start_line": 1930
+      },
+      {
+        "end_line": 2720,
+        "path": "src/textual/widget.py",
+        "reason": "_scroll_to with release_anchor=True — the single funnel through which every user-initiated scroll releases the anchor.",
+        "source_status": "included",
+        "start_line": 2682
+      },
+      {
+        "end_line": 3045,
+        "path": "src/textual/widget.py",
+        "reason": "scroll_end: deferred-until-refresh max_scroll_y read, immediate flag, and its release_anchor=False / anchor re-arm behaviour.",
+        "source_status": "included",
+        "start_line": 2975
+      },
+      {
+        "end_line": 803,
+        "path": "src/textual/widget.py",
+        "reason": "The existing follow/tail mechanism: anchor(), release_anchor(), _check_anchor().",
+        "source_status": "included",
+        "start_line": 770
+      },
+      {
+        "end_line": 700,
+        "path": "src/textual/_compositor.py",
+        "reason": "Where anchoring is actually applied for line-API widgets during reflow, which is why anchoring survives resizes while auto_scroll does not.",
+        "source_status": "included",
+        "start_line": 690
+      },
+      {
+        "end_line": 1370,
+        "path": "src/textual/screen.py",
+        "reason": "How _size_updated is driven and when events.Resize is posted to a widget — the entry point RichLog.on_resize depends on.",
+        "source_status": "included",
+        "start_line": 1318
+      },
+      {
+        "end_line": 124,
+        "path": "src/textual/widgets/_switch.py",
+        "reason": "Canonical nested-Message convention with explicit __init__ and a control alias, posted from a reactive watcher.",
+        "source_status": "included",
+        "start_line": 105
+      },
+      {
+        "end_line": 298,
+        "path": "src/textual/widgets/_input.py",
+        "reason": "The @dataclass variant of the same Message convention.",
+        "source_status": "included",
+        "start_line": 276
+      },
+      {
+        "end_line": 91,
+        "path": "src/textual/message.py",
+        "reason": "Message base: bubble/verbose/namespace class kwargs, handler_name derivation from qualname, ALLOW_SELECTOR_MATCH and the default control property.",
+        "source_status": "included",
+        "start_line": 22
+      },
+      {
+        "end_line": 883,
+        "path": "tests/snapshot_tests/test_snapshots.py",
+        "reason": "The two deferred-render snapshot tests whose stored SVGs disagree with current expand rendering.",
+        "source_status": "included",
+        "start_line": 854
+      },
+      {
+        "end_line": 982,
+        "path": "tests/snapshot_tests/test_snapshots.py",
+        "reason": "run_before + pilot.resize_terminal snapshot convention, needed for a resize/expand regression test.",
+        "source_status": "included",
+        "start_line": 973
+      }
+    ]
+  }
+]

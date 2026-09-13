@@ -1,0 +1,119 @@
+[
+  {
+    "wire_request_line": 6,
+    "wire_response_line": 7,
+    "arguments": {
+      "repository": "<checkout>",
+      "query": "Find label sorting implementation, tests and applicable AGENTS.md instructions, and recommend smallest change points. Required total order: leading-whitespace strings first using natural original-string ordering and never typed; then positive infinity, finite numeric, negative infinity, duration, bytes, semantic version, IP address, CIDR prefix, timestamp, untyped natural strings (including empty). Numbers support plus and scientific exponents, reject bare exponent/NaN. Durations and bytes support signed scientific magnitudes. Arbitrary precision magnitude comparisons. Strict semver optional v. IPv4 before IPv6, mapped IPv6 stays IPv6. CIDR equal network bytes shorter prefix first. Equal typed values tie natural original string. Investigate only provided checkout, no other study directories or reference solutions. Return code/test evidence and local validation commands; do not edit."
+    },
+    "latency_seconds": 113.57,
+    "is_error": false,
+    "stats": {
+      "cache_write_prompt_tokens": 0,
+      "cached_prompt_tokens": 747776,
+      "completion_tokens": 5418,
+      "duration_ms": 113572,
+      "index_usage": {
+        "available": true,
+        "calls": 0,
+        "duration_ms": 0,
+        "failed_calls": 0,
+        "incomplete_calls": 0,
+        "output_bytes": 0,
+        "parsed_files": 0,
+        "reused_files": 0
+      },
+      "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+      "prompt_tokens": 804959,
+      "reasoning_effort": "medium",
+      "reasoning_output_tokens": 1369,
+      "thread_turn": 1,
+      "tool_calls": 17,
+      "total_tokens": 810377,
+      "turns": 18,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 747776,
+        "input_tokens": 804959,
+        "output_tokens": 5418,
+        "reasoning_output_tokens": 1369,
+        "total_tokens": 810377
+      },
+      "usage_status": "complete",
+      "warm_process": false
+    },
+    "report": "No repository `AGENTS.md` exists under the provided checkout. The applicable guidance is therefore the user-supplied instruction block.\n\nThe production implementation is `promql.funcSortByLabel` and its descending counterpart in `promql/functions.go`. Both mutate `vectorVals[0]` in place with `slices.SortFunc`, compare each requested label, and fall back to `labels.Compare` when all requested values are equal. Missing labels are represented by `Metric.Get` as the empty string. `sort_by_label_desc` reverses both the requested-label comparison and the full-label fallback. The smallest functional change point is this shared comparator logic in `promql/functions.go`, ideally extracting one typed label-value comparator so ascending and descending only differ by sign. The existing `github.com/facette/natsort` import can then be removed if natural ordering is implemented locally.\n\nCurrent behavior is only natural string ordering. The dependency splits values into digit/non-digit chunks and parses numeric chunks with `strconv.Atoi`, so it cannot provide arbitrary precision, signed/scientific numeric parsing, typed-domain precedence, or the requested rejection rules. The current code also has no special leading-whitespace class, infinity class, duration/bytes parsing, semver, IP/CIDR, or timestamp handling.\n\nExisting acceptance coverage is in `promql/promqltest/testdata/functions.test`, covering ascending/descending multi-label ordering, natural numeric chunks such as `0, 1, 2, 10, 20, 100`, and mixed strings such as `4m5`, `4m600`, and `4m1000`. Add the new edge cases there if testing through the public PromQL function is preferred. `TestEvaluations` executes this embedded suite, and the current baseline command `go test ./promql -run '^TestEvaluations$' -count=1` passed. `promql/functions_test.go` currently contains only function-registry consistency coverage, so a direct comparator unit test would require either placing it in package `promql` or exposing no new API via a test helper.\n\nRecommended test/change locations:\n\n- `promql/functions.go`: replace the `natsort.Compare` branches in both sort functions with the shared total-order comparator, preserving full-label fallback semantics for equal requested values.\n- A new `promql/label_sort.go` plus `promql/label_sort_test.go`, if the parser becomes substantial. Keep the comparator unexported and test classification/parsing independently, then retain a small integration test in `functions.test`.\n- `promql/promqltest/testdata/functions.test`: add cases covering the exact domain order, leading whitespace and empty strings, plus/scientific forms, invalid bare exponent and NaN fallback, huge magnitudes, signed duration/bytes, strict semver with optional `v`, IPv4/IPv6 and mapped IPv6, CIDR prefix tie-breaking, timestamp values, and original-string natural tie-breaks.\n- `docs/querying/functions.md`: current documentation promises natural sort only. If the requested behavior is user-facing contract, update the description after implementation.\n\nThe standard library is sufficient for most requirements: `math/big` for exact decimal magnitudes, `net/netip` for IP/CIDR normalization, and local parsers for decimal/scientific values, duration/bytes, semver, and timestamps. Do not use `model.ParseDuration` for the new comparator because it only accepts unsigned integer unit components and rejects values outside `time.Duration`; the requested signed scientific magnitudes and arbitrary precision require a separate representation. Existing module metadata includes `Masterminds/semver/v3` only in the module graph, not as a direct `go.mod` requirement, so adding it would be a dependency decision; strict semver parsing can also be implemented locally.\n\nThe exact precedence should be encoded explicitly in the classifier in the order supplied: leading-whitespace strings, positive infinity, finite numeric, negative infinity, duration, bytes, semantic version, IP address, CIDR prefix, timestamp, then untyped natural strings including empty. Within a typed domain compare normalized values exactly, and only then compare the original strings naturally. IPv4/IPv6 family ordering and CIDR equal-network prefix ordering must be explicit, since generic `netip` ordering alone does not establish those requested rules.",
+    "citations": [
+      {
+        "end_line": 666,
+        "path": "promql/functions.go",
+        "reason": "Ascending sort_by_label implementation, in-place sort, natural-string comparison, and full-label fallback.",
+        "source_status": "included",
+        "start_line": 642
+      },
+      {
+        "end_line": 692,
+        "path": "promql/functions.go",
+        "reason": "Descending implementation and evidence that it reverses requested-label and full-label comparisons.",
+        "source_status": "included",
+        "start_line": 668
+      },
+      {
+        "end_line": 24,
+        "path": "<go-module-cache>/github.com/facette/natsort@v0.0.0-20181210072756-2cd4dd1e2dcb/natsort.go",
+        "reason": "Current natural sorter uses digit/non-digit chunks and strconv.Atoi, which explains its precision and syntax limitations.",
+        "source_status": "included",
+        "start_line": 24
+      },
+      {
+        "end_line": 84,
+        "path": "<go-module-cache>/github.com/facette/natsort@v0.0.0-20181210072756-2cd4dd1e2dcb/natsort.go",
+        "reason": "Dependency comparison behavior and lexical fallback for non-numeric chunks.",
+        "source_status": "included",
+        "start_line": 35
+      },
+      {
+        "end_line": 881,
+        "path": "promql/promqltest/testdata/functions.test",
+        "reason": "Existing acceptance coverage for sort_by_label, descending sorting, natural numeric chunks, and mixed string values.",
+        "source_status": "included",
+        "start_line": 727
+      },
+      {
+        "end_line": 160,
+        "path": "promql/promqltest/test.go",
+        "reason": "Builtin test discovery and execution entry point used by TestEvaluations.",
+        "source_status": "included",
+        "start_line": 124
+      },
+      {
+        "end_line": 35,
+        "path": "promql/promql_test.go",
+        "reason": "TestEvaluations invokes the builtin acceptance suite.",
+        "source_status": "included",
+        "start_line": 22
+      },
+      {
+        "end_line": 258,
+        "path": "<go-module-cache>/github.com/prometheus/common@v0.67.5/model/time.go",
+        "reason": "Existing duration parser only accepts unsigned integer components and bounds results to time.Duration, so it is unsuitable for the requested arbitrary-precision signed scientific duration comparison.",
+        "source_status": "included",
+        "start_line": 202
+      },
+      {
+        "end_line": 269,
+        "path": "<go-module-cache>/github.com/prometheus/common@v0.67.5/model/time.go",
+        "reason": "Negative duration support is only a leading minus around the bounded unsigned parser.",
+        "source_status": "included",
+        "start_line": 261
+      },
+      {
+        "end_line": 820,
+        "path": "docs/querying/functions.md",
+        "reason": "Current public contract documents natural sort and full-label fallback, but not the requested typed total order.",
+        "source_status": "included",
+        "start_line": 805
+      }
+    ]
+  }
+]

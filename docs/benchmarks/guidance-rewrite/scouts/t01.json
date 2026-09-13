@@ -1,0 +1,197 @@
+[
+  {
+    "wire_request_line": 6,
+    "wire_response_line": 7,
+    "arguments": {
+      "query": "Investigate implementation points and tests for adding nosec-begin/end regions and nosec-next-line next statement directives to Bandit. Keywords case insensitive. Selectors optional/empty/all=all, none=empty, IDs/names/prefix globs, comma/space union, | & - ! and parentheses with parse-failure plain union fallback. Regions start next physical line, end before end directive, nested stack, indented unterminated regions auto-end on smaller leading whitespace indentation. Next statement skips blank/comments/grouping-only/semicolon/ellipsis lines. Suppression statement-wide if any line applies, combine all applicable sets with blanket dominant. ignore-nosec disables everything. Resolved blanket metrics nosec, specific nonempty skipped_tests. Explain existing enabled-test universe, statement line ranges, inline compatibility, suitable integration/tests and traps. Read only supplied repository, no external directories or network.",
+      "repository": "<checkout>"
+    },
+    "latency_seconds": 78.64,
+    "is_error": false,
+    "stats": {
+      "cache_write_prompt_tokens": 0,
+      "cached_prompt_tokens": 431872,
+      "completion_tokens": 5065,
+      "duration_ms": 78684,
+      "index_usage": {
+        "available": true,
+        "calls": 0,
+        "duration_ms": 0,
+        "failed_calls": 0,
+        "incomplete_calls": 0,
+        "output_bytes": 0,
+        "parsed_files": 0,
+        "reused_files": 0
+      },
+      "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+      "prompt_tokens": 488764,
+      "reasoning_effort": "medium",
+      "reasoning_output_tokens": 600,
+      "thread_turn": 1,
+      "tool_calls": 21,
+      "total_tokens": 493829,
+      "turns": 22,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 431872,
+        "input_tokens": 488764,
+        "output_tokens": 5065,
+        "reasoning_output_tokens": 600,
+        "total_tokens": 493829
+      },
+      "usage_status": "complete",
+      "warm_process": false
+    },
+    "report": "Current suppression flow is concentrated in `bandit/core/manager.py`, `bandit/core/tester.py`, and `bandit/core/utils.py`.\n\n- `BanditManager._parse_file()` reads bytes, counts LOC, tokenizes the source, and currently builds `nosec_lines: dict[int, set[str] | None]` from every comment token. With `ignore_nosec=True`, it leaves the map empty, so the new region/next-line expansion should happen entirely behind this same gate. Tokenization catches `TokenError` and continues to AST execution, so malformed-token handling must remain compatible.\n- `_parse_nosec_comment()` recognizes `# nosec` case-insensitively, with an optional colon, and returns `None` for no directive, an empty set for blanket suppression, or resolved test IDs for specific selectors. Its current regex only supports exact `B###` and lowercase-style test names, and it resolves names through `extension_loader.MANAGER`.\n- `BanditTester._get_nosecs_from_contexts()` combines the result line (`result.lineno`) with `context['linerange']`; however `utils.get_nosec()` currently returns only the first matching line. For the requested statement-wide behavior, this must become an aggregate over every applicable line. The aggregate must preserve tri-state semantics: no applicable directives means `None`, any empty set means blanket suppression, otherwise union all specific IDs. This also naturally handles inline plus region/next-line combinations.\n- Tester behavior is already metric-compatible once the aggregate is correct: blanket suppression increments `metrics.nosec`, specific suppression increments `metrics.skipped_tests`, and a finding is skipped before it is appended/scored. The `result is None` warning path only checks specific IDs and does not increment metrics.\n- AST contexts get their physical line range from `utils.linerange(node)`, which uses `lineno..end_lineno` for nodes with locations and a fallback subtree calculation for location-less nodes. `BanditNodeVisitor.pre_visit()` installs that range for every node, and `File` checks use `[0, 1]`. This is the integration point for next-statement and region line maps, not a plugin API change.\n\nThe enabled test universe should be derived from the actual `BanditTestSet` being scanned, not blindly from all extension-manager entries. Default construction includes plugin IDs, builtin `B001`, and selected blacklist IDs; profiles can narrow that set. The current default environment resolves to 43 IDs, while the extension manager separately contains 42 plugins plus blacklist IDs. Name resolution currently supports plugin names and blacklist names, but not wildcard matching. Case-insensitive matching should normalize both selectors and IDs/names. `all` should mean the enabled universe and `none` should mean the empty set. Prefix globs should match IDs and names against that same universe.\n\nRecommended ownership/design split:\n\n1. Keep source scanning/directive collection in `BanditManager._parse_file()`, likely using physical source lines plus tokenize comments. Build a line-to-suppression map before AST traversal.\n2. Put selector parsing/resolution in a small helper/module or manager helpers, with a resolver that sees the active `BanditTestSet`. Parse comma/space-separated terms as union, support `|`, `&`, `-`, `!`, and parentheses, and on parse failure use the required plain-union fallback instead of partially applying operator syntax.\n3. Represent a suppression as either blanket or a concrete set, rather than using only an empty set, because `none` is a valid specific expression and must not be confused with blanket `# nosec`.\n4. Extend `utils.get_nosec()` or replace it with an aggregate helper. It must inspect all lines in `context['linerange']`; statement-wide suppression is then achieved for multiline nodes and for plugins that report a result line different from the context’s first line.\n5. For `nosec-begin/end`, directives apply starting on the physical line after `begin` and stop before the `end` line. Maintain a nested stack. The indentation rule requires auto-closing an indented unterminated region when a later physical line has smaller leading whitespace, so this logic belongs in the physical-line pass rather than AST traversal.\n6. For `nosec-next-line`, scan forward from the directive and select the next actual statement, skipping blank/comment lines, grouping-only lines, semicolon-only lines, and ellipsis-only lines. AST statement locations are useful for identifying the target, but comments/directives themselves are not AST statements. A semicolon line can contain multiple AST statements with the same physical line, and each should inherit the same applicable suppression.\n\nExisting tests are sparse but give the compatibility anchors. `tests/functional/test_functional.py::test_nosec` covers the example file, `test_skip` covers inline `#nosec` and `#noqa`, `test_ignore_skip` verifies `ignore_nosec`, and `test_multiline_sql_statements` checks both suppression metrics. Add focused unit tests near `tests/unit/core/test_manager.py` for comment parsing and line-map construction, near `tests/unit/core/test_util.py` for aggregate line lookup, and functional fixtures/tests for nested regions, indentation auto-close, next-statement skipping, expression operators, case/globs, blanket dominance, multiline statements, semicolon statements, and `ignore_nosec`.\n\nObserved experiment: running the existing focused suite with `.venv/bin/stestr run tests.functional.test_functional.FunctionalTests.test_nosec tests.functional.test_functional.FunctionalTests.test_skip` passed both tests. It emitted warnings for prose after existing inline `#nosec` comments, demonstrating that the current parser treats arbitrary trailing text as candidate selectors. The AST experiment showed `a=1; b=2` produces two `Assign` nodes on line 1, while a grouped call spans lines 4-6 and an ellipsis is an `Expr` on line 7. This confirms why suppression must be keyed by physical lines and aggregated across a node’s full line range. `pytest` is unavailable in the environment; `stestr` is available and passed the focused tests.\nInvestigation limitations:\n- Source could not be attached: bandit/core/utils.py:219-402 (unavailable file or invalid range).\n",
+    "citations": [
+      {
+        "end_line": 329,
+        "path": "bandit/core/manager.py",
+        "reason": "File scanning, tokenization, ignore-nosec gate, and nosec line-map construction.",
+        "source_status": "included",
+        "start_line": 301
+      },
+      {
+        "end_line": 499,
+        "path": "bandit/core/manager.py",
+        "reason": "Current inline nosec grammar and exact ID/name resolution.",
+        "source_status": "included",
+        "start_line": 464
+      },
+      {
+        "end_line": 154,
+        "path": "bandit/core/tester.py",
+        "reason": "Suppression aggregation, blanket versus specific skip behavior, and metrics updates.",
+        "source_status": "included",
+        "start_line": 45
+      },
+      {
+        "end_line": 270,
+        "path": "bandit/core/utils.py",
+        "reason": "Physical/AST line-range behavior used by tester contexts.",
+        "source_status": "included",
+        "start_line": 219
+      },
+      {
+        "end_line": 296,
+        "path": "bandit/core/node_visitor.py",
+        "reason": "AST context line ranges and File-level test context.",
+        "source_status": "included",
+        "start_line": 190
+      },
+      {
+        "end_line": 57,
+        "path": "bandit/core/test_set.py",
+        "reason": "Actual enabled-test filtering, profile behavior, builtins, and blacklist universe.",
+        "source_status": "included",
+        "start_line": 15
+      },
+      {
+        "end_line": 107,
+        "path": "bandit/core/extension_loader.py",
+        "reason": "Available ID/name lookup and separation of plugins, builtins, and blacklist tests.",
+        "source_status": "included",
+        "start_line": 54
+      },
+      {
+        "end_line": 452,
+        "path": "tests/functional/test_functional.py",
+        "reason": "Existing inline, ignore-nosec, multiline metric, and functional test anchors.",
+        "source_status": "included",
+        "start_line": 389
+      },
+      {
+        "end_line": 779,
+        "path": "tests/functional/test_functional.py",
+        "reason": "Existing nosec functional coverage.",
+        "source_status": "included",
+        "start_line": 774
+      }
+    ]
+  },
+  {
+    "wire_request_line": 8,
+    "wire_response_line": 9,
+    "arguments": {
+      "repository": "<checkout>",
+      "investigation": {
+        "conversation_id": "<prior-conversation>"
+      },
+      "query": "The implementation is now in working-tree changes, especially new bandit/core/nosec.py plus manager/tester/test_set/utils changes. Check specifically whether token span resolution can miss or leak directive suppressions for legitimate Python statements, or violate blanket/none metric classification. Current approach splits logical NEWLINE and semicolon, joins decorators to header, stores suppressions per token span, uses AST node line/column and optional result positions. Regions are paired explicitly before applying dedent only to unclosed begins, per user wording 'and is not explicitly ended'. Find concrete correctness problems with reproductions if any, no changes. Only repository and scratch evidence, no network. Do not rerun broad suite; parent is running it."
+    },
+    "latency_seconds": 107.73,
+    "is_error": false,
+    "stats": {
+      "cache_write_prompt_tokens": 0,
+      "cached_prompt_tokens": 329728,
+      "completion_tokens": 7233,
+      "duration_ms": 107726,
+      "index_usage": {
+        "available": true,
+        "calls": 0,
+        "duration_ms": 0,
+        "failed_calls": 0,
+        "incomplete_calls": 0,
+        "output_bytes": 0,
+        "parsed_files": 0,
+        "reused_files": 0
+      },
+      "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+      "prompt_tokens": 372810,
+      "reasoning_effort": "medium",
+      "reasoning_output_tokens": 4794,
+      "thread_turn": 1,
+      "tool_calls": 11,
+      "total_tokens": 380043,
+      "turns": 12,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 329728,
+        "input_tokens": 372810,
+        "output_tokens": 7233,
+        "reasoning_output_tokens": 4794,
+        "total_tokens": 380043
+      },
+      "usage_status": "complete",
+      "warm_process": false
+    },
+    "report": "The span implementation is broadly consistent with the documented behavior, and I did not find a blanket/`none` classification error in the selector logic. `Selector.parse()` represents no effect as `None`, blanket as `set()`, and `normalize()` converts a specific union covering the enabled universe into blanket. The existing focused tests cover these cases, including profiles and nested regions.\n\nOne correctness risk remains in position resolution: `Suppressions.for_context()` only adds the result position when `result.lineno` differs from the context line. If a plugin reports a finding on the same physical line but with a different `col_offset`, the result position is ignored and the context position selects the span. This can leak or apply a suppression to the wrong semicolon-separated statement. The relevant condition is `result.lineno != context.get(\"lineno\")` at `bandit/core/nosec.py:243-247`; it should be validated against plugins that return custom same-line result positions.\n\nThe token-span behavior itself intentionally does not make a compound header suppression cover its suite. Statements are split at logical `NEWLINE`, decorators are joined to definitions, and each span is independently indexed. This matches the module documentation and the tests for decorated definitions and multiline statements: a marker on a continuation line or inline suppression inside a multiline statement can cover that span, while a header directive is kept separate from child-suite spans.\n\nFocused reproduction using `tokenize` and a stubbed extension manager confirmed the expected span boundaries: `if x:` and its indented `assert` become separate spans, top-level semicolon-separated statements become separate spans, and decorators join the following definition. The test suite could not be executed in this checkout: `pytest` is unavailable and `python -m unittest ...` stops at import because `yaml` is not installed.",
+    "citations": [
+      {
+        "end_line": 124,
+        "path": "bandit/core/nosec.py",
+        "reason": "Documents the intended token-span model, including separate compound-header/suite spans and multiline statement coverage.",
+        "source_status": "included",
+        "start_line": 119
+      },
+      {
+        "end_line": 237,
+        "path": "bandit/core/nosec.py",
+        "reason": "Shows tokenization, statement splitting, decorator joining, region calculation, and next-statement assignment.",
+        "source_status": "included",
+        "start_line": 127
+      },
+      {
+        "end_line": 257,
+        "path": "bandit/core/nosec.py",
+        "reason": "Shows AST/context position lookup and blanket normalization, including the same-line result-position condition.",
+        "source_status": "included",
+        "start_line": 240
+      },
+      {
+        "end_line": 147,
+        "path": "bandit/core/tester.py",
+        "reason": "Shows how legacy line suppressions and span suppressions are merged and applied to findings.",
+        "source_status": "included",
+        "start_line": 128
+      },
+      {
+        "end_line": 116,
+        "path": "tests/functional/test_nosec_directives.py",
+        "reason": "Focused tests establish the intended compound/decorator, nesting, and blanket/none behavior.",
+        "source_status": "included",
+        "start_line": 92
+      }
+    ]
+  }
+]

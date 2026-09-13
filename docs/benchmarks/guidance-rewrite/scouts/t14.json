@@ -1,0 +1,119 @@
+[
+  {
+    "wire_request_line": 6,
+    "wire_response_line": 7,
+    "arguments": {
+      "repository": "<checkout>",
+      "query": "Investigate Log and RichLog implementation and tests to implement: expose is_following_end bool, follow_end(animate=False), nested FollowChanged message(widget,is_following_end,scroll_y,max_scroll_y), emitted only for boolean transitions. Writes auto-follow only when auto_scroll and already following; scrolling to end restores follow; appends and max_lines pruning preserve viewport when not following. Normal scrolling must still update viewport and vertical scrollbar. RichLog expand=True must retain full-width justification for deferred and explicit writes and rerender existing expanded entries on resize/min_width changes with current Rich. Locate relevant hooks, base watchers, rendering/layout APIs, testing patterns and pitfalls. Also example requested RichLogFollowStateApp with controls. Only supplied checkout evidence allowed, no other directories, network, or modifications."
+    },
+    "latency_seconds": 99.26,
+    "is_error": false,
+    "stats": {
+      "cache_write_prompt_tokens": 0,
+      "cached_prompt_tokens": 461056,
+      "completion_tokens": 6732,
+      "duration_ms": 99261,
+      "index_usage": {
+        "available": true,
+        "calls": 0,
+        "duration_ms": 0,
+        "failed_calls": 0,
+        "incomplete_calls": 0,
+        "output_bytes": 0,
+        "parsed_files": 0,
+        "reused_files": 0
+      },
+      "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+      "prompt_tokens": 536246,
+      "reasoning_effort": "medium",
+      "reasoning_output_tokens": 1979,
+      "thread_turn": 1,
+      "tool_calls": 26,
+      "total_tokens": 542978,
+      "turns": 27,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 461056,
+        "input_tokens": 536246,
+        "output_tokens": 6732,
+        "reasoning_output_tokens": 1979,
+        "total_tokens": 542978
+      },
+      "usage_status": "complete",
+      "warm_process": false
+    },
+    "report": "The implementation is split between `Log` and `RichLog`, both `ScrollView` subclasses. The base `Widget` already provides `max_scroll_y`, `is_vertical_scroll_end`, and `scroll_y` validation, while `ScrollView.watch_scroll_y` updates the vertical scrollbar and refreshes the viewport. Any subclass watcher must call `super().watch_scroll_y(...)`, otherwise ordinary scrolling and scrollbar updates regress.\n\nCurrent follow behavior is inconsistent. `Log.write` always calls `scroll_end` whenever `auto_scroll` or `scroll_end=True`, even if the user has scrolled away from the end. `Log.write_lines` already captures the pre-write end state and only auto-scrolls when that state was true, the scrollbar is not being dragged, and the requested scroll policy is enabled. `RichLog.write` currently always scrolls whenever its resolved auto-scroll policy is true. The new rule should be applied to all write paths: resolve `scroll_end`, then scroll only if it is enabled and the log was already following. Explicit `follow_end(animate=False)` should bypass `auto_scroll` and call the inherited `scroll_end`, with `x_axis=False`.\n\n`is_following_end` should be derived from the current vertical position and `max_scroll_y`, equivalent to `is_vertical_scroll_end`. Because `max_scroll_y` can change when content or widget size changes, transition detection needs a cached previous boolean or an explicit before/after comparison, not only a `scroll_y` watcher. For example, appending while at `scroll_y == 0` can transition from following to not-following when the new content makes `max_scroll_y > 0`; calling `follow_end` or an eligible auto-follow write transitions back. Post the nested `FollowChanged(widget, is_following_end, scroll_y, max_scroll_y)` message only when the boolean changes. Existing nested message conventions call `super().__init__()` and commonly expose a `control` property returning the sender, which is useful for this message too.\n\nThe max-lines code currently removes old rows without preserving the viewport. In `Log._prune_max_lines`, remove count is available before slicing, so when not following, the vertical position should be shifted upward by the number of removed rows, then clamped by normal scroll validation. `Log.write` also sets `virtual_size` before pruning and does not recompute it afterward, while `write_lines` sets it after pruning. `RichLog` tracks `_start_line` for selection/cache coordinates but leaves `scroll_y` unchanged when trimming. The same viewport adjustment is needed there. When following, pruning should be followed by end scrolling so the bottom remains visible. Cache/index bookkeeping must continue to account for removed rows.\n\n`RichLog` has a separate rendering limitation. It stores only rendered `Strip` rows in `lines`, so after an explicit write has been rendered there is no original renderable or write configuration available for a resize/min-width rerender. Deferred writes retain `content`, `width`, `expand`, `shrink`, and `scroll_end` in `DeferredRender`, but this metadata is discarded once `write` renders it. To support expanded entries, retain the original renderable plus the effective write options for each entry, and rebuild only entries whose width depends on the current content region. Recompute `lines`, `_widest_line_width`, `_start_line`, virtual size, and the line cache consistently during that rebuild. Fixed `width=` writes should remain fixed. `min_width` is a reactive attribute, but there is currently no watcher, so changing it does not rerender existing entries. Resize events are currently handled only to mark the first size as known and flush deferred writes, making `on_resize` the natural hook for rerendering width-dependent entries after the initial layout.\n\nFor full-width justification, preserve the original Rich renderable, especially its `Text.justify` setting, and rerender it with Rich console options updated to the current target width. The existing path already uses `measure_renderables`, computes an expanded width from `scrollable_content_region.width`, calls `render_options.update_width(render_width)`, renders through the current app console, and adjusts each resulting strip to that width. The deferred path passes the saved options back through `write`, so the likely failure is loss of metadata after that first render, not the `DeferredRender` tuple itself. Existing snapshot tests cover right-justified `Text` with `min_width`, deferred non-expand, deferred expand, explicit expand while hidden/visible, and width-specific writes. They are the best regression locations for adding resize and explicit-write coverage.\n\nThe requested `RichLogFollowStateApp` can follow the existing example style: compose a `RichLog`, controls using `Button`/`Switch`, and handlers named from the widget message conventions. It should display or log `FollowChanged` fields, provide append and explicit follow-end actions, and expose toggles for `auto_scroll`, `max_lines`, or resize/min-width behavior. There is no existing follow-state example or test in this checkout, and the environment lacks installed dependencies (`python` cannot import `rich`), so runtime tests could not be executed here.",
+    "citations": [
+      {
+        "end_line": 196,
+        "path": "src/textual/widgets/_log.py",
+        "reason": "Shows Log's current write behavior, including unconditional write auto-scroll and max-lines pruning.",
+        "source_status": "included",
+        "start_line": 143
+      },
+      {
+        "end_line": 249,
+        "path": "src/textual/widgets/_log.py",
+        "reason": "Shows Log.write_lines' existing pre-write follow check and its virtual-size/pruning flow.",
+        "source_status": "included",
+        "start_line": 215
+      },
+      {
+        "end_line": 145,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "Shows RichLog state, DeferredRender metadata, first-size-only resize handling, and lack of min_width rerender watcher.",
+        "source_status": "included",
+        "start_line": 27
+      },
+      {
+        "end_line": 281,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "Shows RichLog's rendering pipeline, expand width calculation, metadata loss after rendering, max-lines trim, and unconditional auto-scroll.",
+        "source_status": "included",
+        "start_line": 180
+      },
+      {
+        "end_line": 1978,
+        "path": "src/textual/widget.py",
+        "reason": "Defines max_scroll_y, is_vertical_scroll_end, scroll validation, and the geometry used to determine follow state.",
+        "source_status": "included",
+        "start_line": 1932
+      },
+      {
+        "end_line": 3041,
+        "path": "src/textual/widget.py",
+        "reason": "Shows inherited scroll_end behavior, including animate/immediate arguments and deferred layout handling.",
+        "source_status": "included",
+        "start_line": 2975
+      },
+      {
+        "end_line": 56,
+        "path": "src/textual/scroll_view.py",
+        "reason": "Shows the base scroll watcher that updates the vertical scrollbar and refreshes the viewport.",
+        "source_status": "included",
+        "start_line": 46
+      },
+      {
+        "end_line": 882,
+        "path": "tests/snapshot_tests/test_snapshots.py",
+        "reason": "Existing RichLog regression coverage for max_lines, scrolling, min_width, deferred writes, and expand=True justification.",
+        "source_status": "included",
+        "start_line": 824
+      },
+      {
+        "end_line": 30,
+        "path": "tests/snapshot_tests/snapshot_apps/richlog_width.py",
+        "reason": "Existing example exercising explicit expand writes while hidden, visible, and deferred.",
+        "source_status": "included",
+        "start_line": 1
+      },
+      {
+        "end_line": 269,
+        "path": "src/textual/widgets/_toggle_button.py",
+        "reason": "Example nested Changed message and watcher pattern for event construction.",
+        "source_status": "included",
+        "start_line": 247
+      }
+    ]
+  }
+]

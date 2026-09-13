@@ -9,13 +9,11 @@ const MANAGED_START: &str = "<!-- repotracer:start -->";
 const MANAGED_END: &str = "<!-- repotracer:end -->";
 
 pub(crate) const ROUTING_INSTRUCTIONS: &str = concat!(
-    "RepoTracer investigates repository tasks using a separately configured model. Delegate when finding, understanding or checking relevant behavior would otherwise take your time; a known small lookup may be simpler locally. ",
-    "Give repo_scout the objective, requirements, corrections and relevant context you already know. Do not investigate first to prepare a delegation. Query alone is enough; search terms and file names are optional. Example: 'We are adding layered configuration. Find the loader and investigate what affects precedence. Requirements: later files win; preserve the old API.' ",
-    "The investigator can follow useful related leads and use available scripts, tests and other tools. It returns an explanation with selected source and experiment evidence. Source attachments come from files; conclusions are model judgments. Use the answer to continue the task. Check a specific missing fact, conflicting evidence or changed source when it matters, rather than repeating the investigation. Review your own edits and run relevant checks as usual. ",
-    "You may select investigation.reasoning_effort when the assignment already makes the need clear: medium for straightforward questions, high for difficult diagnosis or interacting behavior. Supported higher levels remain available. Omit it to use configured effort and native adaptive behavior. Do not search merely to decide effort. ",
-    "Set repository to the current target when different from the server startup directory. It is a starting location, not a restriction on useful related evidence. Reuse conversation.id in investigation.conversation_id whenever its existing context helps, including a related assignment in another repository; supply the new target explicitly. Start fresh when relevance is unclear. No extra investigation or elapsed-time rule is needed to decide. ",
-    "The response identifies actual source locations and whether native history resumed, started fresh or is unknown. Give necessary current context when history is unavailable. Independent calls can run in parallel; calls on the same conversation run in order. ",
-    "Prefer directly exposed repo_scout when available. structuredContent contains the answer and evidence; content[].text is a readable alternative. Use either representation, not both. If direct exposure is unavailable, use the host's supported tool discovery and wait mechanism."
+    "Use repo_scout when finding, understanding or checking repository behavior needs investigation. Handle known small lookups directly.\n\n",
+    "Send the objective, relevant requirements and questions the answer must resolve, using context you already have. Let the scout find the code. Ask for conclusions supported by evidence and specific uncertainties; the investigation is done when those questions are answered well enough to proceed.\n\n",
+    "While it runs, work on independent parts of the task. Use the returned evidence for implementation, checking specific gaps, contradictions or changed code.\n\n",
+    "Set repository to the current target. Reuse conversation.id as investigation.conversation_id when prior context helps; start fresh for unrelated work. Leave reasoning effort automatic unless the task warrants an override.\n\n",
+    "Prefer directly exposed repo_scout; otherwise use the host's tool discovery and wait mechanism. Read structuredContent, or content[].text as the fallback."
 );
 
 const REPOTRACER_NAMESPACE: &str = "mcp__repotracer";
@@ -911,29 +909,16 @@ mcp_servers = { repotracer = { command = "old" }, other = { command = "keep" } }
     }
 
     #[test]
-    fn parent_delegates_existing_context_without_preliminary_investigation() {
-        assert!(ROUTING_INSTRUCTIONS.contains("context you already know"));
-        assert!(ROUTING_INSTRUCTIONS.contains("Requirements: later files win"));
-        for capability in [
-            "Do not investigate first",
-            "Query alone is enough",
-            "scripts, tests and other tools",
-            "selected source and experiment evidence",
-            "including a related assignment in another repository",
-            "not a restriction on useful related evidence",
-        ] {
-            assert!(
-                ROUTING_INSTRUCTIONS.contains(capability),
-                "missing capability: {capability}"
-            );
-        }
-        for removed_rule in [
-            "Call repo_scout first",
-            "before planning the first repository operation",
-            "repeating broad searches",
-            "one targeted history lookup",
-        ] {
-            assert!(!ROUTING_INSTRUCTIONS.contains(removed_rule));
-        }
+    fn routing_refresh_replaces_the_old_block_and_preserves_user_instructions() {
+        let old = "# User rules\n\n<!-- repotracer:start -->\nOld routing text\n<!-- repotracer:end -->\n\nKeep local conventions.\n";
+        let block = format!("{MANAGED_START}\n{ROUTING_INSTRUCTIONS}\n{MANAGED_END}");
+        let refreshed = replace_managed_block(old, &block);
+        assert!(refreshed.starts_with("# User rules\n\n"));
+        assert!(refreshed.ends_with("\n\nKeep local conventions.\n"));
+        assert!(!refreshed.contains("Old routing text"));
+        assert_eq!(refreshed.matches(MANAGED_START).count(), 1);
+        assert_eq!(refreshed.matches(MANAGED_END).count(), 1);
+        assert_eq!(replace_managed_block(&refreshed, &block), refreshed);
+        assert_eq!(remove_managed_block(&refreshed), remove_managed_block(old));
     }
 }

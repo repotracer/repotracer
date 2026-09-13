@@ -1,0 +1,164 @@
+[
+  {
+    "wire_request_line": 6,
+    "wire_response_line": 7,
+    "arguments": {
+      "query": "Investigate implementation and tests for Log and RichLog follow scrolling and RichLog expanded rendering. We must add is_following_end bool, follow_end(animate=False), FollowChanged(widget,is_following_end,scroll_y,max_scroll_y) posted only on boolean changes. auto_scroll writes follow only if already following; reaching end resumes follow; appends/pruning when detached preserve viewport. Normal scroll must continue updating viewport and scrollbar. RichLog expand=True must justify to full width with current Rich for deferred/explicit writes and reflow existing expanded entries on resize/min_width changes. Identify appropriate hooks, risks, test patterns and implementation recommendations. Read-only, only this checkout, no other study directories/network.",
+      "investigation": {
+        "reasoning_effort": "high",
+        "intent": "change_impact"
+      }
+    },
+    "latency_seconds": 599.2,
+    "is_error": false,
+    "stats": {
+      "cache_write_prompt_tokens": 0,
+      "cached_prompt_tokens": 7523328,
+      "completion_tokens": 35485,
+      "duration_ms": 599184,
+      "index_usage": {
+        "available": true,
+        "calls": 0,
+        "duration_ms": 0,
+        "failed_calls": 0,
+        "incomplete_calls": 0,
+        "output_bytes": 0,
+        "parsed_files": 0,
+        "reused_files": 0
+      },
+      "model": "GPT scout via Codex CLI (gpt-5.6-luna)",
+      "prompt_tokens": 7736447,
+      "reasoning_effort": "high",
+      "reasoning_output_tokens": 15569,
+      "thread_turn": 1,
+      "tool_calls": 85,
+      "total_tokens": 7771932,
+      "turns": 86,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 7523328,
+        "input_tokens": 7736447,
+        "output_tokens": 35485,
+        "reasoning_output_tokens": 15569,
+        "total_tokens": 7771932
+      },
+      "usage_status": "complete",
+      "warm_process": false
+    },
+    "report": "The implementation is centered in the shared `LogScrollView` helper now present in the live worktree, with both `Log` and `RichLog` subclassing it. `FollowChanged` carries the widget, boolean state, current `scroll_y`, and `max_scroll_y`, while `_set_following_end` suppresses duplicate messages. The scroll watcher correctly calls `super()`, preserving viewport refresh and scrollbar updates.\n\nThe current parent tests cover the main follow cases and pass: `18 passed`. A focused run also confirmed detached Log pruning preserves the visible content by subtracting removed rows from the scroll position.\n\nImportant remaining risks:\n\n- `_preserve_scroll` calls deferred `scroll_to` without `immediate=True`, then clears `_preserving_viewport` before the scheduled scroll watcher runs. This can allow the preservation scroll to affect follow-state detection. Existing tests do not expose it.\n- `follow_end(animate=True)` now marks the widget as following immediately, so its transition message captures the pre-animation scroll position. If the contract requires `FollowChanged(True)` only when the viewport actually reaches the end, the message should instead be emitted on arrival. This is a semantic choice.\n- Explicit `scroll_end=True` still forces following even when detached. The default `scroll_end=None` path correctly requires both `auto_scroll` and the existing follow state.\n\nRichLog rendering is implemented by retaining `_LogEntry` source renderables for entries written with `expand=True` and no explicit width. `_reflow_expanded` runs from resize and `min_width` changes, rebuilds strips, recalculates virtual size, and restores the follow or detached viewport state. Deferred writes now retain `animate`, which fixes an existing deferred-argument loss.\n\nTwo regressions remain in the current RichLog edit:\n\n- `_render_entry` extends strips to the computed width only for `expand=True`. Ordinary writes with `min_width` or explicit `width` can now have narrower strips and virtual widths than before. A direct app test with `RichLog(min_width=10)` and non-expanded `Text(\"abc\")` produced a 3-cell strip and virtual width 3, instead of the prior 10-cell minimum. Strip length should be adjusted to the chosen render width for every entry.\n- `_LogEntry.trimmed` records old wrapped row counts. Reflowing a partially-pruned wrapped entry slices the newly rendered output by that stale count. Reproduction: `wrap=True`, `max_lines=3`, one long expanded text rendered four rows at width 18, then widened to 28. The retained output lost the first newly rendered row and contained only two rows. Re-render retained source entries from an untrimmed state, then apply `max_lines` pruning again.\n\nWith the installed Rich 15.0.0, the old `overflow=\"ignore\", no_wrap=True` combination bypasses justification for short `Text` renderables. Direct Rich rendering at width 18 produced one unpadded cell with `overflow=\"ignore\"`, but an 18-cell justified line with `overflow=\"crop\"`. The current parent change uses the latter for expanded text and fixes the existing deferred and explicit expansion expectations. Existing snapshot tests already cover deferred expand, explicit expand, minimum width, and explicit widths, but the snapshot fixture is unavailable in this environment. The full non-snapshot collection is also blocked by a missing `xdist_group` marker plugin; targeted Log/RichLog tests and compilation pass.",
+    "citations": [
+      {
+        "end_line": 26,
+        "path": "src/textual/widgets/_log_scroll_view.py",
+        "reason": "Defines FollowChanged payload fields and control alias.",
+        "source_status": "included",
+        "start_line": 9
+      },
+      {
+        "end_line": 78,
+        "path": "src/textual/widgets/_log_scroll_view.py",
+        "reason": "Defines shared follow-state transitions, scroll watcher, follow_end behavior, and preservation guard.",
+        "source_status": "included",
+        "start_line": 29
+      },
+      {
+        "end_line": 100,
+        "path": "src/textual/widgets/_log_scroll_view.py",
+        "reason": "Defines default versus explicit write-follow semantics and write completion behavior.",
+        "source_status": "included",
+        "start_line": 80
+      },
+      {
+        "end_line": 56,
+        "path": "src/textual/scroll_view.py",
+        "reason": "Inherited scroll watcher updates scrollbar position and refreshes the viewport.",
+        "source_status": "included",
+        "start_line": 46
+      },
+      {
+        "end_line": 198,
+        "path": "src/textual/widgets/_log.py",
+        "reason": "Log pruning and write paths use the shared follow decision and preserve detached scroll position.",
+        "source_status": "included",
+        "start_line": 146
+      },
+      {
+        "end_line": 261,
+        "path": "src/textual/widgets/_log.py",
+        "reason": "Log write_lines and clear paths show state updates that RichLog must mirror.",
+        "source_status": "included",
+        "start_line": 218
+      },
+      {
+        "end_line": 43,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "DeferredRender metadata and retained entry structure for responsive RichLog output.",
+        "source_status": "included",
+        "start_line": 28
+      },
+      {
+        "end_line": 159,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "RichLog resize hook drains deferred writes and invokes expanded-entry reflow.",
+        "source_status": "included",
+        "start_line": 151
+      },
+      {
+        "end_line": 300,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "Current RichLog write/render implementation, including current Rich overflow handling and strip-width behavior.",
+        "source_status": "included",
+        "start_line": 225
+      },
+      {
+        "end_line": 351,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "Current RichLog pruning and reflow implementation, including row-based trimmed metadata.",
+        "source_status": "included",
+        "start_line": 302
+      },
+      {
+        "end_line": 395,
+        "path": "src/textual/widgets/_rich_log.py",
+        "reason": "RichLog clear and line-cache behavior relevant to reflow and viewport preservation.",
+        "source_status": "included",
+        "start_line": 358
+      },
+      {
+        "end_line": 56,
+        "path": "tests/test_log_follow.py",
+        "reason": "Follow-state, detached scrolling, scrollbar, and message-field test patterns.",
+        "source_status": "included",
+        "start_line": 37
+      },
+      {
+        "end_line": 126,
+        "path": "tests/test_log_follow.py",
+        "reason": "Detached append and pruning test pattern, including stream writes.",
+        "source_status": "included",
+        "start_line": 78
+      },
+      {
+        "end_line": 186,
+        "path": "tests/test_log_follow.py",
+        "reason": "Expanded justification, resize/min_width reflow, explicit width, and pruning test patterns.",
+        "source_status": "included",
+        "start_line": 129
+      },
+      {
+        "end_line": 882,
+        "path": "tests/snapshot_tests/test_snapshots.py",
+        "reason": "Existing deferred RichLog expand and no-expand snapshot coverage.",
+        "source_status": "included",
+        "start_line": 824
+      },
+      {
+        "end_line": 942,
+        "path": "tests/snapshot_tests/test_snapshots.py",
+        "reason": "Existing RichLog minimum-width, explicit-width, and shrink snapshot coverage.",
+        "source_status": "included",
+        "start_line": 838
+      }
+    ]
+  }
+]
