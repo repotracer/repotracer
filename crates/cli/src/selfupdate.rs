@@ -1,9 +1,9 @@
 //! Keeping the installed binary current, without asking anyone to run anything.
 //!
 //! Codex launches RepoTracer from a fixed path (`~/.repotracer/bin/repotracer`),
-//! so an update is a file swap: fetch the newest release asset, verify its
-//! SHA-256 against the published `SHA256SUMS`, and put it in place. npm is only
-//! ever the installer; it plays no part at runtime.
+//! so an update is a file swap: read npm's `latest` dist-tag, fetch that exact
+//! GitHub release asset, verify its SHA-256 against the published
+//! `SHA256SUMS`, and put it in place.
 //!
 //! Replacing a *running* executable is the one genuinely hard part, and it is
 //! not ours to solve. Unix can rename over a mapped image; Windows can rename
@@ -24,7 +24,7 @@
 //!   build, a source checkout, or an npx vendor copy belongs to whatever put it
 //!   there.
 //! - It never runs on the tool-call path. It is a background task at startup.
-//! - Every failure is silent. An unreachable release feed is not the user's
+//! - Every failure is silent. An unreachable registry is not the user's
 //!   problem and must not surface during a coding session.
 
 use anyhow::{bail, Context, Result};
@@ -34,7 +34,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use tracing::debug;
 
-const RELEASES_LATEST: &str = "https://api.github.com/repos/repotracer/repotracer/releases/latest";
+const NPM_DIST_TAGS: &str = "https://registry.npmjs.org/-/package/repotracer/dist-tags";
 const DOWNLOAD_BASE: &str = "https://github.com/repotracer/repotracer/releases/download";
 const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
 /// A wrong URL that returns a huge body must not fill the user's disk.
@@ -107,7 +107,7 @@ async fn stage() -> Result<Option<Staged>> {
         return Ok(None);
     };
 
-    let latest = fetch_latest_version(&releases_api()).await?;
+    let latest = fetch_latest_version(&dist_tags_api()).await?;
     if !is_newer(&latest, current_version()) {
         return Ok(None);
     }
@@ -228,36 +228,25 @@ fn hex_digest(bytes: &[u8]) -> String {
         .collect()
 }
 
-/// Compare dotted numeric versions. Anything unparsable sorts as older, so a
-/// malformed tag can never trigger a download.
+/// Compare strict stable semantic versions. Malformed or prerelease versions
+/// can never trigger a download or downgrade.
 pub fn is_newer(candidate: &str, current: &str) -> bool {
-    fn parts(v: &str) -> Vec<u64> {
-        v.trim()
-            .trim_start_matches('v')
-            .split('.')
-            .map(|p| {
-                p.chars()
-                    .take_while(char::is_ascii_digit)
-                    .collect::<String>()
-                    .parse()
-                    .unwrap_or(0)
-            })
-            .collect()
+    match (stable_version(candidate), stable_version(current)) {
+        (Ok(candidate), Ok(current)) => candidate > current,
+        _ => false,
     }
-    if candidate.trim().is_empty() {
-        return false;
+}
+
+fn stable_version(value: &str) -> Result<semver::Version> {
+    if value.trim() != value {
+        bail!("version must not contain surrounding whitespace");
     }
-    let (a, b) = (parts(candidate), parts(current));
-    for index in 0..a.len().max(b.len()) {
-        let (x, y) = (
-            a.get(index).copied().unwrap_or(0),
-            b.get(index).copied().unwrap_or(0),
-        );
-        if x != y {
-            return x > y;
-        }
+    let version =
+        semver::Version::parse(value).context("version is not strict semantic version")?;
+    if !version.pre.is_empty() || !version.build.is_empty() || version.to_string() != value {
+        bail!("version must be a canonical stable semantic version");
     }
-    false
+    Ok(version)
 }
 
 // ---------------------------------------------------------------------------
@@ -326,19 +315,31 @@ fn http_client() -> Result<reqwest::Client> {
         .build()?)
 }
 
-/// Both endpoints are overridable so the integration test can point at a local
-/// server. `REPOTRACER_RELEASE_BASE_URL` is the same variable the npm installer
-/// already honours.
-fn releases_api() -> String {
-    std::env::var("REPOTRACER_RELEASE_API").unwrap_or_else(|_| RELEASES_LATEST.to_string())
+/// Both endpoints are overridable so tests and mirrors can use a local server.
+/// The old release-API name remains an alias, but its response must use the npm
+/// dist-tags shape. `REPOTRACER_RELEASE_BASE_URL` is also used by the installer.
+fn dist_tags_api() -> String {
+    dist_tags_api_from(
+        std::env::var("REPOTRACER_NPM_DIST_TAGS_API").ok(),
+        std::env::var("REPOTRACER_RELEASE_API").ok(),
+    )
+}
+
+fn dist_tags_api_from(primary: Option<String>, legacy: Option<String>) -> String {
+    primary
+        .or(legacy)
+        .unwrap_or_else(|| NPM_DIST_TAGS.to_string())
 }
 
 fn download_base(version: &str) -> String {
-    std::env::var("REPOTRACER_RELEASE_BASE_URL")
-        .unwrap_or_else(|_| format!("{DOWNLOAD_BASE}/v{version}"))
+    std::env::var("REPOTRACER_RELEASE_BASE_URL").unwrap_or_else(|_| default_download_base(version))
 }
 
-/// The newest published version, without its tag prefix.
+fn default_download_base(version: &str) -> String {
+    format!("{DOWNLOAD_BASE}/v{version}")
+}
+
+/// The strict stable version selected by npm's `latest` dist-tag.
 async fn fetch_latest_version(api: &str) -> Result<String> {
     let body: serde_json::Value = http_client()?
         .get(api)
@@ -347,11 +348,12 @@ async fn fetch_latest_version(api: &str) -> Result<String> {
         .error_for_status()?
         .json()
         .await?;
-    let tag = body
-        .get("tag_name")
+    let version = body
+        .get("latest")
         .and_then(|t| t.as_str())
-        .context("release feed had no tag_name")?;
-    Ok(tag.trim_start_matches('v').to_string())
+        .context("npm dist-tags response had no latest version")?;
+    stable_version(version)?;
+    Ok(version.to_string())
 }
 
 /// Download one release asset and refuse to return it unless its SHA-256
@@ -483,13 +485,40 @@ mod tests {
     #[test]
     fn version_comparison_handles_the_shapes_we_publish() {
         assert!(is_newer("0.1.9", "0.1.3"));
-        assert!(is_newer("v0.2.0", "0.1.9"));
+        assert!(is_newer("0.2.0", "0.1.9"));
         assert!(is_newer("1.0.0", "0.9.9"));
         assert!(!is_newer("0.1.3", "0.1.3"));
         assert!(!is_newer("0.1.2", "0.1.3"));
-        // A malformed tag must never trigger a download.
-        assert!(!is_newer("garbage", "0.1.3"));
-        assert!(!is_newer("", "0.1.3"));
+        // npm's latest tag must name one canonical stable release.
+        for malformed in [
+            "v0.2.0",
+            "0.2",
+            "01.2.0",
+            "0.2.0-beta.1",
+            "0.2.0+build",
+            " 0.2.0",
+            "garbage",
+            "",
+        ] {
+            assert!(!is_newer(malformed, "0.1.3"));
+        }
+    }
+
+    #[test]
+    fn npm_and_github_urls_select_the_same_exact_version() {
+        assert_eq!(
+            dist_tags_api_from(None, None),
+            "https://registry.npmjs.org/-/package/repotracer/dist-tags"
+        );
+        assert_eq!(
+            default_download_base("2.1.1"),
+            "https://github.com/repotracer/repotracer/releases/download/v2.1.1"
+        );
+        assert_eq!(
+            dist_tags_api_from(Some("primary".into()), Some("legacy".into())),
+            "primary"
+        );
+        assert_eq!(dist_tags_api_from(None, Some("legacy".into())), "legacy");
     }
 
     #[test]
@@ -573,8 +602,7 @@ mod tests {
 
     #[test]
     fn the_download_url_puts_the_tag_prefix_back() {
-        // The release feed reports `v0.1.9` and we strip the `v` to compare
-        // versions, but the download path needs it again.
+        // npm reports `0.1.9`, while the matching GitHub release is `v0.1.9`.
         assert!(download_base("0.1.9").ends_with("/releases/download/v0.1.9"));
     }
 }
@@ -648,19 +676,16 @@ mod network_tests {
 
     fn release_server(asset: &str, sums: Vec<u8>, binary: &[u8]) -> Server {
         Server::start(vec![
-            (
-                "/releases/latest".into(),
-                br#"{"tag_name": "v99.0.0"}"#.to_vec(),
-            ),
+            ("/dist-tags".into(), br#"{"latest": "99.0.0"}"#.to_vec()),
             ("/SHA256SUMS".into(), sums),
             (format!("/{asset}"), binary.to_vec()),
         ])
     }
 
     #[tokio::test]
-    async fn the_release_feed_reports_the_version_without_its_tag_prefix() {
+    async fn npm_latest_reports_the_exact_stable_version() {
         let server = release_server("x", vec![], b"");
-        let version = fetch_latest_version(&format!("{}/releases/latest", server.base))
+        let version = fetch_latest_version(&format!("{}/dist-tags", server.base))
             .await
             .unwrap();
         assert_eq!(version, "99.0.0");

@@ -1502,6 +1502,7 @@ dependencies = [
  "repotracer-repo-tools",
  "reqwest",
  "self-replace",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
