@@ -828,6 +828,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn low_to_medium_policy_allows_medium_but_rejects_high() {
+        let mut first = result(InvestigationStatus::Partial, Some(continuation("medium")));
+        first.stats.reasoning_effort = Some("low".into());
+        let mut complete = result(InvestigationStatus::Complete, None);
+        complete.investigation.unresolved.clear();
+        let backend = Arc::new(ScriptedBackend::new(vec![Ok(first), Ok(complete)]));
+        let scout = AdaptiveScout::new(
+            backend.clone(),
+            true,
+            Some(vec!["low".into(), "medium".into()]),
+            "low",
+        );
+        let output = scout.scout(request()).await.unwrap();
+        let requests = backend.requests.lock().await;
+        assert_eq!(requests.len(), 2);
+        assert_eq!(
+            requests[0].investigation.continuation_efforts,
+            Some(vec!["medium".into()])
+        );
+        assert_eq!(
+            requests[1].investigation.reasoning_effort.as_deref(),
+            Some("medium")
+        );
+        assert_eq!(output.investigation.status, InvestigationStatus::Complete);
+        drop(requests);
+
+        let backend = Arc::new(ScriptedBackend::new(vec![Ok(result(
+            InvestigationStatus::Partial,
+            Some(continuation("high")),
+        ))]));
+        let scout = AdaptiveScout::new(
+            backend.clone(),
+            true,
+            Some(vec!["low".into(), "medium".into()]),
+            "low",
+        );
+        let output = scout.scout(request()).await.unwrap();
+        assert_eq!(backend.requests.lock().await.len(), 1);
+        assert_eq!(output.investigation.status, InvestigationStatus::Partial);
+    }
+
+    #[tokio::test]
     async fn request_effort_is_used_when_provider_stats_omit_it() {
         let mut first = result(InvestigationStatus::Partial, Some(continuation("max")));
         first.stats.reasoning_effort = None;

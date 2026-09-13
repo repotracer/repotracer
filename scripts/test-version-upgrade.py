@@ -10,11 +10,19 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import socketserver
 import subprocess
+import sys
 import tempfile
 import threading
+
+
+if sys.version_info < (3, 11):
+    raise SystemExit("scripts/test-version-upgrade.py requires Python 3.11 or newer")
+
+import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -125,6 +133,17 @@ def main() -> None:
         }
         run(managed, "config", "--init", env=environment)
         run(managed, "__refresh-integration", env=environment)
+        # Reproduce the 2.1.0 managed default even when starting from an older
+        # tag which did not write a caller timeout. The updater must migrate it.
+        text = codex_config.read_text()
+        section = re.search(r"(?m)^\[mcp_servers\.repotracer\]\s*$", text)
+        if section is None:
+            raise RuntimeError("historical setup did not write the expected MCP section")
+        following = re.search(r"(?m)^\[", text[section.end():])
+        end = section.end() + following.start() if following else len(text)
+        body = text[section.end():end]
+        body = re.sub(r"(?m)^tool_timeout_sec\s*=.*\n?", "", body)
+        codex_config.write_text(text[:section.end()] + "\ntool_timeout_sec = 600\n" + body + text[end:])
         old_config_hash = hashlib.sha256(app_config.read_bytes()).digest()
 
         payload = release_binary.read_bytes()
@@ -178,6 +197,8 @@ def main() -> None:
         refreshed_config = codex_config.read_text()
         refreshed_agents = agents.read_text()
         checks = {
+            "legacy caller timeout migrated": tomllib.loads(refreshed_config)
+            ["mcp_servers"]["repotracer"]["tool_timeout_sec"] == 2_147_483_647,
             "user Codex config": 'model = "user-choice"' in refreshed_config
             and "[user_settings]" in refreshed_config,
             "single MCP entry": refreshed_config.count("[mcp_servers.repotracer]") == 1,
