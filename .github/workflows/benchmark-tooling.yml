@@ -1,0 +1,25 @@
+name: benchmark tooling
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/benchmarks/**'
+      - '.github/workflows/benchmark-tooling.yml'
+  pull_request:
+    paths:
+      - 'tools/benchmarks/**'
+      - '.github/workflows/benchmark-tooling.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: python3 -m unittest discover -s tools/benchmarks -p 'test_*.py' -v
