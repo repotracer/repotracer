@@ -1,195 +1,223 @@
 # Changelog
 
-## 2.1.0
+This file records behavior at the time each release shipped. Older entries can describe constraints that no longer apply to the current architecture.
+
+## 2.1.0 — 2026-09-13
+
+The first release since 1.0.1, and the largest so far. Version 2.0.0 was used during development but never published, so this entry covers everything since 1.0.1.
+
+RepoTracer started this cycle as a Codex search helper. It ships as a repo investigator for Claude Code and Codex: a separate agent traces the repository, runs checks when they help, and reports back with source, results, and anything it could not settle.
+
+### Highlights
+
+- **Claude Code support.** Install RepoTracer for Claude Code, Codex, or both. Each keeps its own investigator profile.
+- **Investigations instead of file lookups.** `repo_scout` can trace behavior across files and related repositories, run checks or experiments, and report what it found, what it checked, and what is still unresolved.
+- **Follow-ups continue the same investigation.** A related call picks up the earlier work, even when it moves into another repository. Independent investigations run in parallel.
+- **Warm native sessions.** Investigator processes stay up between related calls, so follow-ups skip CLI start-up.
+- **A new setup and settings wizard.** Pick agents, models, reasoning effort, and the Codex fast tier from one full-screen terminal UI, and uninstall from the same place.
+- **Bring any model.** Choose from the native model catalogs, enter a `provider:model-id`, or point at any OpenAI-compatible endpoint.
+- **`repotracer symbols`.** Definitions, references, and outlines for Rust, Python, JavaScript, TypeScript/TSX, and Go, with no model call.
 
 ### Added
 
-- An Uninstall button on the install page, reachable by tabbing or with `R`.
-  It stages each installed integration for removal so the rows and the primary
-  button say what will happen before anything is touched.
-- A Codex fast tier setting on the Scout models page, on for the recommended
-  model and off for every other Codex model.
+**Agents and models**
+
+- Claude Code parent integration alongside Codex. `setup --agents codex|claude|both` selects them without the wizard.
+- Independent investigator profiles per parent, so changing the Codex setup never changes Claude Code.
+- Native model discovery from the installed CLIs, a searchable model catalog, `provider:model-id` entries, and a Custom model form for OpenAI-compatible endpoints (base URL, model ID, optional API key).
+- Defaults: `codex:gpt-5.6-luna` on the fast tier for Codex, and `claude:opus` with automatic reasoning for Claude Code.
+- `repotracer settings`, interactive or scripted with `--agents`, `--codex-scout`, `--codex-model`, `--claude-scout`, `--claude-model`, and `--dry-run`.
+- A Codex fast-tier setting, on by default for `gpt-5.6-luna` and off for other Codex models.
+
+**Investigations**
+
+- A new investigation engine. Reports carry a written answer, selected source, experiment results, unresolved questions, limitations, usage, and timing.
+- Investigations can span several repository targets and keep citations to paths outside the starting repository.
+- Continuation through `investigation.conversation_id`. Calls on one conversation run in order; separate conversations run concurrently.
+- Optional `repository`, `focus`, and `investigation` inputs on `repo_scout`, and investigation intents on the CLI (`scout --intent`).
+- An investigator can ask for one follow-up pass at a higher reasoning effort when that would settle a specific gap.
+- Native Claude Code investigations with subscription usage accounting.
+- Warm native sessions. Retained Codex app-server and Claude Code processes are reused for related work and retired after `session.idle_secs`.
+- Source attachments are checked against the file and delivered as bounded ranges. A failed attachment is reported next to the answer instead of discarding the report.
+- The `repo_scout` result format is versioned as handoff v4, and failed investigations are returned as MCP tool errors.
+
+**Setup wizard**
+
+- A full-screen terminal wizard for setup and settings. The card sizes to the page, with a step rail, per-page titles, and a wordmark where there is room.
+- Model, reasoning effort, and fast tier are each a row you arrow onto. Enter opens a setting and Space flips a toggle.
+- `Custom model…` leads the model picker.
+- A first install opens with Codex and Claude Code both selected.
+- Uninstall from the wizard: uncheck an agent, or press Uninstall (`R`) to stage every installed agent. Rows read "will be removed" before anything changes.
+- Catalog warnings name the command that fixes them.
+- Works without color (`NO_COLOR`) and on terminals without UTF-8 (`REPOTRACER_ASCII=1`).
+
+**Tooling and release**
+
+- `doctor` checks Claude Code authentication in the same environment the Claude investigator uses.
+- `scripts/verify-release.sh` checks packaging and integration in a throwaway home directory, including the published package with `--published`.
+- `scripts/subscription-smoke.py` runs `repo_scout` end to end with a real Codex or Claude Code CLI behind it.
+- CI on Linux, macOS, and Windows with rustfmt, strict Clippy, the native Codex app-server checks, and a repository hygiene check. Pre-commit hooks for contributors.
+- The npm launcher installs the platform-native binary for macOS, Linux, and Windows.
 
 ### Changed
 
-- The setup and settings wizard sizes its card to the page it is showing
-  instead of stretching one box to the whole viewport, and adds a step rail,
-  a per-page title, and a wordmark where there is room for one.
-- A first install arrives with Codex and Claude Code both selected rather than
-  both unchecked.
-- The Claude Code default is `claude:opus` with automatic reasoning. Codex
-  stays `codex:gpt-5.6-luna`.
-- `Custom model…` leads the model picker instead of trailing the catalog.
-- Every scout setting is a row you arrow onto: model, reasoning effort, and
-  fast tier. Enter opens the focused setting and Space flips a toggle, in
-  place of the previous letter shortcuts.
-- Left and right move within the row of buttons; up and down treat that row as
-  a single stop.
+- Routing: when a task needs an investigation, the parent calls `repo_scout` straight away instead of searching on its own first.
+- Timeouts are separate settings: `session.idle_secs` for warm-process idle time, `model.timeout_ms` for stream silence, and `explorer.timeout_seconds` for a whole investigation on the OpenAI-compatible engine only. A zero tool timeout disables the limit.
+- OpenAI-compatible endpoints leave reasoning effort unset unless you choose one; the medium default applies only to native investigators. Reasoning requests use completion-token limits.
+- `service_tier` is written only to Codex profiles. Claude Code and custom profiles no longer carry it, and profiles written before this change behave as they did.
+- Building from source requires Rust 1.90 or newer.
+- The docs describe source validation as a location check, not proof that a conclusion is correct.
 
 ### Fixed
 
-- `service_tier` is written only for Codex, the one backend that reads it.
-  Claude Code and custom-endpoint profiles no longer carry a setting that
-  nothing consumes. A tier already saved on a profile is preserved, and
-  pinning a tier then changing models drops the pin with the model it was
-  pinned on.
-- Integration removals that succeed before a later failure are persisted, so a
-  retry does not start from the beginning.
-- Uninstall state survives a rerun of the wizard.
+- Cancelling or retiring an investigation kills the whole native process tree, including helper processes Claude Code starts. On Windows, a job object owns Claude Code's child processes.
+- Setup keeps the first backup of your config instead of overwriting it on every auto-update.
+- An inline `mcp_servers` entry is detected as installed.
+- Profile saves are atomic on every platform, and saved API keys are tied to the provider origin they were entered for.
+- A turn with unreported usage no longer disables warm reuse for its conversation. Missing usage is marked partial instead of estimated.
+- Claude Code failures quote the end of its stderr, so a renamed flag is distinguishable from a stream that ended early.
+- Repository boundaries hold through path aliases, generic tools stay bound to the requested repository, and nested reads and searches for dash-prefixed text work.
+- Follow-ups on one conversation can no longer overtake each other while a repository is being selected.
+- Citation source is read in bounded, streamed ranges instead of loading whole files.
+- Symbols indexes are kept across requests, and paging can no longer stall on an empty page.
+- Tool telemetry is kept when a native turn fails.
+- Custom provider discovery settings are preserved, and verified discovery results appear in the wizard.
+- Workspace context refreshes when a native investigation changes targets, and retained scratch directories no longer collide when processes are recycled.
+- Successful integration removals persist even if a later removal fails, and uninstall state survives a rerun of the wizard.
+- Self-update picks the correct upgrade target version.
 
-### Verification status
+### Upgrading from 1.0.1
 
-Workspace tests, Clippy, and rustfmt pass, and the release tag gates the
-published artifacts on GitHub CI across Linux, macOS, and Windows. This note
-makes no savings, latency, or quality claim.
+- Run `npx repotracer@latest setup` to add Claude Code or change models, then restart the parent agent.
+- Anything that parses raw `repo_scout` output should expect handoff v4.
 
-## 2.0.0
+### Verification
 
-### Added
+Workspace tests, Clippy, and rustfmt pass. Release tags gate published artifacts on GitHub CI across Linux, macOS, and Windows.
 
-- Codex and Claude Code parent integrations, with independent scout profiles.
-- A two-step terminal setup and settings wizard for parent and model selection.
-- Per-parent Advanced settings for different scout providers and model IDs.
-- Native subscription model discovery and `provider:model-id` custom entries.
-- Structured `repo_scout` results with source context, citations, usage fields,
-  and a readable text fallback.
-- Repository and focus selection, investigation intents, and related
-  follow-ups through bounded conversation handles.
-- Read-only repository tools with path and line-range citation validation.
-
-### Changed
-
-- Defaults are `codex:gpt-5.6-luna` for a Codex parent and `claude:sonnet` for
-  a Claude Code parent.
-- Parent profiles are configured independently and must be restarted after
-  settings changes.
-- Warm process retention and stream-inactivity handling are separate from
-  optional whole-investigation timeouts.
-- Documentation describes citation validation as location checking, not proof
-  that model-authored findings are correct.
-
-### Verification status
-
-The release candidate has passed GitHub CI on Linux, macOS, and Windows,
-including the native Codex app-server checks. This release note makes no savings, latency, or
-quality claim.
+This verification note is not a benchmark claim.
 
 ## 1.0.1 — 2026-08-30
 
 ### Fixed
-- Setup no longer treats unrelated `repotracer` text left in Codex configuration as an installed MCP integration after uninstall
+
+- Setup no longer treats unrelated `repotracer` text left in Codex configuration as an installed MCP integration after uninstall.
 
 ## 1.0.0 — 2026-08-30
 
 ### Changed
-- GPT-5.6 Luna scouts use the fast service tier by default
-- Routing classifies the requested ownership surface before planning searches and uses contrasting local and Scout examples: localized changes start with one targeted lookup even when paths are unknown, while exhaustive inventories and cross-owner propagation call Scout first
+
+- GPT-5.6 Luna investigators use the fast service tier by default.
+- Routing classifies the requested ownership surface before planning broad searches. Localized changes start with targeted work; exhaustive or cross-owner tasks can call RepoTracer first.
 
 ### Fixed
-- Subscription scouts treat `model.timeout_ms` as a silence limit: valid app-server stream activity resets it, while a silent child and its descendants are terminated
-- Subscription scouts accept every reasoning level exposed by Luna: low, medium, high, xhigh, and max
 
-## 0.1.9 - 2026-08-26
+- Subscription investigations treat `model.timeout_ms` as a stream-silence limit.
+- Luna accepts every reasoning level exposed by the native backend.
+
+## 0.1.9 — 2026-08-26
 
 ### Fixed
-- Setup no longer requires an active Codex login. It verifies that Codex is installed and defers authentication until a scout runs
+
+- Setup no longer requires an active Codex login. It verifies that Codex is installed and defers authentication until an investigation runs.
 
 ## 0.1.8 — 2026-08-26
 
 ### Changed
-- Automatic update checks now run whenever the RepoTracer MCP server starts instead of at most once every 24 hours
-- Isolated Codex scouts preserve the active built-in or custom model provider, provider authentication mode, and credential store without inheriting personal MCP servers, hooks, plugins, or instructions
+
+- Automatic update checks now run whenever the RepoTracer MCP server starts instead of at most once every 24 hours.
+- Codex investigations preserve active model-provider and authentication settings while avoiding unrelated inherited configuration from that release's isolated environment.
 
 ## 0.1.7 — 2026-08-26
 
 ### Fixed
-- Codex subscription scouts restore the user's Windows `unelevated` sandbox setting when they start an isolated app-server session
-- CI now runs the real RepoTracer to Codex app-server to sandbox repository-read path on Linux, macOS, and Windows, including a regression fixture for the Windows configuration loss
+
+- Codex subscription investigations restore the user's Windows `unelevated` sandbox setting when starting an app-server session.
+- CI exercises the RepoTracer → Codex app-server → repository-read path on Linux, macOS, and Windows.
 
 ## 0.1.6 — 2026-08-26
 
 ### Added
-- RepoTracer replaces its own binary. Once a day the MCP server checks the release feed off the request path, verifies the new binary's SHA-256 against the published `SHA256SUMS`, swaps `~/.repotracer/bin/repotracer` via `self-replace`, and refreshes the managed MCP and `AGENTS.md` files. The new version takes effect at the next Codex start
-- `repotracer update` does the same thing on demand and reports what happened
-- Automatic updates default to on without a setup question. `updates.automatic` in `~/.repotracer/config.toml` and `REPOTRACER_NO_UPDATE=1` turn them off
+
+- RepoTracer can update the binary installed under `~/.repotracer/bin`, verify the release checksum, and refresh managed integration files.
+- Added `repotracer update`.
+- Automatic updates default to on and can be disabled with configuration or `REPOTRACER_NO_UPDATE=1`.
 
 ### Changed
-- Codex subscription scouts now use isolated `codex app-server` sessions instead of `codex exec`, avoiding the Windows read-only sandbox regression
+
+- Codex subscription investigations moved from `codex exec` to `codex app-server`.
 
 ### Removed
-- The update notice in the `repo_scout` handoff, along with `notifications.update_available`. Asking Codex to relay a message so the user could go run a command was a workaround for a binary that could not update itself
+
+- Removed the old update notice from `repo_scout` results.
 
 ## 0.1.5 — 2026-08-25
 
 ### Fixed
-- Tiny repositories and localized single-owner changes skip `repo_scout`, while broad cross-component work still calls it first
-- Long-running scouts no longer time out by default; explicit timeout configuration remains supported
 
-## 0.1.1 — 2026-08-24
-
-### Added
-- `setup` presents an arrow-key menu when it finds an existing install: update or uninstall, Enter to confirm, Esc to cancel. Falls back to a numbered prompt where raw mode is unavailable, and skips the prompt entirely for non-interactive callers
-
-### Fixed
-- Docs no longer claim setup installs a "Codex routing skill"; it writes a managed block to `~/.codex/AGENTS.md` and removes any leftover skill file
-- The npm launcher no longer falls back to a bare `repotracer` on `PATH`, which could silently run an unrelated build
+- Tiny repositories and localized single-owner changes skip `repo_scout`; broad cross-component work can still call it first.
+- Long-running investigations no longer use a total timeout by default.
 
 ## 0.1.4 — 2026-08-25
 
 ### Added
-- The `repo_scout` handoff tells the user once a day when a newer release exists, with one line on what changed. Tested against real Codex: the MCP `notifications/message` channel is parsed and silently dropped, and a bare statement of fact is ignored, so the handoff must explicitly ask Codex to relay it
-- Release notes now come from the tag annotation, so the change line is written for a human rather than autogenerated
+
+- Added release-update information to the old `repo_scout` handoff path.
+- Release notes began using tag annotations rather than autogenerated change text.
 
 ## 0.1.3 — 2026-08-25
 
 ### Fixed
-- `setup` no longer scans the working directory or runs `doctor`. Run from a non-repository such as a home folder it could appear to hang for minutes while it walked the whole tree and made a live model call
-- Model path escapes are detected from the string rather than the host platform, so a POSIX path on Windows or a drive-lettered path on Unix is broadened to the repository root as intended
+
+- `setup` no longer scans the working directory or runs a live repository diagnosis.
+- Model path-escape detection handles POSIX and drive-letter paths independently of the host platform.
 
 ### Changed
-- `setup` output is three lines instead of a four-section report
+
+- Setup output was shortened.
 
 ## 0.1.2 — 2026-08-24
 
-### Changed
-- `setup` runs `doctor` itself instead of printing instructions to run it. A failing check reports what to fix but does not fail the command, since setup still succeeded
-- Removed the trailing "verify any time / remove it again" block from setup output
-
 ### Added
-- Independent routing benchmark tasks, bringing the predeclared suite to 37: 23 scout-eligible and 14 expected skips
-- Tamper-evident benchmark result index and SHA-256 ledger, including rejected runs and the Sol request-sequence analysis
+
+- Expanded the routing benchmark suite.
+- Added a tamper-evident benchmark index and SHA-256 ledger.
 
 ### Changed
-- Product support is limited to Codex until other agent hosts have equivalent end-to-end quality and cost evidence
+
+- `setup` ran `doctor` itself instead of only printing the command.
+- Product support was limited to Codex while other hosts lacked equivalent end-to-end evidence.
 
 ### Fixed
-- Codex GPT scouts ignore inherited MCP servers and instructions, disable unrelated apps, browser, computer-use, image-generation, multi-agent, and plugin capabilities, and retain only login and provider routing
-- Luna scout reasoning is configurable as `low`, `medium`, or `high` and defaults to the only level that completed all three isolated quality runs: `medium`
-- Codex scout telemetry reports repository tool counts plus input, cache, output, and reasoning tokens
-- Scout prompts budget at most three repository tools and request batched independent reads
-- Scout handoffs cap output at five citations and 6 KiB of evidence while preserving direct source excerpts
-- Read, Glob, and Grep results share a 32 KiB hard cap with explicit continuation guidance
-- Routing decides eligibility before repository operations, calls the scout first for broad unknown-location exploration, and prevents duplicate broad searches after a validated handoff
-- GPT scout prompts request a ranked 3–4 citation evidence map instead of verbose repository narration
-- Setup is zero-question and GPT-only: it verifies the existing Codex login, pins `gpt-5.6-luna`, and configures detected hosts without a model download or API key
-- Benchmark tasks use ordinary user-style prompts; routing labels and expected paths remain evaluator-only, and natural arms never force a scout call
+
+- Codex investigation sessions narrowed inherited capabilities in the v0.1 architecture.
+- Luna reasoning became configurable and defaulted to medium.
+- Benchmark prompts were ordinary user prompts; routing labels remained evaluator-only.
+- Setup became zero-question and GPT-only for that release.
+
+## 0.1.1 — 2026-08-24
+
+### Added
+
+- Existing installs gained an update/uninstall menu.
+
+### Fixed
+
+- Documentation stopped calling the managed Codex instructions a “routing skill.”
+- The npm launcher stopped falling back to an arbitrary `repotracer` on `PATH`.
 
 ## 0.1.0 — 2026-08-08
 
 ### Added
-- Rust scout engine with Read / Glob / Grep tools
-- Concurrent tool execution (bounded, ordered results)
-- Grep `count` mode mapped to `rg --count-matches`
-- Citation parse + path/line validation
-- OpenAI-compatible model backend (Ollama default)
-- Deterministic mock model for CI
-- CLI: `scout`, `serve`, `setup`, `doctor`, `status`, `config`, `uninstall`
-- MCP `repo_scout` tool over stdio
-- Claude Code, Codex, and Cursor auto-configuration
-- Interactive macOS, Linux, and Windows setup with Ollama install, model pull, and live tool-call verification
-- Zero-download Codex and Claude subscription backends through the official installed CLIs, with read-only execution, strict structured output, timeouts, and citation revalidation
-- Hardware-aware setup defaults plus explicit `--provider ollama|codex|claude|custom` selection
-- RepoTracer routing skills for Claude Code and Codex, Cursor rules, and GitHub Copilot instructions
-- MCP `repo_scout` prompt for generic clients
-- npm launcher package scaffold
-- Benchmark harness scaffold and methodology docs
+
+- Rust investigation engine.
+- Read / Glob / Grep repository tools.
+- Concurrent tool execution.
+- `rg --count-matches` support.
+- Citation parsing and source-location validation.
+- OpenAI-compatible model backend and deterministic mock backend.
+- CLI commands for scouting, MCP serving, setup, diagnostics, status, configuration, and uninstall.
+- `repo_scout` over MCP stdio.
+- Initial coding-agent integration work.
+- npm launcher scaffold.
+- Benchmark harness and methodology docs.
