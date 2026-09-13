@@ -144,13 +144,19 @@ def main() -> None:
         body = text[section.end():end]
         body = re.sub(r"(?m)^tool_timeout_sec\s*=.*\n?", "", body)
         codex_config.write_text(text[:section.end()] + "\ntool_timeout_sec = 600\n" + body + text[end:])
-        old_config_hash = hashlib.sha256(app_config.read_bytes()).digest()
+        with app_config.open("a") as config:
+            config.write("\n# upgrade fixture comment\n[upgrade_fixture]\nkeep = 'yes'\n")
+        old_app_config = app_config.read_bytes()
 
         payload = release_binary.read_bytes()
         digest = hashlib.sha256(payload).hexdigest()
         asset = asset_name()
         routes = {
-            "/releases/latest": json.dumps({"tag_name": f"v{to_version}"}).encode(),
+            # The old updater reads tag_name from its release override. The
+            # current updater reads latest from the npm dist-tags override.
+            "/dist-tags": json.dumps(
+                {"latest": to_version, "tag_name": f"v{to_version}"}
+            ).encode(),
             "/SHA256SUMS": f"{digest}  ./{asset}/{asset}\n".encode(),
             f"/{asset}": payload,
         }
@@ -176,7 +182,8 @@ def main() -> None:
         base = f"http://127.0.0.1:{server.server_address[1]}"
         update_environment = {
             **environment,
-            "REPOTRACER_RELEASE_API": f"{base}/releases/latest",
+            "REPOTRACER_NPM_DIST_TAGS_API": f"{base}/dist-tags",
+            "REPOTRACER_RELEASE_API": f"{base}/dist-tags",
             "REPOTRACER_RELEASE_BASE_URL": base,
         }
         try:
@@ -189,8 +196,16 @@ def main() -> None:
             raise RuntimeError(f"unexpected updater output: {update.stdout}")
         if managed.read_bytes() != payload or version(managed, environment) != to_version:
             raise RuntimeError("the managed binary was not replaced")
-        if hashlib.sha256(app_config.read_bytes()).digest() != old_config_hash:
-            raise RuntimeError("the updater changed the existing RepoTracer config")
+        migrated_app_config = app_config.read_text()
+        parsed_app_config = tomllib.loads(migrated_app_config)
+        if parsed_app_config["explorer"]["max_turns"] != 0:
+            raise RuntimeError("the updater did not migrate the legacy six-turn ceiling")
+        if "# upgrade fixture comment" not in migrated_app_config:
+            raise RuntimeError("the updater removed an existing RepoTracer config comment")
+        if parsed_app_config["upgrade_fixture"]["keep"] != "yes":
+            raise RuntimeError("the updater removed unrelated RepoTracer configuration")
+        if app_config.with_suffix(".toml.bak").read_bytes() != old_app_config:
+            raise RuntimeError("the updater did not preserve the pre-migration config backup")
         run(managed, "--json", "status", env=environment)
         run(managed, "--mock", "--root", ROOT, "scout", "where is routing handled?", env=environment)
 

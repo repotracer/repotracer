@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "experiment": "replace-with-change-or-daily-batch-id",
+  "development_tasks": [],
+  "redact_test_strings": [],
+  "rate_cards": {},
+  "tasks": [
+    {
+      "id": "my-task-1",
+      "origin": "user",
+      "purpose": "validation",
+      "derived_from": [],
+      "prompt": "Replace with your exact task prompt. Do not let the runner rewrite it.",
+      "context": "Record the starting source snapshot, relevant context, and acceptance criteria shared by all candidates. No group/model/cost/time information.",
+      "candidates": [
+        {
+          "id": "run-1",
+          "group": "baseline",
+          "version": "parent-only",
+          "parent": {"model": "gpt-5.6-sol", "effort": "medium"},
+          "scout": null,
+          "machine": "replace-with-stable-machine-id",
+          "snapshot": "replace-with-source-and-dirty-state-digest",
+          "status": "not_started",
+          "seconds": null,
+          "time_missing_reason": "Not run yet",
+          "usage_complete": false,
+          "usage_missing_reason": "Not run yet",
+          "requests": [],
+          "patch": "baseline.patch",
+          "acceptance_checks": "baseline-acceptance.json",
+          "agent_tests": "baseline-tests.json"
+        },
+        {
+          "id": "run-2",
+          "group": "current",
+          "version": "replace-with-exact-repotracer-commit-and-prompt-digest",
+          "parent": {"model": "gpt-5.6-sol", "effort": "medium"},
+          "scout": {"model": "gpt-5.6-luna", "effort": "auto", "default": "medium", "allowed": ["medium", "high", "xhigh", "max"]},
+          "machine": "replace-with-stable-machine-id",
+          "snapshot": "replace-with-source-and-dirty-state-digest",
+          "status": "not_started",
+          "seconds": null,
+          "time_missing_reason": "Not run yet",
+          "usage_complete": false,
+          "usage_missing_reason": "Not run yet",
+          "requests": [],
+          "patch": "current.patch",
+          "acceptance_checks": "current-acceptance.json",
+          "agent_tests": "current-tests.json"
+        }
+      ]
+    }
+  ]
+}

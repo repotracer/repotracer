@@ -26,6 +26,7 @@ repotracer-mcp.workspace = true
 repotracer-model.workspace = true
 repotracer-repo-tools.workspace = true
 reqwest.workspace = true
+semver.workspace = true
 self-replace.workspace = true
 serde.workspace = true
 serde_json.workspace = true

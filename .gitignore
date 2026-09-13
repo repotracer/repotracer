@@ -25,6 +25,9 @@ docs/benchmarks/*.log
 .claude/
 .agents/
 [Aa]gents.md
+!/AGENTS.md
+.benchmark-runs/
+tools/benchmarks/__pycache__/
 .fastcontext/
 
 # Personal research notes, plans, and internal docs
@@ -53,3 +56,8 @@ style.css
 main.js
 robots.txt
 sitemap.xml
+
+# Public benchmark tooling; run data stays in ignored .benchmark-runs/.
+!/tools/benchmarks/
+!/tools/benchmarks/**
+/tools/benchmarks/__pycache__/

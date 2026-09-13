@@ -21,6 +21,9 @@ on:
       - '.github/workflows/repository-hygiene.yml'
       - 'SECURITY.md'
       - 'packages/npm/README.md'
+      - 'AGENTS.md'
+      - 'tools/benchmarks/**'
+      - '.github/workflows/benchmark-tooling.yml'
   pull_request:
     paths-ignore:
       - 'README.md'
@@ -37,6 +40,9 @@ on:
       - '.github/workflows/repository-hygiene.yml'
       - 'SECURITY.md'
       - 'packages/npm/README.md'
+      - 'AGENTS.md'
+      - 'tools/benchmarks/**'
+      - '.github/workflows/benchmark-tooling.yml'
 
 concurrency:
   group: repotracer-ci-${{ github.ref }}

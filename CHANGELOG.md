@@ -2,10 +2,18 @@
 
 This file records behavior at the time each release shipped. Older entries can describe constraints that no longer apply to the current architecture.
 
-## 2.1.1 - 2026-09-13
+## [Unreleased]
+
+## [2.1.1] - 2026-09-13
+
+### Added
+
+- `repotracer benchmarks` configures native Codex and Claude Code comparisons, tracks detached jobs, and shows costs, tokens, time, and blind quality grades. Public Python commands support the same workflow for agents. ([#21](https://github.com/repotracer/repotracer/pull/21))
+- Benchmark results can launch a separate investigation of worse cost, time, or quality. Custom-task patches can be applied explicitly when the original checkout is unchanged. ([#21](https://github.com/repotracer/repotracer/pull/21))
 
 ### Changed
 
+- `repotracer update` and automatic updates follow npm's `latest` version, then verify and install that exact GitHub release. Unpublished GitHub releases no longer trigger updates. ([#21](https://github.com/repotracer/repotracer/pull/21))
 - Codex's managed `mcp_servers.repotracer.tool_timeout_sec` now uses a finite
   compatibility allowance and upgrades the previous managed `600`-second value
   without changing other MCP entries or custom timeout values. ([#20](https://github.com/repotracer/repotracer/pull/20))
@@ -13,6 +21,13 @@ This file records behavior at the time each release shipped. Older entries can d
   configured native model. The recommended Luna model offers medium through
   max. The recommended Opus model starts Auto at low and can automatically
   escalate only to medium. ([#20](https://github.com/repotracer/repotracer/pull/20))
+
+### Fixed
+
+- Setup and update migrate the old `explorer.max_turns = 6` setting to `0`, including installed Codex and Claude profiles, so investigations can finish their reports. Other turn limits are preserved, and migrated files retain a backup. ([#21](https://github.com/repotracer/repotracer/pull/21))
+
+[Unreleased]: https://github.com/repotracer/repotracer/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/repotracer/repotracer/compare/v2.1.0...v2.1.1
 
 ## 2.1.0 — 2026-09-13
 

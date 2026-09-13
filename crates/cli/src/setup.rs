@@ -27,7 +27,11 @@ pub async fn run(
         }
     }
 
-    let selected_cfg = gpt_config(cfg)?;
+    if !dry_run {
+        crate::config::migrate_legacy_max_turns(cfg_path)?;
+    }
+    let mut selected_cfg = gpt_config(cfg)?;
+    crate::config::normalize_legacy_max_turns(&mut selected_cfg);
     if is_subscription_backend(&selected_cfg) {
         verify_codex_available(&selected_cfg, dry_run)?;
     }

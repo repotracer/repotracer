@@ -349,9 +349,11 @@ pub fn run(
             RepoTracerConfig::load_from(&path)?
         } else {
             let mut c = cfg.clone();
+            crate::config::normalize_legacy_max_turns(&mut c);
             select_provider(&mut c, parent);
             c
         };
+        crate::config::normalize_legacy_max_turns(&mut selected);
         let (provider, model) = if parent == "codex" {
             (&codex, &codex_model)
         } else {
@@ -398,6 +400,7 @@ pub fn run(
             bail!("Install Claude Code before configuring its MCP integration");
         }
     }
+    migrate_installed_configs(base, &state)?;
     for (parent, path, selected) in pending {
         let old_profile = match fs::read(&path) {
             Ok(bytes) => Some(bytes),
@@ -484,9 +487,11 @@ fn install_parent(parent: &str, profile: &Path, managed: bool) -> Result<()> {
 pub fn refresh(base: &Path) -> Result<bool> {
     let path = base.with_extension("integrations.json");
     if !path.exists() {
+        crate::config::migrate_legacy_max_turns(base)?;
         return Ok(false);
     }
     let state: InstallState = serde_json::from_slice(&fs::read(path)?)?;
+    migrate_installed_configs(base, &state)?;
     for parent in state.parents {
         if !matches!(parent.as_str(), "codex" | "claude") {
             bail!("invalid parent profile");
@@ -494,6 +499,19 @@ pub fn refresh(base: &Path) -> Result<bool> {
         install_parent(&parent, &profile(base, &parent), true)?;
     }
     Ok(true)
+}
+
+fn migrate_installed_configs(base: &Path, state: &InstallState) -> Result<()> {
+    for parent in &state.parents {
+        if !matches!(parent.as_str(), "codex" | "claude") {
+            bail!("invalid parent profile");
+        }
+    }
+    crate::config::migrate_legacy_max_turns(base)?;
+    for parent in &state.parents {
+        crate::config::migrate_legacy_max_turns(&profile(base, parent))?;
+    }
+    Ok(())
 }
 
 /// Detach one parent: its native registration, then the generated profile.
@@ -557,6 +575,53 @@ pub fn uninstall(base: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inspecting_settings_does_not_migrate_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("config.toml");
+        let original = "[explorer]\nmax_turns = 6\n";
+        fs::write(&base, original).unwrap();
+        let cfg = RepoTracerConfig::load_from(&base).unwrap();
+        for dry in [false, true] {
+            run(&base, &cfg, None, None, None, None, None, dry).unwrap();
+            assert_eq!(fs::read_to_string(&base).unwrap(), original);
+            assert!(!base.with_extension("toml.bak").exists());
+        }
+    }
+
+    #[test]
+    fn installed_base_and_parent_profiles_migrate_together() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("config.toml");
+        let codex = profile(&base, "codex");
+        let claude = profile(&base, "claude");
+        let legacy = "# keep\n[explorer]\nmax_turns = 6 # generated\n";
+        fs::write(&base, legacy).unwrap();
+        fs::write(&codex, legacy).unwrap();
+        fs::write(&claude, "[explorer]\nmax_turns = 9 # chosen\n").unwrap();
+        let state = InstallState {
+            parents: vec!["codex".into(), "claude".into()],
+        };
+
+        migrate_installed_configs(&base, &state).unwrap();
+        migrate_installed_configs(&base, &state).unwrap();
+
+        for path in [&base, &codex] {
+            let text = fs::read_to_string(path).unwrap();
+            assert!(text.contains("# keep"));
+            assert!(text.contains("max_turns = 0 # generated"));
+            assert_eq!(
+                fs::read_to_string(path.with_extension("toml.bak")).unwrap(),
+                legacy
+            );
+        }
+        assert!(fs::read_to_string(&claude)
+            .unwrap()
+            .contains("max_turns = 9 # chosen"));
+        assert!(!claude.with_extension("toml.bak").exists());
+    }
+
     #[test]
     fn tracer_choice_includes_an_explicit_subscription() {
         assert_eq!(
