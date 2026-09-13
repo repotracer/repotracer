@@ -475,6 +475,40 @@ impl App {
         }
     }
 
+    /// Up and down move between rows. The buttons share one row at the foot of
+    /// the page, so they count as a single stop: leaving them lands back on a
+    /// setting instead of stepping sideways through the other buttons.
+    fn move_row(&mut self, rows: usize, forward: bool) {
+        if rows == 0 {
+            return;
+        }
+        let on_buttons = self.focus >= rows;
+        self.focus = match (forward, on_buttons) {
+            (true, true) => 0,
+            (true, false) if self.focus + 1 < rows => self.focus + 1,
+            (true, false) => rows,
+            (false, true) => rows - 1,
+            (false, false) if self.focus > 0 => self.focus - 1,
+            (false, false) => rows,
+        };
+    }
+
+    /// Left and right stay inside the button row. The settings above it are a
+    /// column, so sideways movement there has nowhere to go, and wrapping out
+    /// of Cancel into the top of the page reads as the focus jumping.
+    fn move_button(&mut self, rows: usize, buttons: usize, forward: bool) {
+        if self.focus < rows || buttons == 0 {
+            return;
+        }
+        let current = self.focus - rows;
+        let next = if forward {
+            (current + 1) % buttons
+        } else {
+            (current + buttons - 1) % buttons
+        };
+        self.focus = rows + next;
+    }
+
     fn set_catalog(&mut self, catalog: Catalog) {
         self.catalog = catalog;
         self.loading = false;
@@ -831,12 +865,22 @@ impl App {
         match self.page {
             Page::Install => match key.code {
                 KeyCode::Esc => return Outcome::Cancel,
-                KeyCode::Up | KeyCode::Left | KeyCode::BackTab => {
+                KeyCode::BackTab => {
                     let stops = self.install_stops();
                     self.focus = (self.focus + stops - 1) % stops;
                 }
-                KeyCode::Down | KeyCode::Right | KeyCode::Tab => {
+                KeyCode::Tab => {
                     self.focus = (self.focus + 1) % self.install_stops();
+                }
+                KeyCode::Up => self.move_row(2, false),
+                KeyCode::Down => self.move_row(2, true),
+                KeyCode::Left => {
+                    let buttons = self.install_stops() - 2;
+                    self.move_button(2, buttons, false);
+                }
+                KeyCode::Right => {
+                    let buttons = self.install_stops() - 2;
+                    self.move_button(2, buttons, true);
                 }
                 KeyCode::Char(' ') if self.focus < 2 => {
                     self.enabled[self.focus] = !self.enabled[self.focus];
@@ -871,12 +915,12 @@ impl App {
                         self.page = Page::Install;
                         self.focus = 2;
                     }
-                    KeyCode::Up | KeyCode::Left | KeyCode::BackTab => {
-                        self.focus = (self.focus + stops - 1) % stops
-                    }
-                    KeyCode::Down | KeyCode::Right | KeyCode::Tab => {
-                        self.focus = (self.focus + 1) % stops
-                    }
+                    KeyCode::BackTab => self.focus = (self.focus + stops - 1) % stops,
+                    KeyCode::Tab => self.focus = (self.focus + 1) % stops,
+                    KeyCode::Up => self.move_row(count, false),
+                    KeyCode::Down => self.move_row(count, true),
+                    KeyCode::Left => self.move_button(count, 3, false),
+                    KeyCode::Right => self.move_button(count, 3, true),
                     // Space reads as "flip this" and Enter as "open this", but
                     // a toggle is the same thing either way.
                     KeyCode::Char(' ') if self.focus < count => self.edit_field(self.focus),
@@ -1245,7 +1289,9 @@ impl App {
                 (&["Continue", "Uninstall", "Cancel"], 2)
             }
             Page::Install => (&["Continue", "Cancel"], 2),
-            Page::Models => (&["Save", "Back", "Cancel"], self.parents().len()),
+            // The buttons come after every setting row, so that is where their
+            // focus numbering starts.
+            Page::Models => (&["Save", "Back", "Cancel"], self.fields().len()),
             // A sub-page has one way out; say what it is instead of leaving a
             // row of dead space where buttons used to be.
             _ => {
@@ -2243,6 +2289,36 @@ mod tests {
         assert!(screen(&mut app, 80, 24).contains("❯ ◉ Codex"));
     }
 
+    /// Cells drawn with the focus pill, in screen order.
+    fn highlighted(app: &mut App, width: u16, height: u16) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .filter(|cell| cell.bg == Color::Cyan)
+            .map(|cell| cell.symbol())
+            .collect::<String>()
+    }
+
+    #[test]
+    fn the_focused_button_is_highlighted_once_the_settings_are_counted() {
+        let mut app = app();
+        key(&mut app, KeyCode::Enter);
+        // The buttons are numbered after every setting row, so counting agents
+        // instead of settings would leave the page with nothing highlighted.
+        assert_eq!(app.focus, app.fields().len());
+        assert!(highlighted(&mut app, 100, 32).contains("Save"));
+        key(&mut app, KeyCode::Right);
+        assert!(highlighted(&mut app, 100, 32).contains("Back"));
+        key(&mut app, KeyCode::Up);
+        let focused = highlighted(&mut app, 100, 32);
+        assert!(focused.contains("Effort"));
+        assert!(!focused.contains("Back"));
+    }
+
     #[test]
     fn picker_scrolls_to_focused_model() {
         let mut app = app();
@@ -2256,13 +2332,36 @@ mod tests {
     }
 
     #[test]
-    fn bottom_buttons_support_horizontal_navigation() {
+    fn horizontal_navigation_stays_inside_the_button_row() {
         let mut app = app();
         key(&mut app, KeyCode::Enter);
+        let save = app.fields().len();
+        assert_eq!(app.focus, save);
+        // Right cycles Save, Back, Cancel and round again; it never wraps up
+        // into the settings, which are a column and not part of this row.
+        for expected in [save + 1, save + 2, save] {
+            key(&mut app, KeyCode::Right);
+            assert_eq!(app.focus, expected);
+        }
+        key(&mut app, KeyCode::Left);
+        assert_eq!(app.focus, save + 2);
+        // Up leaves the row as a whole rather than stepping through Back.
+        key(&mut app, KeyCode::Up);
+        assert_eq!(app.focus, save - 1);
+        key(&mut app, KeyCode::Right);
+        assert_eq!(app.focus, save - 1);
+        key(&mut app, KeyCode::Down);
+        assert_eq!(app.focus, save);
+
         key(&mut app, KeyCode::Right);
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.page, Page::Install);
+        assert_eq!(app.focus, 2);
+        // The install page follows the same rule: its checkboxes are rows and
+        // its buttons are one row underneath them.
         key(&mut app, KeyCode::Left);
+        assert_eq!(app.focus, app.install_stops() - 1);
+        key(&mut app, KeyCode::Up);
         assert_eq!(app.focus, 1);
     }
 
