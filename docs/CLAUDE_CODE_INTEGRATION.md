@@ -1,132 +1,153 @@
 # Claude Code and Codex integration
 
-RepoTracer v2 can install an MCP server for Codex, Claude Code, or both. Each
-parent has its own scout profile. A parent model does not silently change the
-scout mapping during a session.
+RepoTracer can install `repo_scout` for Claude Code, Codex, or both.
+
+Each parent has its own investigator profile, so changing the Codex setup does not silently change Claude Code and vice versa.
 
 ## Requirements
 
-Install and sign in to the native parent CLI you want to use:
+Install the native CLI you want RepoTracer to integrate with:
 
-- Codex integration: the `codex` executable.
-- Claude Code integration: the `claude` executable with native MCP
-  registration support.
+- Codex: `codex`
+- Claude Code: `claude`
 
-RepoTracer keeps provider authentication with the native CLI. It does not
-extract credentials or implement a second provider login flow.
+Sign in through the native CLI. RepoTracer reuses that session; it does not copy provider credentials into a second login system.
 
-## Install and configure
+Node.js 18 or newer is required for the `npx` launcher.
 
-The npm launcher forwards setup and settings to the native binary:
+## Setup
 
-```sh
-npx repotracer@latest setup --agents both
-npx repotracer@latest settings
-npx repotracer@latest settings --agents both --dry-run
+```bash
+npx repotracer@latest setup
 ```
 
-The interactive wizard has two steps. First select Codex, Claude Code, or
-both. Existing integrations are selected by default. Unchecking an existing
-parent leaves it unchanged. Next accept recommended models or keep saved
-choices. Select a mapping with Enter, or press A for advanced selection, to
-search the native model catalog on the same screen.
+On a first install, the wizard can configure Claude Code, Codex, or both.
 
-The v2 defaults are:
+Run the same command later to reconfigure or uninstall.
 
-| Parent agent | Scout provider | Scout model |
-| --- | --- | --- |
-| Codex | Codex | `gpt-5.6-luna` |
-| Claude Code | Claude | `sonnet` |
+For explicit non-interactive selection:
 
-The defaults are convenient starting values when available. Edit each parent
-independently, even with only one parent selected. The current choices stay
-visible above the model search; Save and Back are at the bottom. The custom model
-format is `codex:model-id` or `claude:model-id`.
+```bash
+npx repotracer@latest setup --agents codex
+npx repotracer@latest setup --agents claude
+npx repotracer@latest setup --agents both --dry-run
+```
 
-Nothing is written until Save or Ctrl-S. Esc goes back; Ctrl-C cancels without
-changing settings. `--dry-run` previews a configuration. After
-saving, restart both parent agents so their MCP processes reload the profiles.
+`--dry-run` previews the changes without writing them.
 
-For scripted per-parent mappings:
+Restart the parent agent after changing its MCP configuration.
 
-```sh
+## Investigator models
+
+Each parent can use its own native investigator model.
+
+The current defaults in the release configuration are:
+
+| Parent | Native investigator |
+|---|---|
+| Codex | `gpt-5.6-luna` |
+| Claude Code | `opus` with automatic reasoning |
+
+These are setup defaults, not guarantees about cost, speed, or quality on every repository.
+
+Use `settings` to change them:
+
+```bash
+npx repotracer@latest settings
+```
+
+For scripted mappings:
+
+```bash
 npx repotracer@latest settings --agents both \
   --codex-scout codex --codex-model gpt-5.6-luna \
-  --claude-scout claude --claude-model sonnet
+  --claude-scout claude --claude-model opus
 ```
 
-`--tracer-model provider:model-id` applies one subscription model to every
-selected parent. For example, `--agents both --tracer-model claude:sonnet`
-uses Claude Sonnet for both parent integrations. Use the per-parent flags when
-the two mappings should differ.
+Native model catalogs and accepted reasoning settings come from the installed CLI and can change independently of RepoTracer.
 
-## Parent profiles
+## What gets installed
 
-RepoTracer stores independent configuration for each selected parent and
-starts the MCP server with the matching profile. A Codex setting change cannot
-rewrite the Claude scout profile, and a Claude setting change cannot rewrite
-the Codex profile.
+RepoTracer registers an MCP server with the selected parent and adds the instructions that tell the parent when `repo_scout` is useful.
 
-The Claude installer delegates MCP registration to Claude Code's native
-`claude mcp add-json` command at user scope. It adds a managed RepoTracer block
-to Claude's instruction file and preserves other instructions. An existing
-untracked MCP entry is not overwritten. If registration fails, the changed
-profile is restored when possible.
+The parent still decides whether to call the tool.
 
-## Scout boundaries and result handling
+A focused edit can stay direct:
 
-The Claude scout exposes only native Read, Grep, and Glob operations. It does
-not receive Bash, Edit, Write, network, delegation, plugins, skills, or other
-external MCP servers. Repository path and citation checks are enforced by
-RepoTracer, but they are application-level checks rather than an operating
-system filesystem sandbox.
+```text
+"Rename this variable in src/config.ts"
+  → Claude Code / Codex
+```
 
-The scout receives the query and any supplied requirements, not the full parent
-conversation. Its result contains a model-authored explanation and source
-context. Returned citations are checked against the selected repository's
-files and line ranges. This proves that a location resolves; it does not prove
-that the explanation or conclusion is correct. Review important findings and
-run relevant tests before changing code.
+A broad investigation can delegate:
 
-Related calls can pass the previous result's
-`conversation.id` as `investigation.conversation_id`. The handle is bound to its repository and
-native provider configuration. `conversation.status` reports `resumed`,
-`fresh`, or `unknown`. Omit the handle for an independent question.
+```text
+"Trace why refresh tokens fail after rotation"
+  → repo_scout
+```
 
-## Session and timeout behavior
+The current routing test records 42/42 correct decisions.
 
-Warm native provider processes are enabled by default. `session.idle_secs`
-retires a retained process after inactivity, 300 seconds by default. This is an
-idle-retention setting, not a total request or investigation timeout.
+## Native investigator behavior
 
-`model.timeout_ms` is an optional stream-inactivity limit. Native stream
-activity resets it, and zero disables it. `explorer.timeout_seconds` is an
-whole-investigation limit only for the generic OpenAI-compatible engine;
-native Codex and Claude scouts do not use it. The parent or MCP
-caller may have its own request allowance. These limits are separate from the
-native model's turn and tool behavior.
+A native investigator runs through the Claude Code or Codex CLI you already use.
 
-Related conversations may reuse a retained process when the repository,
-provider, model, and effort match. Independent questions start a new
-conversation. A process is retired after errors, cancellation, idle expiry,
-or configured session bounds. No disk conversation history is stored by the
-RepoTracer session layer.
+It starts in a separate investigation conversation. It may trace behavior across files or related repositories, run checks or experiments, and report what it found.
 
-## Limitations and verification
+RepoTracer does not turn the native CLI into a read-only sandbox. The investigator is instructed to investigate rather than modify the product, but capabilities available through the underlying CLI can remain available.
 
-RepoTracer does not promise lower cost, faster completion, or a particular
-quality level. Results depend on the native CLI, selected model, account
-limits, repository, and parent-agent decisions. The Claude backend does not
-provide the optional RepoTracer Symbols operation as a native scout tool;
-`repotracer symbols` remains a separate local CLI command.
+The repository is a starting location, not a guaranteed operating-system filesystem boundary.
 
-Automated CI covers the Codex backend against a real native CLI. The Claude
-backend has no CI coverage against a real `claude` executable, because CI has
-no native CLI login. `scripts/subscription-smoke.py --backend claude-cli` is the
-check that exercises it end to end over MCP; see the native CLI smoke checks
-section of `CONTRIBUTING.md` for how and when to run it.
+If you need stricter execution or filesystem controls, configure them in the native CLI environment itself.
 
-The v2 release candidate has local Linux verification. macOS and Windows CI
-verification is pending. Native CLI versions can expose different model
-catalog entries or flags. Unsupported native options fail closed rather than
-being silently replaced.
+## Continuing an investigation
+
+Related follow-ups can continue the same investigation instead of starting over.
+
+The caller can pass the previous conversation handle with the follow-up request. Independent questions should start independent investigations.
+
+A continuation keeps useful model context, but it is not a snapshot of the repository. Files can change between calls, so the investigator should re-check current code when that matters.
+
+## Results and source
+
+The investigator returns a model-written report. It can include findings, source, checks or experiment results, unresolved questions, and limitations.
+
+When RepoTracer attaches structured source ranges, it checks that the cited location resolves. That is a location check, not proof that the investigator's conclusion is correct.
+
+A source attachment can fail without making the whole investigation useless; the result keeps the report and records the delivery problem.
+
+## If the investigator cannot settle the task
+
+It should say so.
+
+A useful partial report tells the coding agent what was found, what was checked, and what remains unresolved. Claude Code or Codex can continue from that work rather than repeating the same investigation from scratch.
+
+## Custom OpenAI-compatible investigator
+
+You can also point RepoTracer at an OpenAI-compatible endpoint:
+
+```bash
+npx repotracer@latest setup \
+  --base-url http://localhost:11434/v1 \
+  --model deepseek-coder
+```
+
+Set `REPOTRACER_API_KEY` when authentication is required.
+
+This path uses RepoTracer's own repository-tool loop. It does not automatically inherit the native Claude Code or Codex execution environment.
+
+## Timeouts
+
+Warm native provider processes may be kept for related work.
+
+- `session.idle_secs` retires an inactive retained process. It is not a total request timeout.
+- `model.timeout_ms` controls native stream inactivity when configured.
+- `explorer.timeout_seconds` is a whole-investigation limit for the generic OpenAI-compatible engine, not native Claude Code or Codex investigations.
+
+## Verification
+
+GitHub CI covers the Rust workspace and supported platforms, including the Codex native integration checks used by the repository.
+
+Live Claude Code checks require a signed-in `claude` CLI and remain an opt-in local smoke test. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+For implementation details, see [ARCHITECTURE.md](./ARCHITECTURE.md).

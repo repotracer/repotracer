@@ -1,25 +1,75 @@
-# I moved repository search from Sol to Luna
+# I stopped making the coding agent investigate the repo itself
 
-I came across Microsoft's [FastContext paper](https://arxiv.org/abs/2606.14066v3), which separates repository exploration from solving: a smaller, faster model searches the code and returns verified locations, so the primary coding model works from concise evidence instead of cluttering its context with exploratory lookups.
+A lot of coding-agent work happens before any code gets changed.
 
-I wanted that workflow in Codex, so I built RepoTracer.
+The agent searches for the entry point, opens candidates, traces callers, backtracks, runs a check, and only then starts implementing. All of that stays in the same conversation and uses the same limits the agent later needs for the actual change.
 
-RepoTracer is an MCP server. Its `repo_scout` tool starts an isolated GPT-5.6 Luna thread with read-only Read, Glob, and Grep tools. RepoTracer validates every returned path and line range against disk, then returns structured citations, excerpts, and findings back to Codex Sol. An intelligent routing block in `~/.codex/AGENTS.md` ensures Sol delegates broad exploration while handling localized, single-file edits directly.
+I wanted to separate those jobs.
+
+So I built RepoTracer.
+
+RepoTracer gives Claude Code or Codex one MCP tool: `repo_scout`. When a task needs repository investigation, a separate agent traces the code and reports back. The coding agent keeps the implementation.
 
 ```text
-Sol → MCP repo_scout → Luna → Read / Glob / Grep
-Sol ← validated citations and excerpts
-Sol → edit and verify
+without RepoTracer
+
+Claude / Codex
+investigate → reason → implement → verify
+
+
+with RepoTracer
+
+RepoTracer
+investigate
+    ↓
+Claude / Codex
+reason → implement → verify
 ```
 
-Across paired benchmarks on real codebases with identical prompts, repositories, commits, and models:
+The investigator is more than a keyword search. It can follow behavior across files or related repositories, run checks or experiments, continue an earlier investigation, and say what it could not resolve.
 
-- **62.68% cost reduction (−24.54% implementation time) on MAH-SWE:** On a complex full-stack bug fix recorded from real developer work, RepoTracer fixed the bug in both arms while stretching development budgets by **2.68×**.
-- **50.12% cost reduction on SWE-bench:** On Astropy 13453, RepoTracer produced the exact fix and passed the gold regression at half the normal cost.
-- **27.71% cost reduction across DeepSWE:** On multi-language release benchmarks across TypeScript, Python, and Go, RepoTracer delivered 97% feature checks and preserved **1,956 of 1,956 regression checks**, where the direct frontier model dropped 4.
-- **4.00/4.00 blind quality rating:** Luna Medium achieved 24/24 perfect evaluations in double-blind grading, proving that cheaper repository exploration does not compromise solution quality.
+That last part matters. If the investigator reaches the edge of what it can settle, the work is not thrown away. Claude Code or Codex gets what was found, what was checked, and what still needs attention.
 
-Every number measures complete task cost, start to finish, with RepoTracer's own model usage counted against it. The repository publishes all paired artifacts and raw outputs.
+## What happened in the benchmarks
+
+We measure the complete task:
+
+```text
+without RepoTracer = coding-agent usage
+with RepoTracer    = coding-agent usage + investigator usage
+```
+
+The current public paired runs produced:
+
+| Task | Same limits | Time | Quality |
+|---|---:|---:|---|
+| Production bug fix | **2.68×** | **24.54% faster** | Bug fixed in both |
+| SWE-bench Astropy 13453 | **2.00×** | **9.60% faster** | Passing fix in both |
+| Multi-language release | **1.38×** | 16.83% slower | RepoTracer kept all existing tests passing; direct broke 4 |
+
+A complete run that costs 62.68% less lets the same fixed limit cover 2.68× as many runs.
+
+The part I did not expect was quality. On the public tasks where the two outputs differed in quality, RepoTracer produced the better result.
+
+Every public run has raw artifacts and checksums in the repository.
+
+## Why this can work
+
+The coding model and the investigator do different jobs.
+
+The investigator can spend its conversation understanding the repository. The coding agent receives the result without carrying every exploratory read and dead end in the conversation it later uses to implement the change.
+
+That does not mean any small model will work. In a 72-run blind-graded reasoning study, the lowest investigator setting was faster and cheaper but produced six minor defects. Medium and high both scored 4.00/4.00 across their 24 evaluations, while high took much longer.
+
+RepoTracer also keeps uncertainty visible. An unresolved investigation stays unresolved instead of being upgraded into a confident answer.
+
+## Claude Code and Codex
+
+RepoTracer supports both.
+
+Native investigations run through the CLI you already use and reuse its login. They are not a RepoTracer-enforced read-only sandbox; the underlying native environment still matters.
+
+You can also use an OpenAI-compatible endpoint, including a local one.
 
 ## Install
 
@@ -27,9 +77,10 @@ Every number measures complete task cost, start to finish, with RepoTracer's own
 npx repotracer@latest setup
 ```
 
-Codex must already be installed and signed in. RepoTracer reuses that login, registers the MCP server and routing instructions, and requires no second API key.
+Repository: https://github.com/repotracer/repotracer
 
-- Repository: https://github.com/repotracer/repotracer
-- Benchmarks: https://github.com/repotracer/repotracer/blob/main/BENCHMARKS.md
-- Architecture: https://github.com/repotracer/repotracer/blob/main/docs/ARCHITECTURE.md
-- Paper: https://arxiv.org/abs/2606.14066v3
+Benchmarks: https://github.com/repotracer/repotracer/blob/main/BENCHMARKS.md
+
+Architecture: https://github.com/repotracer/repotracer/blob/main/docs/ARCHITECTURE.md
+
+RepoTracer was inspired by Microsoft's FastContext work: https://arxiv.org/abs/2606.14066v3
