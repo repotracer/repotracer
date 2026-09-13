@@ -14,8 +14,14 @@ import re
 import shutil
 import socketserver
 import subprocess
+import sys
 import tempfile
 import threading
+
+
+if sys.version_info < (3, 11):
+    raise SystemExit("scripts/test-version-upgrade.py requires Python 3.11 or newer")
+
 import tomllib
 
 

@@ -638,14 +638,10 @@ impl App {
             }
             efforts.get(&key).cloned()
         } else {
-            let discovered = self.catalog.reasoning_efforts.get(&key)?;
+            let discovered = self.catalog.reasoning_efforts.get(&key).map(Vec::as_slice);
             // Keep the picker aligned with the same model-specific effort
             // policy advertised to the parent agent through MCP.
-            model_catalog::advertised_reasoning_efforts(
-                &model.provider,
-                &model.id,
-                Some(discovered),
-            )
+            model_catalog::advertised_reasoning_efforts(&model.provider, &model.id, discovered)
         }
     }
 

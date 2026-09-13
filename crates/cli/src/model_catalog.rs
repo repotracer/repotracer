@@ -64,13 +64,14 @@ pub fn advertised_reasoning_efforts(
         None
     };
     match (allowed, discovered) {
-        (Some(allowed), Some(levels)) => Some(
-            levels
+        (Some(allowed), Some(levels)) => {
+            let filtered = levels
                 .iter()
                 .filter(|level| allowed.contains(&level.as_str()))
                 .cloned()
-                .collect(),
-        ),
+                .collect::<Vec<_>>();
+            (!filtered.is_empty()).then_some(filtered)
+        }
         (Some(allowed), None) => Some(allowed.iter().map(|level| (*level).to_owned()).collect()),
         (None, Some(levels)) => Some(levels.to_vec()),
         (None, None) => None,
@@ -1530,6 +1531,10 @@ mod tests {
                     .map(String::from)
                     .collect()
             )
+        );
+        assert_eq!(
+            advertised_reasoning_efforts("claude", "opus", Some(&[])),
+            None
         );
     }
 
