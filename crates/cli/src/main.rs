@@ -402,11 +402,22 @@ async fn cmd_scout(
 
 async fn cmd_serve(root: &std::path::Path, cfg: &RepoTracerConfig, mock: bool) -> Result<()> {
     // Logs must not touch stdout.
-    let engine = build_scout(root, cfg, mock)?;
+    let discovered_efforts = (!mock
+        && adaptive_enabled(cfg)
+        && (cfg.model.is_claude() || subscription::is_subscription_backend(cfg)))
+    .then(|| native_supported_efforts(cfg))
+    .flatten();
+    let engine = build_scout_with_efforts(root, cfg, mock, discovered_efforts.clone())?;
     // Off the request path and before the first message. The swap only ever
     // affects the next launch.
     selfupdate::spawn(cfg.updates.automatic);
-    let server = McpServer::new(engine, root.to_path_buf());
+    let advertised_efforts = model_catalog::advertised_reasoning_efforts(
+        &cfg.model.backend,
+        &cfg.model.model,
+        discovered_efforts.as_deref(),
+    );
+    let server =
+        McpServer::new(engine, root.to_path_buf()).with_reasoning_efforts(advertised_efforts);
     server.serve_stdio().await
 }
 
@@ -510,6 +521,20 @@ fn build_scout(
     cfg: &RepoTracerConfig,
     mock: bool,
 ) -> Result<Arc<dyn ScoutBackend>> {
+    let discovered_efforts = (!mock
+        && adaptive_enabled(cfg)
+        && (cfg.model.is_claude() || subscription::is_subscription_backend(cfg)))
+    .then(|| native_supported_efforts(cfg))
+    .flatten();
+    build_scout_with_efforts(root, cfg, mock, discovered_efforts)
+}
+
+fn build_scout_with_efforts(
+    root: &std::path::Path,
+    cfg: &RepoTracerConfig,
+    mock: bool,
+    discovered_efforts: Option<Vec<String>>,
+) -> Result<Arc<dyn ScoutBackend>> {
     if !mock && cfg.model.is_claude() {
         let backend: Arc<dyn ScoutBackend> = Arc::new(claude::ClaudeScout::new(cfg)?);
         let enabled = adaptive_enabled(cfg);
@@ -517,7 +542,7 @@ fn build_scout(
             adaptive::AdaptiveScout::new(
                 backend,
                 enabled,
-                enabled.then(|| native_supported_efforts(cfg)).flatten(),
+                enabled.then(|| discovered_efforts.clone()).flatten(),
                 cfg.model.native_reasoning_effort().to_string(),
             )
             .with_turn_ceiling(cfg.explorer.max_turns),
@@ -530,7 +555,7 @@ fn build_scout(
             adaptive::AdaptiveScout::new(
                 backend,
                 enabled,
-                enabled.then(|| native_supported_efforts(cfg)).flatten(),
+                enabled.then(|| discovered_efforts.clone()).flatten(),
                 cfg.model.native_reasoning_effort().to_string(),
             )
             .with_turn_ceiling(cfg.explorer.max_turns),

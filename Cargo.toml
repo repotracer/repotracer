@@ -11,7 +11,7 @@ exclude = ["crates/bench"]
 default-members = ["crates/cli"]
 
 [workspace.package]
-version = "2.1.0"
+version = "2.1.1"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repotracer/repotracer"

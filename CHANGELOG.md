@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.1 - 2026-09-13
+
+### Changed
+
+- Codex's managed `mcp_servers.repotracer.tool_timeout_sec` now uses a finite
+  compatibility allowance and upgrades the previous managed `600`-second value
+  without changing other MCP entries or custom timeout values. ([#20](https://github.com/repotracer/repotracer/pull/20))
+- `repo_scout` advertises the discovered reasoning effort levels for the
+  configured native model. The recommended Luna model offers medium through
+  max, and the recommended Opus model offers low and medium. ([#20](https://github.com/repotracer/repotracer/pull/20))
+
 ## 2.1.0
 
 ### Added
