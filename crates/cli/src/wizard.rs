@@ -257,6 +257,25 @@ const TAGLINE: &str = "small models investigate. big models solve.";
 /// catalog index is therefore offset by this one row.
 const CUSTOM_ROW_COUNT: usize = 1;
 
+/// One editable setting on the Scout models page. Every setting is a row the
+/// reader can arrow onto, so nothing is reachable only through a shortcut key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Field {
+    Model,
+    Effort,
+    FastTier,
+}
+
+impl Field {
+    fn label(self) -> &'static str {
+        match self {
+            Field::Model => "Model",
+            Field::Effort => "Effort",
+            Field::FastTier => "Fast tier",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Page {
     Install,
@@ -398,13 +417,62 @@ impl App {
 
     /// Land on Save only when there is something to save. Opening on a Save
     /// button that immediately rejects the press is the worst first keystroke.
-    fn enter_models_page(&mut self) {
-        let parents = self.parents();
-        self.page = Page::Models;
-        self.focus = parents
+    /// Every focusable setting on the Scout models page, in screen order. The
+    /// tier row exists only where the backend has a tier, so the shape of this
+    /// list follows the chosen models rather than being fixed.
+    fn fields(&self) -> Vec<(usize, Field)> {
+        let mut fields = Vec::new();
+        for index in self.parents() {
+            fields.push((index, Field::Model));
+            fields.push((index, Field::Effort));
+            if self.effective_fast_tier(index).is_some() {
+                fields.push((index, Field::FastTier));
+            }
+        }
+        fields
+    }
+
+    fn field_focus(&self, parent: usize, field: Field) -> usize {
+        self.fields()
             .iter()
-            .position(|index| self.choices[*index].is_none())
-            .unwrap_or(parents.len());
+            .position(|entry| *entry == (parent, field))
+            .unwrap_or(0)
+    }
+
+    /// Rows the settings list occupies. Compact drops the per-agent heading
+    /// and the gap between agents, so a short viewport spends its rows on
+    /// values rather than on structure.
+    fn models_rows(&self, compact: bool) -> u16 {
+        let fields = self.fields().len() as u16;
+        if compact {
+            fields
+        } else {
+            let parents = self.parents().len() as u16;
+            fields + parents + parents.saturating_sub(1)
+        }
+    }
+
+    fn enter_models_page(&mut self) {
+        self.page = Page::Models;
+        // Open on the first thing that still needs an answer; with everything
+        // answered there is nothing to review, so open on Save.
+        self.focus = self
+            .parents()
+            .iter()
+            .find(|index| self.choices[**index].is_none())
+            .map(|index| self.field_focus(*index, Field::Model))
+            .unwrap_or_else(|| self.fields().len());
+    }
+
+    fn edit_field(&mut self, position: usize) {
+        let Some((parent, field)) = self.fields().get(position).copied() else {
+            return;
+        };
+        match field {
+            Field::Model => self.open_picker(parent),
+            Field::Effort => self.open_effort(parent),
+            Field::FastTier => self.toggle_fast_tier(parent),
+        }
     }
 
     fn set_catalog(&mut self, catalog: Catalog) {
@@ -461,11 +529,7 @@ impl App {
         for index in self.parents() {
             let Some(model) = self.choices[index].clone() else {
                 self.message = format!("Choose a scout for {} first.", LABELS[index]);
-                self.focus = self
-                    .parents()
-                    .iter()
-                    .position(|value| *value == index)
-                    .unwrap_or(0);
+                self.focus = self.field_focus(index, Field::Model);
                 return Outcome::Continue;
             };
             let fast_tier = self.effective_fast_tier(index);
@@ -579,18 +643,9 @@ impl App {
         tier_applies(model).then(|| self.fast_tiers[index].unwrap_or(default_fast_tier(model)))
     }
 
-    /// The focused scout row, when its backend has a service tier to toggle.
-    fn focused_tier_parent(&self) -> Option<usize> {
-        let index = *self.parents().get(self.focus)?;
-        self.effective_fast_tier(index).is_some().then_some(index)
-    }
-
     fn toggle_fast_tier(&mut self, index: usize) {
-        match self.effective_fast_tier(index) {
-            Some(current) => self.fast_tiers[index] = Some(!current),
-            None => {
-                self.message = format!("{} has no service tier.", LABELS[index]);
-            }
+        if let Some(current) = self.effective_fast_tier(index) {
+            self.fast_tiers[index] = Some(!current);
         }
     }
 
@@ -808,32 +863,24 @@ impl App {
                 _ => {}
             },
             Page::Models => {
-                let parents = self.parents();
-                let count = parents.len();
+                // Settings first, then Save, Back and Cancel.
+                let count = self.fields().len();
+                let stops = count + 3;
                 match key.code {
                     KeyCode::Esc => {
                         self.page = Page::Install;
                         self.focus = 2;
                     }
                     KeyCode::Up | KeyCode::Left | KeyCode::BackTab => {
-                        self.focus = (self.focus + count + 2) % (count + 3)
+                        self.focus = (self.focus + stops - 1) % stops
                     }
                     KeyCode::Down | KeyCode::Right | KeyCode::Tab => {
-                        self.focus = (self.focus + 1) % (count + 3)
+                        self.focus = (self.focus + 1) % stops
                     }
-                    KeyCode::Char('a') => {
-                        self.focus = 0;
-                        self.open_picker(parents[0]);
-                    }
-                    KeyCode::Char('e') if self.focus < count => {
-                        let index = parents[self.focus];
-                        self.open_effort(index);
-                    }
-                    KeyCode::Char('t' | 'T') if self.focus < count => {
-                        let index = parents[self.focus];
-                        self.toggle_fast_tier(index);
-                    }
-                    KeyCode::Enter if self.focus < count => self.open_picker(parents[self.focus]),
+                    // Space reads as "flip this" and Enter as "open this", but
+                    // a toggle is the same thing either way.
+                    KeyCode::Char(' ') if self.focus < count => self.edit_field(self.focus),
+                    KeyCode::Enter if self.focus < count => self.edit_field(self.focus),
                     KeyCode::Enter if self.focus == count => return self.save(),
                     KeyCode::Enter if self.focus == count + 1 => {
                         self.page = Page::Install;
@@ -1090,12 +1137,7 @@ impl App {
                 "Space toggle   Enter continue   R uninstall   Esc cancel"
             }
             Page::Install => "Space toggle   Enter continue   Esc cancel",
-            // Offer the tier key only where the focused backend has a tier,
-            // rather than advertising a key that answers "no such thing".
-            Page::Models if self.focused_tier_parent().is_some() => {
-                "Enter change   E effort   T fast tier   Ctrl+S save"
-            }
-            Page::Models => "Enter change   E effort   Ctrl+S save",
+            Page::Models => "Enter change   Space toggle   Ctrl+S save",
             Page::Picker => "Type to filter   Enter apply   Esc back",
             Page::Custom => "Tab fields   F2 discover   Enter next   Esc back",
             Page::Effort => "Enter apply   Esc back",
@@ -1125,7 +1167,7 @@ impl App {
         match self.page {
             Page::Install => pad + 2 + pad,
             Page::Models => {
-                let rows = self.parents().len() as u16 * if compact { 1 } else { 2 };
+                let rows = self.models_rows(compact);
                 let note: u16 = if self.catalog.warnings.is_empty() || self.loading {
                     1
                 } else {
@@ -1293,9 +1335,8 @@ impl App {
     }
 
     fn draw_models(&mut self, frame: &mut Frame, area: Rect, compact: bool, theme: &Theme) {
-        let parents = self.parents();
         let parts = Layout::vertical([
-            Constraint::Length(parents.len() as u16 * if compact { 1 } else { 2 }),
+            Constraint::Length(self.models_rows(compact)),
             Constraint::Min(1),
         ])
         .split(area);
@@ -1307,7 +1348,7 @@ impl App {
             ))]
         } else if self.catalog.warnings.is_empty() {
             vec![Line::from(Span::styled(
-                "Enter changes the highlighted scout.",
+                "Enter changes the highlighted setting.",
                 theme.dim(),
             ))]
         } else {
@@ -1324,68 +1365,86 @@ impl App {
         frame.render_widget(Paragraph::new(note).wrap(Wrap { trim: false }), parts[1]);
     }
 
-    /// The scout rows stay visible on the sub-pages so the edit always has a
-    /// subject on screen.
-    fn draw_parent_rows(&mut self, frame: &mut Frame, area: Rect, compact: bool, theme: &Theme) {
-        let parents = self.parents();
-        let editing = matches!(self.page, Page::Picker | Page::Custom | Page::Effort);
-        let rows: Vec<ListItem> = parents
-            .iter()
-            .map(|index| {
-                let chosen = self.choices[*index].as_ref().map(|model| {
-                    let default_effort = if model.provider == "openai-compatible" {
-                        "Provider default"
-                    } else {
-                        "Auto"
-                    };
-                    let effort = self.selected_efforts[*index]
-                        .as_deref()
-                        .unwrap_or(default_effort);
-                    let effort = format!("{}effort {effort}", theme.separator());
-                    // Only the backends that have a tier advertise one.
-                    let tier = match self.effective_fast_tier(*index) {
-                        Some(true) => format!("{}fast tier on", theme.separator()),
-                        Some(false) => format!("{}fast tier off", theme.separator()),
-                        None => String::new(),
-                    };
-                    format!("{}{effort}{tier}", self.model_text(*index, model, false))
-                });
-                let value = chosen.clone().unwrap_or_else(|| "not chosen yet".into());
-                let value_style = if chosen.is_some() {
-                    theme.plain()
-                } else {
-                    theme.warn()
-                };
-                if compact {
-                    ListItem::new(Line::from(vec![
-                        Span::styled(format!("{:<12}", LABELS[*index]), theme.bold()),
-                        Span::styled(value, value_style),
-                    ]))
-                } else {
-                    ListItem::new(vec![
-                        Line::from(Span::styled(LABELS[*index], theme.bold())),
-                        Line::from(vec![Span::raw("  "), Span::styled(value, value_style)]),
-                    ])
-                }
-            })
-            .collect();
-        let selected = if editing {
-            parents
-                .iter()
-                .position(|index| *index == self.editing)
-                .unwrap_or(0)
-        } else {
-            self.focus
+    /// The value shown against a setting, and whether it still needs an answer.
+    fn field_value(&self, parent: usize, field: Field, theme: &Theme) -> (String, bool) {
+        let Some(model) = self.choices[parent].as_ref() else {
+            return ("not chosen yet".into(), true);
         };
-        let mut state =
-            ListState::default().with_selected((selected < parents.len()).then_some(selected));
-        frame.render_stateful_widget(
-            List::new(rows)
-                .highlight_style(theme.highlight())
-                .highlight_symbol(theme.pointer()),
-            area,
-            &mut state,
-        );
+        match field {
+            Field::Model => (self.model_text(parent, model, false), false),
+            Field::Effort => {
+                let default = if model.provider == "openai-compatible" {
+                    "Provider default"
+                } else {
+                    "Auto"
+                };
+                (
+                    self.selected_efforts[parent]
+                        .as_deref()
+                        .unwrap_or(default)
+                        .to_owned(),
+                    false,
+                )
+            }
+            Field::FastTier => {
+                let on = self.effective_fast_tier(parent).unwrap_or(false);
+                (
+                    format!("{} {}", theme.checkbox(on), if on { "on" } else { "off" }),
+                    false,
+                )
+            }
+        }
+    }
+
+    /// Every setting is its own row: the reader arrows onto the one they want
+    /// instead of recalling which letter opens it.
+    fn draw_parent_rows(&mut self, frame: &mut Frame, area: Rect, compact: bool, theme: &Theme) {
+        let fields = self.fields();
+        let active = (self.focus < fields.len()).then_some(self.focus);
+        let mut lines: Vec<Line> = Vec::new();
+        let mut focused_line = 0;
+        let mut previous: Option<usize> = None;
+        for (position, (parent, field)) in fields.iter().enumerate() {
+            let first = previous != Some(*parent);
+            // A compact viewport spends its rows on values, so the agent name
+            // moves into a column instead of taking a heading of its own.
+            if first && !compact {
+                if previous.is_some() {
+                    lines.push(Line::default());
+                }
+                lines.push(Line::from(Span::styled(LABELS[*parent], theme.bold())));
+            }
+            previous = Some(*parent);
+            let selected = active == Some(position);
+            if selected {
+                focused_line = lines.len();
+            }
+            let (value, pending) = self.field_value(*parent, *field, theme);
+            let style = if selected {
+                theme.highlight()
+            } else if pending {
+                theme.warn()
+            } else {
+                theme.plain()
+            };
+            let mut spans = vec![Span::styled(
+                if selected { theme.pointer() } else { "  " },
+                theme.accent(),
+            )];
+            if compact {
+                spans.push(Span::styled(
+                    format!("{:<12}", if first { LABELS[*parent] } else { "" }),
+                    theme.bold(),
+                ));
+            }
+            spans.push(Span::styled(format!("{:<10}", field.label()), style));
+            spans.push(Span::styled(value, style));
+            lines.push(Line::from(spans));
+        }
+        // Keep the focused row on screen where the viewport cannot hold them all.
+        let height = area.height.max(1) as usize;
+        let scroll = (focused_line + 1).saturating_sub(height) as u16;
+        frame.render_widget(Paragraph::new(lines).scroll((scroll, 0)), area);
     }
 
     fn draw_picker(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
@@ -1644,13 +1703,21 @@ mod tests {
         app.choose_model(model("openai-compatible", "private"));
         assert_eq!(app.effective_fast_tier(1), None);
 
-        // The row must not offer a tier it cannot set, and the key must say so
-        // rather than silently doing nothing.
+        // A backend with no tier has no tier row, so there is nothing to arrow
+        // onto rather than a setting that answers "no such thing".
         key(&mut app, KeyCode::Enter);
-        app.focus = 1;
-        assert!(!screen(&mut app, 100, 32).contains("T fast tier"));
-        key(&mut app, KeyCode::Char('t'));
-        assert!(app.message.contains("no service tier"));
+        assert_eq!(app.page, Page::Models);
+        assert!(!app.fields().contains(&(1, Field::FastTier)));
+        assert_eq!(
+            app.fields(),
+            vec![
+                (0, Field::Model),
+                (0, Field::Effort),
+                (0, Field::FastTier),
+                (1, Field::Model),
+                (1, Field::Effort),
+            ]
+        );
         assert_eq!(app.effective_fast_tier(1), None);
     }
 
@@ -1659,10 +1726,11 @@ mod tests {
         let mut app = app();
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.page, Page::Models);
-        app.focus = 0;
-        assert!(screen(&mut app, 100, 32).contains("fast tier on"));
-        key(&mut app, KeyCode::Char('t'));
-        assert!(screen(&mut app, 100, 32).contains("fast tier off"));
+        app.focus = app.field_focus(0, Field::FastTier);
+        assert!(screen(&mut app, 100, 32).contains("Fast tier ◉ on"));
+        // Space and Enter both flip it; neither is a letter to remember.
+        key(&mut app, KeyCode::Char(' '));
+        assert!(screen(&mut app, 100, 32).contains("Fast tier ◯ off"));
 
         let Outcome::Save(selection) = app.save() else {
             panic!("both parents have a model")
@@ -1732,8 +1800,8 @@ mod tests {
         let mut app = App::new(&["codex".into()], &[]);
         app.selected_efforts[0] = Some("max".into());
         app.page = Page::Models;
-        app.focus = 0;
-        key(&mut app, KeyCode::Char('e'));
+        app.focus = app.field_focus(0, Field::Effort);
+        key(&mut app, KeyCode::Enter);
         assert_eq!(app.page, Page::Effort);
         assert_eq!(app.effort_options(), vec![None, Some("max".into())]);
         assert_eq!(app.picker.selected(), Some(1));
@@ -1794,13 +1862,14 @@ mod tests {
             ..Catalog::default()
         });
         key(&mut app, KeyCode::Enter);
-        key(&mut app, KeyCode::Up);
-        key(&mut app, KeyCode::Char('e'));
+        app.focus = app.field_focus(0, Field::Effort);
+        key(&mut app, KeyCode::Enter);
         assert_eq!(app.page, Page::Effort);
         assert!(screen(&mut app, 80, 24).contains("Auto (agent-selected)"));
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.selected_efforts[0], None);
-        key(&mut app, KeyCode::Char('e'));
+        app.focus = app.field_focus(0, Field::Effort);
+        key(&mut app, KeyCode::Enter);
         key(&mut app, KeyCode::Down);
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.selected_efforts[0].as_deref(), Some("medium"));
