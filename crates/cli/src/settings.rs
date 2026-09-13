@@ -60,6 +60,16 @@ fn profile_reasoning_effort(cfg: &RepoTracerConfig) -> Option<String> {
     }
 }
 
+/// The saved Codex tier, or `None` when the profile has no tier to speak of —
+/// either it never set one, or its backend has no such setting.
+fn profile_fast_tier(cfg: &RepoTracerConfig) -> Option<bool> {
+    match cfg.model.service_tier.trim() {
+        "fast" | "priority" => Some(true),
+        "default" => Some(false),
+        _ => None,
+    }
+}
+
 fn select_provider(cfg: &mut RepoTracerConfig, provider: &str) {
     if matches!(provider, "openai" | "openai-compatible") {
         if cfg.model.is_claude() || crate::subscription::is_subscription_backend(cfg) {
@@ -68,10 +78,16 @@ fn select_provider(cfg: &mut RepoTracerConfig, provider: &str) {
         cfg.model.backend = "openai-compatible".into();
         cfg.model.executable = None;
         cfg.model.adaptive_reasoning = false;
+        cfg.model.service_tier.clear();
         return;
     }
     let changed = cfg.model.backend != format!("{provider}-cli");
     cfg.model.backend = format!("{provider}-cli");
+    // The Claude CLI has no tier or speed setting, so carrying one across a
+    // provider switch would leave a Codex knob stranded in a Claude profile.
+    if provider == "claude" {
+        cfg.model.service_tier.clear();
+    }
     cfg.model.reasoning_effort = cfg.model.native_reasoning_effort().to_string();
     // Keep this in step with wizard::recommended_model: a parent with no
     // profile yet must land on the same scout the wizard would pre-select.
@@ -107,6 +123,7 @@ fn apply_model_choice(
         cfg.model.backend = "openai-compatible".into();
         cfg.model.executable = None;
         cfg.model.model = choice.model.id.clone();
+        cfg.model.service_tier.clear();
         cfg.model.base_url = custom.base_url.trim_end_matches('/').into();
         cfg.model.api_key = custom.api_key.clone().filter(|key| !key.is_empty());
         cfg.model.adaptive_reasoning = false;
@@ -116,6 +133,13 @@ fn apply_model_choice(
     } else {
         select_provider(cfg, &choice.model.provider);
         cfg.model.model = choice.model.id.clone();
+        // Only Codex has a service tier. Clearing it keeps the field out of a
+        // Claude profile entirely rather than leaving a setting nothing reads.
+        cfg.model.service_tier = match choice.fast_tier {
+            Some(true) => "fast".into(),
+            Some(false) => "default".into(),
+            None => String::new(),
+        };
         if let Some(effort) = &choice.reasoning_effort {
             cfg.model.reasoning_effort = effort.clone();
             cfg.model.adaptive_reasoning = false;
@@ -214,6 +238,7 @@ pub fn run(
                         choice: Some(choice),
                         custom,
                         reasoning_effort: profile_reasoning_effort(&selected),
+                        fast_tier: profile_fast_tier(&selected),
                     });
                 } else {
                     current_by_parent.push(crate::wizard::CurrentProfile {
@@ -221,6 +246,7 @@ pub fn run(
                         choice: None,
                         custom: None,
                         reasoning_effort: None,
+                        fast_tier: None,
                     });
                 }
             } else {
@@ -229,6 +255,7 @@ pub fn run(
                     choice: None,
                     custom: None,
                     reasoning_effort: None,
+                    fast_tier: None,
                 });
             }
         }
@@ -554,6 +581,43 @@ mod tests {
     }
 
     #[test]
+    fn a_claude_profile_never_writes_a_service_tier() {
+        let choice = |provider: &str, id: &str, fast_tier| crate::wizard::ParentModelChoice {
+            parent: "claude".into(),
+            model: crate::model_catalog::ModelChoice {
+                provider: provider.into(),
+                id: id.into(),
+                label: id.into(),
+            },
+            custom: None,
+            reasoning_effort: None,
+            fast_tier,
+        };
+        let mut cfg = RepoTracerConfig::default();
+        // Start from a Codex profile so the switch has a tier to strand.
+        apply_model_choice(&mut cfg, &choice("codex", "gpt-5.6-luna", Some(true))).unwrap();
+        assert_eq!(cfg.model.service_tier, "fast");
+
+        apply_model_choice(&mut cfg, &choice("claude", "opus", None)).unwrap();
+        assert!(cfg.model.service_tier.is_empty());
+        let text = toml::to_string_pretty(&cfg).unwrap();
+        assert!(!text.contains("service_tier"), "{text}");
+    }
+
+    #[test]
+    fn an_unset_tier_still_reads_as_the_tier_codex_has_always_run() {
+        let mut cfg = RepoTracerConfig::default();
+        cfg.model.backend = "codex-cli".into();
+        assert!(cfg.model.service_tier.is_empty());
+        assert_eq!(profile_fast_tier(&cfg), None);
+        // An older profile that spelled the tier out round-trips unchanged.
+        cfg.model.service_tier = "fast".into();
+        assert_eq!(profile_fast_tier(&cfg), Some(true));
+        cfg.model.service_tier = "default".into();
+        assert_eq!(profile_fast_tier(&cfg), Some(false));
+    }
+
+    #[test]
     fn selecting_the_same_provider_preserves_custom_executable_and_budgets() {
         let mut cfg = RepoTracerConfig::default();
         cfg.model.executable = Some("/custom/codex".into());
@@ -596,9 +660,12 @@ mod tests {
                 api_key: Some("secret".into()),
             }),
             reasoning_effort: None,
+            fast_tier: None,
         };
         apply_model_choice(&mut cfg, &choice).unwrap();
         assert_eq!(cfg.model.backend, "openai-compatible");
+        // A custom endpoint's tiers are its own; nothing is written for it.
+        assert!(cfg.model.service_tier.is_empty());
         assert_eq!(cfg.model.model, "vendor/reasoner.v9");
         assert_eq!(cfg.model.base_url, "https://gateway.example/v1");
         assert_eq!(cfg.model.api_key.as_deref(), Some("secret"));
@@ -616,6 +683,7 @@ mod tests {
             },
             custom: None,
             reasoning_effort: None,
+            fast_tier: Some(true),
         };
         let custom = crate::wizard::ParentModelChoice {
             parent: "codex".into(),
@@ -629,12 +697,16 @@ mod tests {
                 api_key: Some("secret".into()),
             }),
             reasoning_effort: Some("high".into()),
+            fast_tier: None,
         };
 
         let mut cfg = RepoTracerConfig::default();
         apply_model_choice(&mut cfg, &native).unwrap();
         assert!(cfg.model.adaptive_reasoning);
+        assert_eq!(cfg.model.service_tier, "fast");
         apply_model_choice(&mut cfg, &custom).unwrap();
+        // Switching away from Codex must not strand its tier in the profile.
+        assert!(cfg.model.service_tier.is_empty());
 
         assert!(!cfg.model.adaptive_reasoning);
         assert_eq!(cfg.model.backend, "openai-compatible");
@@ -655,6 +727,7 @@ mod tests {
             },
             custom: None,
             reasoning_effort,
+            fast_tier: Some(true),
         };
         let mut cfg = RepoTracerConfig::default();
         apply_model_choice(&mut cfg, &choice(None)).unwrap();

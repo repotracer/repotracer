@@ -183,6 +183,9 @@ pub struct CurrentProfile {
     pub choice: Option<ModelChoice>,
     pub custom: Option<CustomApiProfile>,
     pub reasoning_effort: Option<String>,
+    /// Saved Codex service tier, if the profile carries one. `None` means the
+    /// profile never set it, so the model's own default applies.
+    pub fast_tier: Option<bool>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -191,6 +194,10 @@ pub struct ParentModelChoice {
     pub model: ModelChoice,
     pub custom: Option<CustomApiProfile>,
     pub reasoning_effort: Option<String>,
+    /// Resolved service tier, or `None` where the backend has no such concept.
+    /// Only Codex reads a tier; Claude and custom endpoints must not be given
+    /// one, so the caller writes nothing for them.
+    pub fast_tier: Option<bool>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -204,9 +211,11 @@ pub struct ModelSelection {
 const PARENTS: [&str; 2] = ["codex", "claude"];
 const LABELS: [&str; 2] = ["Codex", "Claude Code"];
 
+const RECOMMENDED_CODEX_MODEL: &str = "gpt-5.6-luna";
+
 fn recommended_model(index: usize) -> ModelChoice {
     let (provider, id, label) = match index {
-        0 => ("codex", "gpt-5.6-luna", "Codex — gpt-5.6-luna"),
+        0 => ("codex", RECOMMENDED_CODEX_MODEL, "Codex — gpt-5.6-luna"),
         1 => ("claude", "opus", "Claude Code — opus"),
         _ => unreachable!("the parent list has two entries"),
     };
@@ -215,6 +224,23 @@ fn recommended_model(index: usize) -> ModelChoice {
         id: id.into(),
         label: label.into(),
     }
+}
+
+/// The fast tier is a Codex-only knob: the Claude CLI has no tier or speed
+/// setting, and a custom endpoint's tiers are its own business.
+fn tier_applies(model: &ModelChoice) -> bool {
+    model.provider == "codex"
+}
+
+/// Fast tier is worth its cost on the model the wizard recommends and not
+/// assumed for the rest, so every other Codex model opens on the normal tier.
+/// The non-interactive setup path applies the same rule.
+pub fn default_fast_tier_for(model_id: &str) -> bool {
+    model_id.trim() == RECOMMENDED_CODEX_MODEL
+}
+
+fn default_fast_tier(model: &ModelChoice) -> bool {
+    tier_applies(model) && default_fast_tier_for(&model.id)
 }
 
 /// Half-block wordmark, 39 columns. Drawn only where there is room for it;
@@ -247,6 +273,8 @@ struct App {
     choices: [Option<ModelChoice>; 2],
     custom: [Option<CustomApiProfile>; 2],
     selected_efforts: [Option<String>; 2],
+    /// `None` follows the chosen model's default; a toggle pins it.
+    fast_tiers: [Option<bool>; 2],
     catalog: Catalog,
     loading: bool,
     focus: usize,
@@ -288,6 +316,7 @@ impl App {
                 choice: choice.clone(),
                 custom: None,
                 reasoning_effort: None,
+                fast_tier: None,
             })
             .collect::<Vec<_>>();
         Self::new_with_profiles(installed, &profiles)
@@ -313,6 +342,12 @@ impl App {
                 .find(|profile| profile.parent == parent)
                 .and_then(|profile| profile.reasoning_effort.clone())
         });
+        let fast_tiers = PARENTS.map(|parent| {
+            current
+                .iter()
+                .find(|profile| profile.parent == parent)
+                .and_then(|profile| profile.fast_tier)
+        });
         Self {
             page: Page::Install,
             installed,
@@ -330,6 +365,7 @@ impl App {
             }),
             custom,
             selected_efforts,
+            fast_tiers,
             catalog: Catalog::default(),
             loading: true,
             focus: 0,
@@ -432,11 +468,13 @@ impl App {
                     .unwrap_or(0);
                 return Outcome::Continue;
             };
+            let fast_tier = self.effective_fast_tier(index);
             chosen.push(ParentModelChoice {
                 parent: PARENTS[index].into(),
                 model,
                 custom: self.custom[index].clone(),
                 reasoning_effort: self.selected_efforts[index].clone(),
+                fast_tier,
             });
         }
         let removed = self.removals();
@@ -526,8 +564,34 @@ impl App {
         }
         if !same || old_connection != self.custom[index] {
             self.selected_efforts[index] = None;
+            // A pinned tier belonged to the model it was pinned on; the new one
+            // opens on its own default rather than inheriting that decision.
+            self.fast_tiers[index] = None;
         }
         self.choices[index] = Some(model);
+    }
+
+    /// `None` where the backend has no tier at all, so nothing is written for
+    /// Claude or a custom endpoint. Otherwise the pinned value, or the model's
+    /// default while nothing is pinned.
+    fn effective_fast_tier(&self, index: usize) -> Option<bool> {
+        let model = self.choices[index].as_ref()?;
+        tier_applies(model).then(|| self.fast_tiers[index].unwrap_or(default_fast_tier(model)))
+    }
+
+    /// The focused scout row, when its backend has a service tier to toggle.
+    fn focused_tier_parent(&self) -> Option<usize> {
+        let index = *self.parents().get(self.focus)?;
+        self.effective_fast_tier(index).is_some().then_some(index)
+    }
+
+    fn toggle_fast_tier(&mut self, index: usize) {
+        match self.effective_fast_tier(index) {
+            Some(current) => self.fast_tiers[index] = Some(!current),
+            None => {
+                self.message = format!("{} has no service tier.", LABELS[index]);
+            }
+        }
     }
 
     fn effort_candidates(&self) -> Vec<String> {
@@ -764,6 +828,10 @@ impl App {
                     KeyCode::Char('e') if self.focus < count => {
                         let index = parents[self.focus];
                         self.open_effort(index);
+                    }
+                    KeyCode::Char('t' | 'T') if self.focus < count => {
+                        let index = parents[self.focus];
+                        self.toggle_fast_tier(index);
                     }
                     KeyCode::Enter if self.focus < count => self.open_picker(parents[self.focus]),
                     KeyCode::Enter if self.focus == count => return self.save(),
@@ -1022,6 +1090,11 @@ impl App {
                 "Space toggle   Enter continue   R uninstall   Esc cancel"
             }
             Page::Install => "Space toggle   Enter continue   Esc cancel",
+            // Offer the tier key only where the focused backend has a tier,
+            // rather than advertising a key that answers "no such thing".
+            Page::Models if self.focused_tier_parent().is_some() => {
+                "Enter change   E effort   T fast tier   Ctrl+S save"
+            }
             Page::Models => "Enter change   E effort   Ctrl+S save",
             Page::Picker => "Type to filter   Enter apply   Esc back",
             Page::Custom => "Tab fields   F2 discover   Enter next   Esc back",
@@ -1269,7 +1342,13 @@ impl App {
                         .as_deref()
                         .unwrap_or(default_effort);
                     let effort = format!("{}effort {effort}", theme.separator());
-                    format!("{}{effort}", self.model_text(*index, model, false))
+                    // Only the backends that have a tier advertise one.
+                    let tier = match self.effective_fast_tier(*index) {
+                        Some(true) => format!("{}fast tier on", theme.separator()),
+                        Some(false) => format!("{}fast tier off", theme.separator()),
+                        None => String::new(),
+                    };
+                    format!("{}{effort}{tier}", self.model_text(*index, model, false))
                 });
                 let value = chosen.clone().unwrap_or_else(|| "not chosen yet".into());
                 let value_style = if chosen.is_some() {
@@ -1549,6 +1628,77 @@ mod tests {
     }
 
     #[test]
+    fn fast_tier_is_on_for_the_recommended_codex_model_and_off_for_the_rest() {
+        let mut app = app();
+        assert_eq!(app.effective_fast_tier(0), Some(true));
+        app.editing = 0;
+        app.choose_model(model("codex", "gpt-5.6-pro"));
+        assert_eq!(app.effective_fast_tier(0), Some(false));
+    }
+
+    #[test]
+    fn claude_and_custom_endpoints_have_no_service_tier() {
+        let mut app = app();
+        assert_eq!(app.effective_fast_tier(1), None);
+        app.editing = 1;
+        app.choose_model(model("openai-compatible", "private"));
+        assert_eq!(app.effective_fast_tier(1), None);
+
+        // The row must not offer a tier it cannot set, and the key must say so
+        // rather than silently doing nothing.
+        key(&mut app, KeyCode::Enter);
+        app.focus = 1;
+        assert!(!screen(&mut app, 100, 32).contains("T fast tier"));
+        key(&mut app, KeyCode::Char('t'));
+        assert!(app.message.contains("no service tier"));
+        assert_eq!(app.effective_fast_tier(1), None);
+    }
+
+    #[test]
+    fn toggling_the_tier_shows_on_the_row_and_reaches_the_saved_choice() {
+        let mut app = app();
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.page, Page::Models);
+        app.focus = 0;
+        assert!(screen(&mut app, 100, 32).contains("fast tier on"));
+        key(&mut app, KeyCode::Char('t'));
+        assert!(screen(&mut app, 100, 32).contains("fast tier off"));
+
+        let Outcome::Save(selection) = app.save() else {
+            panic!("both parents have a model")
+        };
+        assert_eq!(selection.chosen[0].fast_tier, Some(false));
+        // Claude carries no tier at all, so the caller writes none.
+        assert_eq!(selection.chosen[1].fast_tier, None);
+    }
+
+    #[test]
+    fn a_pinned_tier_does_not_follow_a_new_model() {
+        let mut app = app();
+        app.editing = 0;
+        app.toggle_fast_tier(0);
+        assert_eq!(app.fast_tiers[0], Some(false));
+        app.choose_model(model("codex", "gpt-5.6-pro"));
+        assert_eq!(app.fast_tiers[0], None);
+        assert_eq!(app.effective_fast_tier(0), Some(false));
+        app.choose_model(recommended_model(0));
+        assert_eq!(app.effective_fast_tier(0), Some(true));
+    }
+
+    #[test]
+    fn a_saved_tier_survives_reopening_the_wizard() {
+        let profile = CurrentProfile {
+            parent: "codex".into(),
+            choice: Some(model("codex", "gpt-5.6-luna")),
+            custom: None,
+            reasoning_effort: None,
+            fast_tier: Some(false),
+        };
+        let app = App::new_with_profiles(&["codex".into()], &[profile]);
+        assert_eq!(app.effective_fast_tier(0), Some(false));
+    }
+
+    #[test]
     fn custom_form_only_shows_editable_inputs() {
         let mut app = app();
         app.open_picker(0);
@@ -1614,6 +1764,7 @@ mod tests {
             choice: Some(saved.clone()),
             custom: None,
             reasoning_effort: Some("high".into()),
+            fast_tier: None,
         };
         let mut app = App::new_with_profiles(&["codex".into()], &[profile]);
         app.set_catalog(Catalog {
@@ -1774,6 +1925,7 @@ mod tests {
                 api_key: Some("secret".into()),
             }),
             reasoning_effort: None,
+            fast_tier: None,
         };
         let mut app = App::new_with_profiles(&["codex".into()], &[profile]);
         app.unicode = true;
@@ -1798,6 +1950,7 @@ mod tests {
                     api_key: Some("saved-secret".into()),
                 }),
                 reasoning_effort: Some("high".into()),
+                fast_tier: None,
             }],
         );
         app.unicode = true;

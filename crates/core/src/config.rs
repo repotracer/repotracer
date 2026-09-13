@@ -74,8 +74,11 @@ pub struct ModelSettings {
     /// Permit one scout-requested continuation at a higher native-supported effort.
     #[serde(default = "default_true")]
     pub adaptive_reasoning: bool,
-    /// Codex service tier. `fast` is accepted as an alias for `priority` by the subscription backend.
-    #[serde(default = "default_service_tier")]
+    /// Codex service tier. `fast` is accepted as an alias for `priority` by the
+    /// subscription backend. Empty means unset, which that backend also reads as
+    /// `priority`; only the Codex backend reads this field at all, so a Claude
+    /// profile leaves it empty and never writes it out.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub service_tier: String,
     #[serde(default = "default_base_url")]
     pub base_url: String,
@@ -117,9 +120,6 @@ fn default_backend() -> String {
 fn default_model() -> String {
     "gpt-5.6-luna".into()
 }
-fn default_service_tier() -> String {
-    "fast".into()
-}
 fn default_base_url() -> String {
     "https://api.openai.com/v1".into()
 }
@@ -132,7 +132,7 @@ impl Default for ModelSettings {
             model: default_model(),
             reasoning_effort: String::new(),
             adaptive_reasoning: true,
-            service_tier: default_service_tier(),
+            service_tier: String::new(),
             base_url: default_base_url(),
             api_key: None,
             timeout_ms: 0,

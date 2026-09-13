@@ -116,6 +116,21 @@ fn gpt_config(cfg: &RepoTracerConfig) -> Result<RepoTracerConfig> {
     }
     if crate::subscription::is_subscription_backend(&selected) {
         selected.model.reasoning_effort = selected.model.native_reasoning_effort().to_string();
+        // Same rule the wizard applies: fast tier on the recommended model,
+        // the normal tier for anything else. A tier already on the profile is
+        // a decision someone made, so it stands.
+        if selected.model.service_tier.trim().is_empty() {
+            selected.model.service_tier =
+                if crate::wizard::default_fast_tier_for(&selected.model.model) {
+                    "fast"
+                } else {
+                    "default"
+                }
+                .into();
+        }
+    } else {
+        // Only Codex reads a tier; no other backend should carry one.
+        selected.model.service_tier.clear();
     }
     Ok(selected)
 }

@@ -74,7 +74,9 @@ impl CliScout {
         };
         let service_tier = match cfg.model.service_tier.trim() {
             "default" => "default",
-            "fast" | "priority" => "priority",
+            // Unset keeps the tier this backend has always run at, so a profile
+            // written before the field became explicit behaves the same.
+            "" | "fast" | "priority" => "priority",
             tier => {
                 bail!("unsupported scout service tier `{tier}`; use default, fast, or priority")
             }
