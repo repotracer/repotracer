@@ -59,6 +59,31 @@ class ReportingTests(unittest.TestCase):
         with self.assertRaises(KeyError):
             bench.report(data, grades(data))
 
+    def test_unpriced_requests_keep_tokens_without_inventing_cost(self):
+        data = fixture()
+        candidate = data["tasks"][0]["candidates"][0]
+        candidate["requests"][0]["rate_card"] = None
+        result = bench.usage(candidate, {})
+        self.assertIsNone(result["cost_usd"])
+        self.assertTrue(result["usage_complete"])
+        self.assertEqual(result["total_tokens"], 1130)
+        self.assertEqual(result["unpriced_requests"], ["request-0"])
+
+    def test_native_reported_cost_is_not_added_to_token_pricing(self):
+        data = fixture()
+        candidate = data["tasks"][0]["candidates"][1]
+        candidate["requests"][0]["rate_card"] = None
+        candidate["reported_cost_by_role_usd"] = {"parent": 1.25}
+        candidate["reported_cost_sources"] = {"parent": "claude-code"}
+        result = bench.usage(candidate, {})
+        self.assertEqual(result["cost_usd"], 1.25)
+        self.assertEqual(result["cost_basis"]["parent"], "claude-code")
+        candidate["usage_complete"] = False
+        self.assertIsNone(bench.usage(candidate, {})["cost_usd"])
+        candidate["reported_cost_by_role_usd"]["parent"] = -1
+        with self.assertRaises(ValueError):
+            bench.usage(candidate, {})
+
     def test_invalid_tokens_and_nan_fail(self):
         for value in (-1, True, float("nan"), .1):
             data = fixture()

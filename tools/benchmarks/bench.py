@@ -223,6 +223,7 @@ def usage(candidate, rate_cards):
     costs = {"parent": 0.0, "scout": 0.0}
     seen = {}
     actual_settings = set()
+    unpriced_requests = []
     for request in candidate["requests"]:
         rid = text(request["id"], "request id")
         if rid in seen:
@@ -235,12 +236,23 @@ def usage(candidate, rate_cards):
             raise ValueError("Request role must be parent or scout, including its child agents")
         if candidate["group"] == "baseline" and role == "scout":
             raise ValueError("Parent-only baseline contains scout requests")
-        rates = rate_cards[request["rate_card"]]
+        actual_settings.add((role, text(request["model"], "request model"),
+                             text(request["effort"], "actual effort")))
+        card_name = request.get("rate_card")
+        if card_name is None:
+            # Native runs may have complete token counts before a price card is
+            # chosen. Keep the usage and subtotal, but never invent a cost.
+            for field in TOKEN_FIELDS:
+                count = number(request["tokens"][field], f"{field} tokens")
+                if type(count) is not int:
+                    raise ValueError("Token counts must be integers")
+                totals[role][field] += count
+            unpriced_requests.append(rid)
+            continue
+        rates = rate_cards[card_name]
         text(rates["source"], "rate source")
         if rates["model"] != request["model"]:
             raise ValueError("Rate-card model does not match request model")
-        actual_settings.add((role, text(request["model"], "request model"),
-                             text(request["effort"], "actual effort")))
         for field in TOKEN_FIELDS:
             count = number(request["tokens"][field], f"{field} tokens")
             if type(count) is not int:
@@ -253,10 +265,28 @@ def usage(candidate, rate_cards):
         raise ValueError("Completed run has no requests; cannot call its usage complete")
     if candidate["group"] == "baseline" and any(totals["scout"].values()):
         raise ValueError("Parent-only baseline contains scout usage")
+    # Native CLIs can supply a full bill even when they do not expose a price
+    # card. Require a separate amount and source for each role; never add the
+    # reported total to token-priced usage, which would count it twice.
+    reported = candidate.get("reported_cost_by_role_usd") or {}
+    sources = candidate.get("reported_cost_sources") or {}
+    cost_basis = {}
+    for role in costs:
+        missing = any(seen[rid]["role"] == role for rid in unpriced_requests)
+        if missing and reported.get(role) is not None:
+            costs[role] = number(reported[role], f"{role} reported cost")
+            cost_basis[role] = text(sources.get(role), f"{role} reported cost source")
+        elif not missing:
+            cost_basis[role] = "rate_cards" if any(r["role"] == role for r in seen.values()) else "no_requests"
+        else:
+            cost_basis[role] = "missing"
+    cost_complete = complete and "missing" not in cost_basis.values()
     return {"tokens": totals, "total_tokens": sum(sum(v.values()) for v in totals.values()),
             "actual_settings": [{"role": role, "model": model, "effort": effort}
                                 for role, model, effort in sorted(actual_settings)],
-            "cost_usd": sum(costs.values()) if complete else None,
+            "cost_usd": sum(costs.values()) if cost_complete else None,
+            "cost_basis": cost_basis,
+            "unpriced_requests": unpriced_requests,
             "known_cost_usd": sum(costs.values()), "cost_by_role_usd": costs,
             "usage_complete": complete, "request_count": len(seen)}
 
@@ -329,7 +359,8 @@ def report(manifest, grades, bootstrap=0):
             # Never blend different versions/model presets or fresh and tuned tasks.
             pair["configuration"] = {"group": row["group"], "version": row["version"], "parent": row["parent"],
                                      "scout": row["scout"], "origin": row["origin"], "purpose": row["purpose"],
-                                     "rate_card_sha256": digest(manifest["rate_cards"])}
+                                     "rate_card_sha256": digest(manifest["rate_cards"]),
+                                     "cost_basis": {"baseline": baseline["cost_basis"], "assisted": row["cost_basis"]}}
     return {"schema_version": 1, "experiment": manifest["experiment"], "rows": rows,
             "pairs": pairs, "aggregates": aggregate_pairs(pairs, bootstrap)}
 
