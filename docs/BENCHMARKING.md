@@ -2,7 +2,38 @@
 
 Compare the same task with and without RepoTracer. Report quality, complete-task cost, parent/scout tokens, and elapsed time together. A finished process is not a finished benchmark until its work has been graded.
 
-The public tools in `tools/benchmarks` prepare blind grading packets, price normalized request usage, and produce per-task and historical reports. They use Python 3.10 or newer, with no packages to install. They do not launch solving agents, collect native provider logs, or call a grader yet. The native batch runner and task-entry TUI are separate work still to be implemented. Until then, the agent running the comparison follows the procedure below and records its evidence in the manifest.
+The public tools in `tools/benchmarks` run native sessions, collect usage, prepare blind grading packets, call a separate grader, and produce per-task and historical reports. They use Python 3.10 or newer, with no packages to install. Installed RepoTracer binaries bundle the same scripts.
+
+## Use the benchmark interface
+
+```sh
+repotracer benchmarks
+# Keep all settings and results in a chosen directory:
+repotracer benchmarks --state-dir .benchmark-runs/daily
+```
+
+The initial list has three custom Codex tasks and one external Claude Code task. Enter your project paths and prompts, or add and remove tasks. Blank custom prompts are skipped. External tasks use SWE-bench Lite or a local SWE-style JSON/JSONL dataset; the selected instance and dataset identity are saved before execution. Local exports need `repo`, `base_commit`, `instance_id`, and `problem_statement`; `test_patch`, `FAIL_TO_PASS`, and `PASS_TO_PASS` supply acceptance checks. Reference solution patches are never given to the solver.
+
+Set model choices and price cards before starting. Codex runs require a rate card for each solving model so they cannot finish with an unpriced token ledger. Claude Code can supply its own reported cost. Price cards use the fields shown below and USD per million tokens. Use your provider's actual model identifiers and rates. Prices are configuration, not guessed from a model alias.
+
+The default comparison is baseline versus current RepoTracer. A third, changed group requires an explicit candidate binary or routing source. Runs pin the binary and guidance they use. Groups run sequentially, and closing the interface leaves workers running. Open it again to see progress, results, or a saved investigation. Applying a patch is opt-in for custom tasks and refuses a source checkout that changed after capture.
+
+The saved daily preset is started manually. It does not install a scheduler. For another machine, run the same command there; both groups must run on that machine. Automatic remote dispatch is not included.
+
+Agents can use the same backend without driving terminal keys:
+
+```sh
+python3 tools/benchmarks/workflow.py --state-dir .benchmark-runs/daily init
+python3 tools/benchmarks/workflow.py --state-dir .benchmark-runs/daily get
+python3 tools/benchmarks/workflow.py --state-dir .benchmark-runs/daily save < config.json
+python3 tools/benchmarks/workflow.py --state-dir .benchmark-runs/daily start
+python3 tools/benchmarks/workflow.py --state-dir .benchmark-runs/daily investigate --run RUN --task TASK --group current
+python3 tools/benchmarks/workflow.py --state-dir .benchmark-runs/daily apply --run RUN --task TASK --group current
+```
+
+`get` returns saved configuration and job summaries as JSON. `save` accepts the configuration object, and `start` resumes an unfinished batch with the same configuration. Raw native logs, patches, grading keys, and reports stay in the state directory. Costs become available as each group finishes; unknown cost remains unknown while it runs. Results without a blind grade remain incomplete.
+
+Custom tasks can set an acceptance command before launch. External pytest checks are derived from the dataset when its test identifiers support that command; other test runners need an explicit command. Dependencies must work natively on the selected machine. Missing checks and environment failures are recorded, not treated as passes.
 
 ## Start a comparison
 
@@ -17,7 +48,7 @@ Edit `.benchmark-runs/today/manifest.json`. The generated files contain no measu
 
 Use two groups normally, `baseline` for the parent alone and `current` for the same parent with RepoTracer. Add a `changed` candidate when testing a code or prompt change. Each candidate needs a unique id and group within its task. Test the exact submitted code and prompt, and record their identifiers in `version`. Later edits need their own comparison.
 
-The normal owner-initiated batch contains two real tasks written by the user and one randomly selected external benchmark task. Preserve the user's prompts exactly. An optional fourth task may be proposed by an agent only when the user enables it, and must be shown before launch. Record the external dataset revision, task id, and selection seed. Keep internal and external results separate in aggregates. Contributors can start with one relevant task rather than paying for a full batch.
+The default owner-initiated batch contains three real tasks written by the user and one randomly selected external benchmark task. Preserve the user's prompts exactly. Additional agent-proposed tasks must be shown and accepted before launch. Record the external dataset revision, task id, and selection seed. Keep internal and external results separate in aggregates. Contributors can start with one relevant task rather than paying for a full batch.
 
 Use Sol medium as the default Codex parent. Luna Auto starts at medium and offers medium/high/xhigh/max. Reserve one task for Claude Code when capacity is limited, normally the external task. Its preset uses Opus as parent and scout; Opus scout Auto starts at low and can increase to medium. Record the exact provider model identifiers, parent effort, and actual per-request scout efforts. These defaults are comparison settings, not claims that a particular account exposes those models.
 
