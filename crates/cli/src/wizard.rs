@@ -1852,9 +1852,20 @@ mod tests {
         app.focus = app.field_focus(0, Field::Effort);
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.page, Page::Effort);
-        assert_eq!(app.effort_options(), vec![None, Some("max".into())]);
-        assert_eq!(app.picker.selected(), Some(1));
-        key(&mut app, KeyCode::Up);
+        assert_eq!(
+            app.effort_options(),
+            vec![
+                None,
+                Some("medium".into()),
+                Some("high".into()),
+                Some("xhigh".into()),
+                Some("max".into())
+            ]
+        );
+        assert_eq!(app.picker.selected(), Some(4));
+        for _ in 0..4 {
+            key(&mut app, KeyCode::Up);
+        }
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.selected_efforts[0], None);
     }
