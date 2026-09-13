@@ -30,7 +30,7 @@ npx repotracer@latest setup
 </p>
 
 <p align="center">
-  <img src="assets/demo/scout.gif" alt="The scout engine finding four verified file and line-range citations in 35 seconds" width="100%"><br>
+  <video src="assets/demo/paired-codex-6s.mp4" width="100%" autoplay muted playsinline preload="auto"></video><br>
   <sub>What the <code>repo_scout</code> MCP tool runs under the hood: plain query in, Luna searches with Read/Glob/Grep, disk-verified <code>file:line</code> citations out in ~35s.</sub>
 </p>
 
