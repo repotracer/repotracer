@@ -207,7 +207,7 @@ const LABELS: [&str; 2] = ["Codex", "Claude Code"];
 fn recommended_model(index: usize) -> ModelChoice {
     let (provider, id, label) = match index {
         0 => ("codex", "gpt-5.6-luna", "Codex — gpt-5.6-luna"),
-        1 => ("claude", "sonnet", "Claude Code — sonnet"),
+        1 => ("claude", "opus", "Claude Code — opus"),
         _ => unreachable!("the parent list has two entries"),
     };
     ModelChoice {
@@ -225,6 +225,11 @@ const WORDMARK: [&str; 3] = [
     "▀ ▀ ▀▀▀ ▀   ▀▀▀  ▀  ▀ ▀ ▀ ▀ ▀▀▀ ▀▀▀ ▀ ▀",
 ];
 const TAGLINE: &str = "small models investigate. big models solve.";
+
+/// The picker leads with "Custom model…" so an endpoint the catalog cannot
+/// know about is the first thing offered, not the last thing found. Every
+/// catalog index is therefore offset by this one row.
+const CUSTOM_ROW_COUNT: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Page {
@@ -289,7 +294,13 @@ impl App {
     }
 
     fn new_with_profiles(installed: &[String], current: &[CurrentProfile]) -> Self {
-        let enabled = PARENTS.map(|parent| installed.iter().any(|value| value == parent));
+        let installed = PARENTS.map(|parent| installed.iter().any(|value| value == parent));
+        // Nothing installed is a first run, and someone reaching this screen
+        // came to install. Offer both agents already checked rather than
+        // opening on a choice that does nothing until they turn something on.
+        // A rerun keeps mirroring disk, so unchecking still means removal.
+        let first_run = !installed.iter().any(|value| *value);
+        let enabled = installed.map(|value| value || first_run);
         let custom = PARENTS.map(|parent| {
             current
                 .iter()
@@ -304,7 +315,7 @@ impl App {
         });
         Self {
             page: Page::Install,
-            installed: enabled,
+            installed,
             enabled,
             choices: PARENTS.map(|parent| {
                 let index = PARENTS
@@ -363,7 +374,8 @@ impl App {
     fn set_catalog(&mut self, catalog: Catalog) {
         self.catalog = catalog;
         self.loading = false;
-        self.picker.select(Some(0));
+        let row = self.first_model_row();
+        self.picker.select(Some(row));
     }
 
     fn parents(&self) -> Vec<usize> {
@@ -377,6 +389,35 @@ impl App {
             .filter(|index| self.installed[*index] && !self.enabled[*index])
             .map(|index| PARENTS[index].to_owned())
             .collect()
+    }
+
+    /// Installed agents still checked — what the Uninstall button would stage.
+    /// The button is offered only while it would actually do something.
+    fn removable(&self) -> Vec<usize> {
+        (0..2)
+            .filter(|index| self.installed[*index] && self.enabled[*index])
+            .collect()
+    }
+
+    /// Focus stops on the Install page: two checkboxes, the primary action,
+    /// Cancel, and an Uninstall button that only exists while something is
+    /// installed. The count is therefore not fixed.
+    fn install_stops(&self) -> usize {
+        if self.removable().is_empty() {
+            4
+        } else {
+            5
+        }
+    }
+
+    /// Stage every installed agent for removal. Staging rather than removing
+    /// keeps the confirmation in the flow: the rows say "will be removed" and
+    /// the primary button says "Remove" before anything is touched.
+    fn stage_uninstall(&mut self) {
+        for index in self.removable() {
+            self.enabled[index] = false;
+        }
+        self.focus = 2;
     }
 
     fn save(&mut self) -> Outcome {
@@ -435,9 +476,20 @@ impl App {
                 self.candidates()
                     .iter()
                     .position(|model| same_model(model, current))
+                    .map(|position| position + CUSTOM_ROW_COUNT)
             })
-            .unwrap_or(0);
+            .unwrap_or_else(|| self.first_model_row());
         self.picker = ListState::default().with_selected(Some(selected));
+    }
+
+    /// Row zero is the custom-model entry, so the catalog starts one below it.
+    /// Filtering and reopening land on a model, never on the escape hatch.
+    fn first_model_row(&self) -> usize {
+        if self.candidates().is_empty() {
+            0
+        } else {
+            CUSTOM_ROW_COUNT
+        }
     }
 
     fn known_efforts(&self, index: usize) -> Option<&Vec<String>> {
@@ -632,7 +684,8 @@ impl App {
                 self.custom_discovered[parent] = Some((connection, models));
                 self.page = Page::Picker;
                 self.query.clear();
-                self.picker.select(Some(0));
+                let row = self.first_model_row();
+                self.picker.select(Some(row));
             }
             Err(error) => self.message = format!("Model discovery failed: {error}"),
         }
@@ -648,7 +701,8 @@ impl App {
                 KeyCode::Char('s') if self.page == Page::Models => return self.save(),
                 KeyCode::Char('u') if matches!(self.page, Page::Picker | Page::Custom) => {
                     self.query.clear();
-                    self.picker.select(Some(0));
+                    let row = self.first_model_row();
+                    self.picker.select(Some(row));
                 }
                 _ => {}
             }
@@ -658,15 +712,24 @@ impl App {
         match self.page {
             Page::Install => match key.code {
                 KeyCode::Esc => return Outcome::Cancel,
-                KeyCode::Up | KeyCode::Left | KeyCode::BackTab => self.focus = (self.focus + 3) % 4,
-                KeyCode::Down | KeyCode::Right | KeyCode::Tab => self.focus = (self.focus + 1) % 4,
+                KeyCode::Up | KeyCode::Left | KeyCode::BackTab => {
+                    let stops = self.install_stops();
+                    self.focus = (self.focus + stops - 1) % stops;
+                }
+                KeyCode::Down | KeyCode::Right | KeyCode::Tab => {
+                    self.focus = (self.focus + 1) % self.install_stops();
+                }
                 KeyCode::Char(' ') if self.focus < 2 => {
                     self.enabled[self.focus] = !self.enabled[self.focus];
                     if self.enabled[self.focus] && self.choices[self.focus].is_none() {
                         self.choices[self.focus] = Some(recommended_model(self.focus));
                     }
                 }
-                KeyCode::Enter if self.focus == 3 => return Outcome::Cancel,
+                // A shortcut next to the button, so the way out is reachable
+                // without hunting for it.
+                KeyCode::Char('r' | 'R') if !self.removable().is_empty() => self.stage_uninstall(),
+                KeyCode::Enter if self.focus == self.install_stops() - 1 => return Outcome::Cancel,
+                KeyCode::Enter if self.focus == 3 => self.stage_uninstall(),
                 KeyCode::Enter => {
                     if !self.parents().is_empty() {
                         self.enter_models_page();
@@ -714,7 +777,8 @@ impl App {
             }
             Page::Picker => {
                 let candidates = self.candidates();
-                let count = candidates.len() + 1; // Explicit custom model entry is always reachable.
+                // The custom model entry leads the list and is always reachable.
+                let count = candidates.len() + CUSTOM_ROW_COUNT;
                 let selected = self.picker.selected().unwrap_or(0).min(count - 1);
                 match key.code {
                     KeyCode::Esc => {
@@ -726,20 +790,22 @@ impl App {
                     KeyCode::Down | KeyCode::Tab => {
                         self.picker.select(Some((selected + 1) % count))
                     }
-                    KeyCode::Enter if selected < candidates.len() => {
-                        self.choose_model(candidates[selected].clone());
-                        self.page = Page::Models;
+                    KeyCode::Enter if selected < CUSTOM_ROW_COUNT => {
+                        self.open_custom();
                     }
                     KeyCode::Enter => {
-                        self.open_custom();
+                        self.choose_model(candidates[selected - CUSTOM_ROW_COUNT].clone());
+                        self.page = Page::Models;
                     }
                     KeyCode::Backspace => {
                         self.query.pop();
-                        self.picker.select(Some(0));
+                        let row = self.first_model_row();
+                        self.picker.select(Some(row));
                     }
                     KeyCode::Char(character) if !key.modifiers.contains(KeyModifiers::ALT) => {
                         self.query.push(character);
-                        self.picker.select(Some(0));
+                        let row = self.first_model_row();
+                        self.picker.select(Some(row));
                     }
                     _ => {}
                 }
@@ -749,7 +815,8 @@ impl App {
                     self.invalidate_custom_discovery();
                     self.page = Page::Picker;
                     self.query.clear();
-                    self.picker.select(Some(0));
+                    let row = self.first_model_row();
+                    self.picker.select(Some(row));
                 }
                 KeyCode::F(2) => self.start_custom_discovery(),
                 KeyCode::Tab | KeyCode::Down => {
@@ -849,10 +916,9 @@ impl App {
                 .iter()
                 .any(|candidate| same_model(candidate, model))
         };
-        let recommended = matches!(
-            (model.provider.as_str(), model.id.as_str()),
-            ("codex", "gpt-5.6-luna") | ("claude", "sonnet")
-        );
+        // One source of truth: what the wizard pre-selects is what it marks.
+        let recommended =
+            (0..PARENTS.len()).any(|parent| same_model(&recommended_model(parent), model));
         let suffix = if self.loading {
             if recommended {
                 " [recommended; availability pending]"
@@ -951,6 +1017,9 @@ impl App {
         let keys = match self.page {
             Page::Install if self.parents().is_empty() && !self.removals().is_empty() => {
                 "Space toggle   Enter remove   Esc cancel"
+            }
+            Page::Install if !self.removable().is_empty() => {
+                "Space toggle   Enter continue   R uninstall   Esc cancel"
             }
             Page::Install => "Space toggle   Enter continue   Esc cancel",
             Page::Models => "Enter change   E effort   Ctrl+S save",
@@ -1055,6 +1124,11 @@ impl App {
             Page::Install if self.parents().is_empty() && !self.removals().is_empty() => {
                 (&["Remove", "Cancel"], 2)
             }
+            // Removing an integration deserves its own button, not a gesture
+            // the reader has to infer from the checkboxes.
+            Page::Install if !self.removable().is_empty() => {
+                (&["Continue", "Uninstall", "Cancel"], 2)
+            }
             Page::Install => (&["Continue", "Cancel"], 2),
             Page::Models => (&["Save", "Back", "Cancel"], self.parents().len()),
             // A sub-page has one way out; say what it is instead of leaving a
@@ -1124,13 +1198,20 @@ impl App {
             parts[1],
             &mut state,
         );
-        let note = if self.removals().is_empty() {
-            Span::styled("Agents left unchecked are not modified.", theme.dim())
-        } else {
+        // Say what the checkbox will do, and say it before it is pressed.
+        // "Not modified" is only true while nothing is installed.
+        let note = if !self.removals().is_empty() {
             Span::styled(
                 "Unchecking an installed agent removes its RepoTracer integration.",
                 theme.warn(),
             )
+        } else if !self.removable().is_empty() {
+            Span::styled(
+                "Uncheck an installed agent, or press R, to remove its integration.",
+                theme.dim(),
+            )
+        } else {
+            Span::styled("Agents left unchecked are not modified.", theme.dim())
         };
         frame.render_widget(
             Paragraph::new(vec![Line::default(), Line::from(note)]).wrap(Wrap { trim: false }),
@@ -1260,12 +1341,13 @@ impl App {
             ]),
             parts[0],
         );
-        let mut rows: Vec<ListItem> = self
-            .candidates()
-            .iter()
-            .map(|model| ListItem::new(self.model_text(self.editing, model, true)))
-            .collect();
-        rows.push(ListItem::new(Span::styled("Custom model…", theme.accent())));
+        let mut rows: Vec<ListItem> =
+            vec![ListItem::new(Span::styled("Custom model…", theme.accent()))];
+        rows.extend(
+            self.candidates()
+                .iter()
+                .map(|model| ListItem::new(self.model_text(self.editing, model, true))),
+        );
         frame.render_stateful_widget(
             List::new(rows)
                 .highlight_style(theme.highlight())
@@ -1463,7 +1545,7 @@ mod tests {
             panic!("Save should be focused")
         };
         assert_eq!(selection.chosen[0].model.id, "gpt-5.6-luna");
-        assert_eq!(selection.chosen[1].model.id, "sonnet");
+        assert_eq!(selection.chosen[1].model.id, "opus");
     }
 
     #[test]
@@ -1481,7 +1563,7 @@ mod tests {
     fn defaults_are_selected_and_saveable_before_discovery() {
         let mut app = App::new(&["codex".into(), "claude".into()], &[]);
         assert_eq!(app.choices[0].as_ref().unwrap().id, "gpt-5.6-luna");
-        assert_eq!(app.choices[1].as_ref().unwrap().id, "sonnet");
+        assert_eq!(app.choices[1].as_ref().unwrap().id, "opus");
         assert_eq!(app.selected_efforts, [None, None]);
         key(&mut app, KeyCode::Enter);
         assert!(screen(&mut app, 80, 24).contains("availability pending"));
@@ -1601,11 +1683,11 @@ mod tests {
             models: vec![model("claude", "haiku")],
             ..Catalog::default()
         });
-        assert_eq!(app.choices[1].as_ref().unwrap().id, "sonnet");
+        assert_eq!(app.choices[1].as_ref().unwrap().id, "opus");
         let Outcome::Save(selection) = app.save() else {
             panic!("the unverified recommendation should remain saveable")
         };
-        assert_eq!(selection.chosen[0].model.id, "sonnet");
+        assert_eq!(selection.chosen[0].model.id, "opus");
         assert!(app
             .model_text(1, app.choices[1].as_ref().unwrap(), false)
             .contains("unverified"));
@@ -1881,6 +1963,9 @@ mod tests {
     #[test]
     fn no_installation_selected_cannot_continue_or_save() {
         let mut app = App::new(&[], &[]);
+        // A first run opens pre-checked, so clear it to reach the empty state
+        // this guard is about.
+        app.enabled = [false, false];
         key(&mut app, KeyCode::Enter);
         assert_eq!(app.page, Page::Install);
         assert!(matches!(app.save(), Outcome::Continue));
@@ -1895,10 +1980,10 @@ mod tests {
         key(&mut app, KeyCode::Enter);
         app.focus = 1;
         key(&mut app, KeyCode::Enter);
-        type_text(&mut app, "opus");
+        type_text(&mut app, "sonnet");
         key(&mut app, KeyCode::Esc);
         assert_eq!(app.focus, 1);
-        assert_eq!(app.choices[1].as_ref().unwrap().id, "sonnet");
+        assert_eq!(app.choices[1].as_ref().unwrap().id, "opus");
     }
 
     #[test]
@@ -1943,7 +2028,8 @@ mod tests {
             .map(|index| model("codex", &format!("model-{index:02}")))
             .collect();
         app.open_picker(0);
-        app.picker.select(Some(49));
+        // Row zero is the custom entry, so catalog entry 49 sits on row 50.
+        app.picker.select(Some(50));
         assert!(screen(&mut app, 60, 18).contains("❯ codex:model-49"));
     }
 
@@ -1962,7 +2048,7 @@ mod tests {
     fn picker_keeps_focused_result_visible_at_minimum_size() {
         let mut app = app();
         app.open_picker(0);
-        app.picker.select(Some(1));
+        app.picker.select(Some(2));
         assert!(screen(&mut app, 32, 10).contains("❯ claude:sonnet"));
     }
 
@@ -2010,8 +2096,111 @@ mod tests {
         let mut app = App::new(&[], &[]);
         app.unicode = true;
         app.set_catalog(Catalog::default());
+        // Clearing a first run leaves nothing to install and nothing to remove.
+        app.enabled = [false, false];
         assert!(matches!(key(&mut app, KeyCode::Enter), Outcome::Continue));
         assert_eq!(app.message, "Select Codex or Claude Code with Space.");
+    }
+
+    #[test]
+    fn a_first_run_opens_with_both_agents_checked() {
+        let mut app = App::new(&[], &[]);
+        app.unicode = true;
+        app.set_catalog(Catalog::default());
+        assert_eq!(app.enabled, [true, true]);
+        // Pre-checking must not invent an install state: nothing is on disk,
+        // so unchecking an agent is not a removal.
+        assert_eq!(app.installed, [false, false]);
+        assert_eq!(app.removals(), Vec::<String>::new());
+        // Enter goes straight to the models page rather than scolding.
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.page, Page::Models);
+    }
+
+    #[test]
+    fn a_rerun_mirrors_what_is_installed_rather_than_pre_checking() {
+        let app = App::new(&["codex".into()], &[]);
+        assert_eq!(app.enabled, [true, false]);
+        assert_eq!(app.installed, [true, false]);
+    }
+
+    #[test]
+    fn an_installed_run_offers_an_explicit_uninstall_button() {
+        let mut app = app();
+        let installed = screen(&mut app, 100, 32);
+        assert!(installed.contains("Uninstall"));
+        assert!(installed.contains("R uninstall"));
+        // Nothing installed means nothing to remove, so the button is absent.
+        let mut fresh = App::new(&[], &[]);
+        fresh.unicode = true;
+        fresh.set_catalog(Catalog::default());
+        assert!(!screen(&mut fresh, 100, 32).contains("Uninstall"));
+    }
+
+    #[test]
+    fn uninstall_stages_every_installed_agent_and_enter_commits_it() {
+        let mut app = app();
+        key(&mut app, KeyCode::Char('r'));
+        assert_eq!(app.enabled, [false, false]);
+        // Staged, not done: the page still has to be confirmed.
+        let staged = screen(&mut app, 100, 32);
+        assert!(staged.contains("will be removed"));
+        assert!(staged.contains("Remove"));
+        let Outcome::Save(selection) = key(&mut app, KeyCode::Enter) else {
+            panic!("Enter on Remove should commit the removal")
+        };
+        assert!(selection.chosen.is_empty());
+        assert_eq!(selection.removed, vec!["codex".to_owned(), "claude".into()]);
+    }
+
+    #[test]
+    fn the_uninstall_button_is_reachable_by_tabbing() {
+        let mut app = app();
+        app.focus = 2;
+        key(&mut app, KeyCode::Tab);
+        assert_eq!(app.focus, 3);
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.enabled, [false, false]);
+        // With nothing left to stage the page drops back to two buttons.
+        assert_eq!(app.install_stops(), 4);
+        assert_eq!(app.focus, 2);
+    }
+
+    #[test]
+    fn the_custom_model_entry_leads_the_picker() {
+        let mut app = app();
+        app.open_picker(1);
+        // The saved model is still what opens focused, one row below custom.
+        assert_eq!(app.picker.selected(), Some(3));
+        let rendered = screen(&mut app, 80, 24);
+        let custom = rendered.find("Custom model…").expect("custom entry");
+        let first = rendered.find("codex:gpt-5.6-luna").expect("first model");
+        assert!(custom < first, "custom must lead the list: {rendered}");
+        // Filtering lands on a model, never on the escape hatch.
+        type_text(&mut app, "sonnet");
+        assert_eq!(app.picker.selected(), Some(1));
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.choices[1].as_ref().unwrap().id, "sonnet");
+    }
+
+    #[test]
+    fn the_leading_custom_entry_opens_the_custom_form() {
+        let mut app = app();
+        app.open_picker(0);
+        app.picker.select(Some(0));
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.page, Page::Custom);
+    }
+
+    #[test]
+    fn an_empty_filter_result_still_reaches_the_custom_entry() {
+        let mut app = app();
+        app.open_picker(0);
+        type_text(&mut app, "no-such-model");
+        assert!(app.candidates().is_empty());
+        assert_eq!(app.picker.selected(), Some(0));
+        key(&mut app, KeyCode::Enter);
+        assert_eq!(app.page, Page::Custom);
     }
 
     #[test]

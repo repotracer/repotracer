@@ -73,8 +73,10 @@ fn select_provider(cfg: &mut RepoTracerConfig, provider: &str) {
     let changed = cfg.model.backend != format!("{provider}-cli");
     cfg.model.backend = format!("{provider}-cli");
     cfg.model.reasoning_effort = cfg.model.native_reasoning_effort().to_string();
+    // Keep this in step with wizard::recommended_model: a parent with no
+    // profile yet must land on the same scout the wizard would pre-select.
     cfg.model.model = if provider == "claude" {
-        "sonnet"
+        "opus"
     } else {
         "gpt-5.6-luna"
     }
@@ -546,7 +548,7 @@ mod tests {
         assert_ne!(profile(base, "codex"), profile(base, "claude"));
         let mut c = RepoTracerConfig::default();
         select_provider(&mut c, "claude");
-        assert_eq!(c.model.model, "sonnet");
+        assert_eq!(c.model.model, "opus");
         select_provider(&mut c, "codex");
         assert_eq!(c.model.backend, "codex-cli");
     }
