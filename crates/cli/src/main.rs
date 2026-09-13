@@ -1,5 +1,6 @@
 mod adaptive;
 mod agents;
+mod benchmark_assets;
 mod benchmark_ui;
 mod claude;
 mod config;
@@ -138,7 +139,7 @@ enum Commands {
         /// Directory where benchmark configuration, runs, and reports are saved
         #[arg(long)]
         state_dir: Option<PathBuf>,
-        /// Python workflow backend (defaults to tools/benchmarks/workflow.py)
+        /// Python workflow backend override (defaults to bundled scripts)
         #[arg(long)]
         engine: Option<PathBuf>,
     },

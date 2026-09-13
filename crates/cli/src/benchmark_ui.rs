@@ -23,7 +23,7 @@ use ratatui::{
 use serde_json::{json, Map, Value};
 use std::{
     io::{self, IsTerminal},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
     sync::mpsc,
     thread,
@@ -111,12 +111,15 @@ enum EditField {
     Preset,
     RepoTracerBinary,
     RepoTracerSource,
+    ChangedBinary,
+    ChangedSource,
     Acceptance,
+    RateCards,
 }
 
 impl EditField {
     fn multiline(self) -> bool {
-        matches!(self, Self::Prompt)
+        matches!(self, Self::Prompt | Self::RateCards)
     }
 
     fn label(self) -> &'static str {
@@ -134,7 +137,10 @@ impl EditField {
             Self::Preset => "daily manual preset arms",
             Self::RepoTracerBinary => "RepoTracer binary",
             Self::RepoTracerSource => "source path",
+            Self::ChangedBinary => "changed-arm binary",
+            Self::ChangedSource => "changed-arm source path",
             Self::Acceptance => "acceptance command",
+            Self::RateCards => "rate cards JSON",
         }
     }
 }
@@ -287,7 +293,7 @@ impl BackendClient {
     fn call(&self, request: Request) -> Result<Value, String> {
         if !self.engine.is_file() {
             return Err(format!(
-                "Benchmark workflow backend not found at {}. Run from the RepoTracer checkout or pass --engine PATH to workflow.py.",
+                "Benchmark workflow backend not found at {}. Reinstall RepoTracer or pass --engine PATH to a compatible workflow.py.",
                 self.engine.display()
             ));
         }
@@ -321,27 +327,48 @@ impl BackendClient {
                 None,
             ),
         };
-        let mut process = Command::new("python3");
-        process
-            .arg(&self.engine)
-            .arg("--state-dir")
-            .arg(&self.state_dir)
-            .arg(command)
-            .args(args)
-            .stdin(if input.is_some() {
-                Stdio::piped()
-            } else {
-                Stdio::null()
-            })
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let mut child = process.spawn().map_err(|error| {
-            if error.kind() == io::ErrorKind::NotFound {
-                "Python 3.10+ is required for benchmarks. Install `python3` and retry, or pass --engine PATH to workflow.py.".to_owned()
-            } else {
-                format!("Could not start benchmark backend: {error}")
+        let mut child = None;
+        let mut launch_error = None;
+        for (python, python_args) in python_launchers() {
+            let mut process = Command::new(python);
+            process
+                .args(*python_args)
+                .arg(&self.engine)
+                .arg("--state-dir")
+                .arg(&self.state_dir)
+                .arg(command)
+                .args(&args)
+                .stdin(if input.is_some() {
+                    Stdio::piped()
+                } else {
+                    Stdio::null()
+                })
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            if let Ok(binary) = std::env::current_exe() {
+                process.env("REPOTRACER_BENCH_BINARY", binary);
             }
-        })?;
+            match process.spawn() {
+                Ok(process) => {
+                    child = Some(process);
+                    break;
+                }
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                    launch_error = Some(error);
+                }
+                Err(error) => {
+                    return Err(format!("Could not start benchmark backend: {error}"));
+                }
+            }
+        }
+        let Some(mut child) = child else {
+            let detail = launch_error
+                .map(|error| format!(" ({error})"))
+                .unwrap_or_default();
+            return Err(format!(
+                "Python 3.10+ is required for benchmarks. Install it and make `python3` or `python` available on PATH{detail}."
+            ));
+        };
         if let Some(input) = input {
             if let Some(mut stdin) = child.stdin.take() {
                 use std::io::Write;
@@ -377,19 +404,14 @@ impl BackendClient {
     }
 }
 
-fn default_engine() -> PathBuf {
-    let relative = Path::new("tools/benchmarks/workflow.py");
-    let mut directory = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    loop {
-        let candidate = directory.join(relative);
-        if candidate.is_file() {
-            return candidate;
-        }
-        if !directory.pop() {
-            break;
-        }
-    }
-    relative.to_path_buf()
+#[cfg(windows)]
+fn python_launchers() -> &'static [(&'static str, &'static [&'static str])] {
+    &[("py", &["-3"]), ("python3", &[]), ("python", &[])]
+}
+
+#[cfg(not(windows))]
+fn python_launchers() -> &'static [(&'static str, &'static [&'static str])] {
+    &[("python3", &[]), ("python", &[])]
 }
 
 fn default_state_dir() -> PathBuf {
@@ -475,6 +497,60 @@ fn set_nested_text(config: &mut Value, parent: &str, key: &str, value: String) {
         .insert(key.to_owned(), Value::String(value));
 }
 
+fn arm_text(config: &Value, arm_name: &str, key: &str) -> String {
+    array(config, "arms")
+        .into_iter()
+        .find(|arm| text(arm, "name") == arm_name)
+        .map(|arm| text(arm, key))
+        .unwrap_or_default()
+}
+
+fn set_arm_text(config: &mut Value, arm_name: &str, key: &str, value: String) {
+    if let Some(arm) = config_array_mut(config, "arms")
+        .iter_mut()
+        .find(|arm| text(arm, "name") == arm_name)
+    {
+        arm[key] = Value::String(value);
+    }
+}
+
+fn parse_rate_cards(value: &str) -> Result<Value, String> {
+    let parsed: Value = serde_json::from_str(value)
+        .map_err(|error| format!("Rate cards must be valid JSON: {error}"))?;
+    let cards = parsed
+        .as_object()
+        .ok_or_else(|| "Rate cards must be a JSON object.".to_owned())?;
+    for (name, card) in cards {
+        if name.trim().is_empty() {
+            return Err("Rate card names cannot be empty.".into());
+        }
+        let card = card
+            .as_object()
+            .ok_or_else(|| format!("Rate card {name:?} must be an object."))?;
+        for field in ["model", "source"] {
+            if !card
+                .get(field)
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.trim().is_empty())
+            {
+                return Err(format!("Rate card {name:?} needs a non-empty {field}."));
+            }
+        }
+        for field in ["uncached_input", "cache_read", "cache_write", "output"] {
+            if !card
+                .get(field)
+                .and_then(Value::as_f64)
+                .is_some_and(|value| value.is_finite() && value >= 0.0)
+            {
+                return Err(format!(
+                    "Rate card {name:?} needs a non-negative numeric {field} rate."
+                ));
+            }
+        }
+    }
+    Ok(parsed)
+}
+
 struct App {
     page: Page,
     config: Value,
@@ -488,10 +564,12 @@ struct App {
     editor: Option<TextEditor>,
     selected_run: usize,
     selected_investigation: usize,
-    confirm_apply: bool,
+    selected_result: usize,
+    confirm_apply: Option<ApplyTarget>,
     pending_start: bool,
     message: String,
     loading: bool,
+    config_loaded: bool,
     receiver: mpsc::Receiver<BackendMessage>,
     busy: bool,
     sender: mpsc::Sender<BackendMessage>,
@@ -499,6 +577,13 @@ struct App {
     last_poll: Instant,
     unicode: bool,
     color: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ApplyTarget {
+    run: String,
+    task: String,
+    group: String,
 }
 
 impl App {
@@ -520,10 +605,12 @@ impl App {
             editor: None,
             selected_run: 0,
             selected_investigation: 0,
-            confirm_apply: false,
+            selected_result: 0,
+            confirm_apply: None,
             pending_start: false,
             message: String::new(),
             loading: true,
+            config_loaded: false,
             receiver,
             busy: false,
             sender,
@@ -554,7 +641,7 @@ impl App {
             self.investigations = self
                 .result_rows()
                 .into_iter()
-                .filter(|result| is_loss(result))
+                .filter(is_loss)
                 .map(|result| {
                     json!({
                         "run_id": text(&result, "run_id"),
@@ -567,11 +654,15 @@ impl App {
                 .collect();
         }
         self.loading = false;
+        self.config_loaded = true;
         self.selected = self.selected.min(self.task_count().saturating_sub(1));
         self.selected_run = self.selected_run.min(self.runs.len().saturating_sub(1));
         self.selected_investigation = self
             .selected_investigation
             .min(self.investigations.len().saturating_sub(1));
+        self.selected_result = self
+            .selected_result
+            .min(self.result_rows().len().saturating_sub(1));
     }
 
     fn poll_backend(&mut self) {
@@ -759,9 +850,12 @@ impl App {
             EditField::Seed => self
                 .config
                 .get("seed")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .into(),
+                .map(|seed| match seed {
+                    Value::String(value) => value.clone(),
+                    Value::Number(value) => value.to_string(),
+                    _ => String::new(),
+                })
+                .unwrap_or_default(),
             EditField::Preset => self
                 .config
                 .get("presets")
@@ -780,7 +874,15 @@ impl App {
             EditField::RepoTracerSource => {
                 nested_text(&self.config, "repotracer", "source_path", "")
             }
+            EditField::ChangedBinary => arm_text(&self.config, "changed", "binary"),
+            EditField::ChangedSource => arm_text(&self.config, "changed", "source_path"),
             EditField::Acceptance => nested_text(&self.config, "acceptance", "command", ""),
+            EditField::RateCards => serde_json::to_string_pretty(
+                self.config
+                    .get("rate_cards")
+                    .unwrap_or(&Value::Object(Map::new())),
+            )
+            .unwrap_or_else(|_| "{}".into()),
         };
         self.edit = Some(field);
         self.editor = Some(TextEditor::new(&value));
@@ -877,9 +979,21 @@ impl App {
             EditField::RepoTracerSource => {
                 set_nested_text(&mut self.config, "repotracer", "source_path", value)
             }
+            EditField::ChangedBinary => set_arm_text(&mut self.config, "changed", "binary", value),
+            EditField::ChangedSource => {
+                set_arm_text(&mut self.config, "changed", "source_path", value)
+            }
             EditField::Acceptance => {
                 set_nested_text(&mut self.config, "acceptance", "command", value)
             }
+            EditField::RateCards => match parse_rate_cards(&value) {
+                Ok(cards) => {
+                    if let Some(root) = self.config.as_object_mut() {
+                        root.insert("rate_cards".into(), cards);
+                    }
+                }
+                Err(error) => self.message = error,
+            },
             _ => {}
         }
     }
@@ -932,6 +1046,11 @@ impl App {
     }
 
     fn save(&mut self) {
+        if !self.config_loaded {
+            self.message =
+                "Wait for the saved benchmark configuration to load before saving.".into();
+            return;
+        }
         self.submit_request(Request::Save(self.config.clone()));
     }
 
@@ -956,10 +1075,10 @@ impl App {
         if self.edit.is_some() {
             return self.handle_editor(key);
         }
-        if self.confirm_apply {
+        if self.confirm_apply.is_some() {
             match key.code {
-                KeyCode::Enter => self.apply_investigation(),
-                KeyCode::Esc => self.confirm_apply = false,
+                KeyCode::Enter => self.apply_confirmed(),
+                KeyCode::Esc => self.confirm_apply = None,
                 _ => {}
             }
             return true;
@@ -967,12 +1086,12 @@ impl App {
         self.message.clear();
         match key.code {
             KeyCode::Char('q') | KeyCode::Char('Q') => return false,
-            KeyCode::Char('1') => self.page = Page::Config,
-            KeyCode::Char('2') => self.page = Page::Models,
-            KeyCode::Char('3') => self.page = Page::Run,
-            KeyCode::Char('4') => self.page = Page::Results,
-            KeyCode::Char('5') => self.page = Page::Investigations,
-            KeyCode::Char('6') => self.page = Page::History,
+            KeyCode::Char('1') => self.show_page(Page::Config),
+            KeyCode::Char('2') => self.show_page(Page::Models),
+            KeyCode::Char('3') => self.show_page(Page::Run),
+            KeyCode::Char('4') => self.show_page(Page::Results),
+            KeyCode::Char('5') => self.show_page(Page::Investigations),
+            KeyCode::Char('6') => self.show_page(Page::History),
             KeyCode::Esc if self.page != Page::Config => {
                 self.page = Page::Config;
                 self.selected = self.task;
@@ -1040,7 +1159,9 @@ impl App {
             KeyCode::Char('i') | KeyCode::Enter if self.page == Page::Investigations => {
                 self.investigate()
             }
-            KeyCode::Char('a') if self.page == Page::Investigations => self.confirm_apply = true,
+            KeyCode::Char('a') if matches!(self.page, Page::Results | Page::Investigations) => {
+                self.begin_apply()
+            }
             KeyCode::Char('<') if self.page == Page::Models => self.arm = 0,
             KeyCode::Char('>') if self.page == Page::Models => self.arm = 1,
             _ => {}
@@ -1073,20 +1194,11 @@ impl App {
     fn move_selection(&mut self, down: bool) {
         let count = match self.page {
             Page::Config => self.task_count(),
-            Page::Task => {
-                if self
-                    .selected_task()
-                    .is_some_and(|task| text(task, "origin") == "external")
-                {
-                    4
-                } else {
-                    4
-                }
-            }
-            Page::Models => 9,
+            Page::Task => 4,
+            Page::Models => 12,
             Page::Run => self.runs.len(),
             Page::Investigations => self.investigations.len(),
-            Page::Results => self.results.len(),
+            Page::Results => self.result_rows().len(),
             Page::History => self.runs.len(),
         };
         if count == 0 {
@@ -1102,8 +1214,20 @@ impl App {
             Page::Config => self.task = self.selected,
             Page::Run | Page::History => self.selected_run = self.selected,
             Page::Investigations => self.selected_investigation = self.selected,
+            Page::Results => self.selected_result = self.selected,
             _ => {}
         }
+    }
+
+    fn show_page(&mut self, page: Page) {
+        self.page = page;
+        self.selected = match page {
+            Page::Config | Page::Task => self.task,
+            Page::Run | Page::History => self.selected_run,
+            Page::Results => self.selected_result,
+            Page::Investigations => self.selected_investigation,
+            Page::Models => 0,
+        };
     }
 
     fn next_page(&mut self) {
@@ -1117,6 +1241,13 @@ impl App {
             Page::Task => Page::Config,
         };
         self.selected = 0;
+        match self.page {
+            Page::Config => self.task = 0,
+            Page::Run | Page::History => self.selected_run = 0,
+            Page::Results => self.selected_result = 0,
+            Page::Investigations => self.selected_investigation = 0,
+            _ => {}
+        }
     }
 
     fn edit_task_enter(&mut self) {
@@ -1151,13 +1282,21 @@ impl App {
             4 => EditField::Seed,
             5 => EditField::RepoTracerBinary,
             6 => EditField::RepoTracerSource,
-            7 => EditField::Acceptance,
+            7 => EditField::ChangedBinary,
+            8 => EditField::ChangedSource,
+            9 => EditField::Acceptance,
+            10 => EditField::RateCards,
             _ => EditField::Preset,
         };
         self.start_edit(field);
     }
 
     fn start_run(&mut self) {
+        if !self.config_loaded {
+            self.message =
+                "Wait for the saved benchmark configuration to load before starting a run.".into();
+            return;
+        }
         if self.busy {
             self.message =
                 "Benchmark backend is still working; wait for it before starting a run.".into();
@@ -1184,34 +1323,83 @@ impl App {
         self.submit_request(Request::Investigate { run, task, group });
     }
 
-    fn apply_investigation(&mut self) {
-        self.confirm_apply = false;
-        let Some(row) = self.selected_investigation() else {
+    fn selected_result_row(&self) -> Option<Value> {
+        self.result_rows().get(self.selected_result).cloned()
+    }
+
+    fn saved_task(&self, run_id: &str, task_id: &str) -> Option<&Value> {
+        let run = self.runs.iter().find(|run| text(run, "id") == run_id)?;
+        run.get("selected_tasks")
+            .and_then(Value::as_array)
+            .or_else(|| {
+                run.get("config")
+                    .and_then(|config| config.get("tasks"))
+                    .and_then(Value::as_array)
+            })
+            .or_else(|| run.get("tasks").and_then(Value::as_array))?
+            .iter()
+            .find(|task| text(task, "id") == task_id)
+    }
+
+    fn begin_apply(&mut self) {
+        let row = match self.page {
+            Page::Results => self.selected_result_row(),
+            Page::Investigations => self.selected_investigation().cloned(),
+            _ => None,
+        };
+        let Some(row) = row else {
+            self.message = "No candidate is selected.".into();
             return;
         };
-        let run = text(row, "run_id");
-        let task = text(row, "task_id");
-        let group = text(row, "group");
-        if run.is_empty() || task.is_empty() || group.is_empty() {
+        if self.page == Page::Results && !is_win(&row) {
+            self.message = "Select a completed winning comparison before applying it.".into();
+            return;
+        }
+        let target = ApplyTarget {
+            run: text(&row, "run_id"),
+            task: text_or(&row, "task_id", "task"),
+            group: text(&row, "group"),
+        };
+        if target.run.is_empty() || target.task.is_empty() || target.group.is_empty() {
             self.message = "This candidate cannot be applied without its run identity.".into();
             return;
         }
-        let selected_task = self
-            .tasks()
-            .into_iter()
-            .find(|item| text(item, "id") == task);
-        let is_custom = selected_task.is_some_and(|item| text(item, "origin") == "custom");
-        if !is_custom {
+        let Some(saved_task) = self.saved_task(&target.run, &target.task) else {
+            self.message =
+                "The saved run does not contain permission metadata for this task.".into();
+            return;
+        };
+        if text(saved_task, "origin") != "custom" {
             self.message =
                 "Only custom tasks may apply a candidate; external tasks stay immutable.".into();
             return;
         }
-        if !selected_task.is_some_and(|item| bool_value(item, "apply_allowed")) {
+        if !bool_value(saved_task, "apply_allowed") {
             self.message =
-                "Enable apply for this custom task first; applying always requires an explicit choice.".into();
+                "This saved run did not authorize applying the selected custom task.".into();
             return;
         }
-        self.submit_request(Request::Apply { run, task, group });
+        self.confirm_apply = Some(target);
+    }
+
+    fn apply_confirmed(&mut self) {
+        let Some(target) = self.confirm_apply.take() else {
+            return;
+        };
+        let Some(saved_task) = self.saved_task(&target.run, &target.task) else {
+            self.message =
+                "The saved run no longer contains permission metadata for this task.".into();
+            return;
+        };
+        if text(saved_task, "origin") != "custom" || !bool_value(saved_task, "apply_allowed") {
+            self.message = "The saved run does not authorize applying this candidate.".into();
+            return;
+        }
+        self.submit_request(Request::Apply {
+            run: target.run,
+            task: target.task,
+            group: target.group,
+        });
     }
 
     fn theme(&self) -> Theme {
@@ -1277,7 +1465,7 @@ impl App {
             Page::Investigations => self.draw_investigations(frame, inner, &theme),
             Page::History => self.draw_history(frame, inner, &theme),
         }
-        let footer = if self.confirm_apply {
+        let footer = if self.confirm_apply.is_some() {
             "Apply this custom-task candidate to the working checkout? Enter confirms · Esc cancels"
         } else if !self.message.is_empty() {
             &self.message
@@ -1287,7 +1475,7 @@ impl App {
         frame.render_widget(
             Paragraph::new(Span::styled(
                 footer,
-                if self.confirm_apply {
+                if self.confirm_apply.is_some() {
                     theme.warn()
                 } else {
                     theme.dim()
@@ -1650,8 +1838,12 @@ impl App {
                 "seed             {}",
                 self.config
                     .get("seed")
-                    .and_then(Value::as_str)
-                    .unwrap_or("manual")
+                    .map(|seed| match seed {
+                        Value::String(value) if !value.is_empty() => value.clone(),
+                        Value::Number(value) => value.to_string(),
+                        _ => "(loading)".into(),
+                    })
+                    .unwrap_or_else(|| "(loading)".into())
             ),
             format!(
                 "RepoTracer binary {}",
@@ -1661,9 +1853,32 @@ impl App {
                 "source path      {}",
                 nested_text(&self.config, "repotracer", "source_path", "(working tree)")
             ),
+            format!("changed binary   {}", {
+                let value = arm_text(&self.config, "changed", "binary");
+                if value.is_empty() {
+                    "(unset)".into()
+                } else {
+                    value
+                }
+            }),
+            format!("changed source   {}", {
+                let value = arm_text(&self.config, "changed", "source_path");
+                if value.is_empty() {
+                    "(unset)".into()
+                } else {
+                    value
+                }
+            }),
             format!(
                 "acceptance       {}",
                 nested_text(&self.config, "acceptance", "command", "(none)")
+            ),
+            format!(
+                "rate cards       {} configured",
+                self.config
+                    .get("rate_cards")
+                    .and_then(Value::as_object)
+                    .map_or(0, Map::len)
             ),
             "preset            daily · manual start only".into(),
         ];
@@ -1771,26 +1986,15 @@ impl App {
             return;
         }
         let mut lines = vec![Line::from(Span::styled(
-            "group             cost       time       tokens       quality / tests",
+            "  group             cost       time       tokens       quality / tests",
             theme.bold(),
         ))];
-        for result in &result_rows {
+        for (index, result) in result_rows.iter().enumerate() {
             let tokens = result
                 .get("tokens")
                 .map(format_tokens)
                 .unwrap_or_else(|| "tokens ?".into());
-            let quality = result
-                .get("quality")
-                .and_then(Value::as_str)
-                .or_else(|| result.get("grade").and_then(Value::as_str))
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    result
-                        .get("quality_delta")
-                        .and_then(Value::as_f64)
-                        .map(|value| format!("delta {value:+.1}"))
-                })
-                .unwrap_or_else(|| "quality ?".into());
+            let quality = format_quality(result);
             let tests = result
                 .get("tests")
                 .map(format_tests)
@@ -1803,21 +2007,33 @@ impl App {
             } else {
                 ""
             };
-            lines.push(Line::from(format!(
-                "{:<17} {:<10} {:<10} {:<12} {} / {}{}",
-                text(result, "group"),
-                result
-                    .get("cost_usd")
-                    .map(format_number)
-                    .unwrap_or_else(|| "cost ?".into()),
-                result
-                    .get("seconds")
-                    .map(format_number)
-                    .unwrap_or_else(|| "time ?".into()),
-                tokens,
-                quality,
-                tests,
-                incomplete
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "{}{:<17} {:<10} {:<10} {:<12} {} / {}{}",
+                    if index == self.selected_result {
+                        theme.pointer()
+                    } else {
+                        " "
+                    },
+                    text(result, "group"),
+                    result
+                        .get("cost_usd")
+                        .map(format_number)
+                        .unwrap_or_else(|| "cost ?".into()),
+                    result
+                        .get("seconds")
+                        .map(format_number)
+                        .unwrap_or_else(|| "time ?".into()),
+                    tokens,
+                    quality,
+                    tests,
+                    incomplete
+                ),
+                if index == self.selected_result {
+                    theme.highlight()
+                } else {
+                    theme.plain()
+                },
             )));
         }
         let mut run_ids = Vec::new();
@@ -1952,7 +2168,7 @@ impl App {
             Page::Task => "↑↓ fields · Enter edit · p project · m parent · Esc back",
             Page::Models => "↑↓ field · Enter edit · </> Codex/Claude · s save · r start · Tab next",
             Page::Run => "↑↓ run · Tab next · jobs continue when you navigate or quit",
-            Page::Results => "↑↓ scroll · Tab next · incomplete usage stays marked",
+            Page::Results => "↑↓ candidate · a then Enter apply winning custom candidate · Tab next",
             Page::Investigations => "↑↓ comparison · Enter investigate · a then Enter apply custom candidate · Tab next",
             Page::History => "↑↓ run · Tab next · q quit; detached jobs are never cancelled",
         }
@@ -1962,7 +2178,7 @@ impl App {
 fn default_config() -> Value {
     json!({
         "schema_version": 1,
-        "seed": "",
+        "seed": 0,
         "tasks": [
             {"id":"custom-1","origin":"custom","project_path":".","prompt":"","apply_allowed":false,"parent":"codex"},
             {"id":"custom-2","origin":"custom","project_path":".","prompt":"","apply_allowed":false,"parent":"codex"},
@@ -1980,6 +2196,7 @@ fn default_config() -> Value {
         },
         "repotracer":{"binary":"","source_path":""},
         "acceptance":{"command":""},
+        "rate_cards":{},
         "presets":[{"name":"daily","schedule":"manual","arms":["baseline","current"]}]
     })
 }
@@ -2029,12 +2246,62 @@ fn format_tests(value: &Value) -> String {
         .unwrap_or_else(|| "tests ?".into())
 }
 
+fn format_quality(value: &Value) -> String {
+    for key in ["quality", "grade"] {
+        let Some(candidate) = value.get(key) else {
+            continue;
+        };
+        if let Some(label) = candidate.as_str() {
+            return label.to_owned();
+        }
+        if let Some(score) = candidate.as_f64() {
+            return format!("grade {score:.1}");
+        }
+        if let Some(score) = candidate.get("score").and_then(Value::as_f64) {
+            return format!("grade {score:.1}");
+        }
+    }
+    value
+        .get("quality_delta")
+        .and_then(Value::as_f64)
+        .map(|value| format!("delta {value:+.1}"))
+        .unwrap_or_else(|| "quality ?".into())
+}
+
 fn is_loss(value: &Value) -> bool {
     value
         .get("diagnosis_required")
         .and_then(Value::as_array)
         .is_some_and(|values| !values.is_empty())
         || bool_value(value, "diagnosis_required")
+}
+
+fn is_win(value: &Value) -> bool {
+    if bool_value(value, "winner") {
+        return true;
+    }
+    if value
+        .get("excluded")
+        .and_then(Value::as_array)
+        .is_some_and(|reasons| !reasons.is_empty())
+        || is_loss(value)
+        || value
+            .get("state")
+            .and_then(Value::as_str)
+            .is_some_and(|state| state != "completed")
+    {
+        return false;
+    }
+    value
+        .get("quality_delta")
+        .and_then(Value::as_f64)
+        .is_some_and(|delta| delta > 0.0)
+        || ["cost_ratio", "time_ratio"].iter().any(|key| {
+            value
+                .get(*key)
+                .and_then(Value::as_f64)
+                .is_some_and(|ratio| ratio < 1.0)
+        })
 }
 
 fn truncate(value: &str, max: usize) -> String {
@@ -2087,7 +2354,10 @@ pub fn run(options: BenchmarkOptions) -> Result<()> {
         return Err(anyhow!("benchmarks is interactive and requires a terminal; use tools/benchmarks/workflow.py directly for redirected or automated runs"));
     }
     let client = BackendClient {
-        engine: options.engine.unwrap_or_else(default_engine),
+        engine: match options.engine {
+            Some(engine) => engine,
+            None => crate::benchmark_assets::install()?,
+        },
         state_dir: options.state_dir.unwrap_or_else(default_state_dir),
     };
     let session = TerminalSession::enter().context("enter benchmark terminal")?;
@@ -2133,6 +2403,7 @@ mod tests {
         );
         app.config = default_config();
         app.loading = false;
+        app.config_loaded = true;
         app.unicode = false;
         app
     }
@@ -2198,5 +2469,119 @@ mod tests {
         app.start_edit(EditField::Prompt);
         app.finish_edit();
         assert!(app.message.contains("dataset"));
+    }
+
+    #[test]
+    fn placeholder_config_cannot_overwrite_saved_config_before_init() {
+        let mut app = app();
+        app.config_loaded = false;
+        app.save();
+        assert!(!app.busy);
+        assert!(app.message.contains("configuration to load"));
+        assert_eq!(app.config["seed"], json!(0));
+    }
+
+    #[test]
+    fn snapshot_keeps_backend_seed() {
+        let mut app = app();
+        app.config_loaded = false;
+        app.apply_snapshot(json!({
+            "config": {"schema_version": 1, "seed": 4242, "tasks": [], "arms": []},
+            "runs": [],
+            "investigations": [],
+            "results": []
+        }));
+        assert!(app.config_loaded);
+        assert_eq!(app.config["seed"], json!(4242));
+    }
+
+    #[test]
+    fn zero_grade_is_visible() {
+        assert_eq!(format_quality(&json!({"grade": {"score": 0}})), "grade 0.0");
+        assert_eq!(format_quality(&json!({"quality_delta": 0})), "delta +0.0");
+    }
+
+    #[test]
+    fn result_apply_uses_saved_run_permission() {
+        let mut app = app();
+        app.page = Page::Results;
+        app.runs = vec![json!({
+            "id": "run-1",
+            "tasks": [{"id":"custom-1", "origin":"custom", "apply_allowed":true}]
+        })];
+        app.results = vec![json!({"pairs": [{
+            "run_id":"run-1", "task":"custom-1", "group":"current",
+            "state":"completed", "quality_delta":1
+        }]})];
+        assert!(!bool_value(app.tasks()[0], "apply_allowed"));
+        app.begin_apply();
+        assert_eq!(
+            app.confirm_apply,
+            Some(ApplyTarget {
+                run: "run-1".into(),
+                task: "custom-1".into(),
+                group: "current".into()
+            })
+        );
+    }
+
+    #[test]
+    fn current_config_cannot_enable_apply_for_an_old_run() {
+        let mut app = app();
+        app.page = Page::Results;
+        app.config["tasks"][0]["apply_allowed"] = Value::Bool(true);
+        app.runs = vec![json!({
+            "id": "run-1",
+            "tasks": [{"id":"custom-1", "origin":"custom", "apply_allowed":false}]
+        })];
+        app.results = vec![json!({"pairs": [{
+            "run_id":"run-1", "task":"custom-1", "group":"current",
+            "state":"completed", "quality_delta":1
+        }]})];
+        app.begin_apply();
+        assert!(app.confirm_apply.is_none());
+        assert!(app.message.contains("saved run did not authorize"));
+    }
+
+    #[test]
+    fn rate_cards_require_the_pricing_shape() {
+        let valid = r#"{
+            "gpt": {
+                "model": "gpt-5.6-sol", "source": "vendor pricing",
+                "uncached_input": 1.0, "cache_read": 0.1,
+                "cache_write": 0, "output": 5
+            }
+        }"#;
+        assert!(parse_rate_cards(valid).is_ok());
+        assert!(parse_rate_cards("[]").unwrap_err().contains("JSON object"));
+        assert!(parse_rate_cards(r#"{"gpt":{"model":"gpt"}}"#)
+            .unwrap_err()
+            .contains("source"));
+    }
+
+    #[test]
+    fn invalid_rate_card_edit_does_not_replace_config() {
+        let mut app = app();
+        app.config["rate_cards"] = json!({"kept": {
+            "model": "gpt", "source": "source", "uncached_input": 1,
+            "cache_read": 1, "cache_write": 1, "output": 1
+        }});
+        app.edit = Some(EditField::RateCards);
+        app.editor = Some(TextEditor::new(r#"{"broken": []}"#));
+        app.finish_edit();
+        assert!(app.config["rate_cards"].get("kept").is_some());
+        assert!(app.message.contains("must be an object"));
+    }
+
+    #[test]
+    fn changed_arm_paths_are_editable() {
+        let mut app = app();
+        app.edit = Some(EditField::ChangedBinary);
+        app.editor = Some(TextEditor::new("/tmp/repotracer-next"));
+        app.finish_edit();
+        assert_eq!(
+            arm_text(&app.config, "changed", "binary"),
+            "/tmp/repotracer-next"
+        );
     }
 }
