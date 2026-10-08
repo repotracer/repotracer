@@ -4,6 +4,12 @@ This file records behavior at the time each release shipped. Older entries can d
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-10-08
+
+### Fixed
+
+- Setup lists Claude Code models with their versions, such as `claude:opus — Opus 5.5 (claude-opus-5-5)`, instead of bare aliases. The list comes from the installed Claude Code CLI, including pinned older models it offers. CLIs that do not report a model list still fall back to the `/model` aliases.
+
 ## [2.1.1] - 2026-09-13
 
 ### Added
@@ -26,7 +32,8 @@ This file records behavior at the time each release shipped. Older entries can d
 
 - Setup and update migrate the old `explorer.max_turns = 6` setting to `0`, including installed Codex and Claude profiles, so investigations can finish their reports. Other turn limits are preserved, and migrated files retain a backup. ([#21](https://github.com/repotracer/repotracer/pull/21))
 
-[Unreleased]: https://github.com/repotracer/repotracer/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/repotracer/repotracer/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/repotracer/repotracer/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/repotracer/repotracer/compare/v2.1.0...v2.1.1
 
 ## 2.1.0 — 2026-09-13
