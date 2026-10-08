@@ -454,13 +454,20 @@ async fn discover_async(providers: &[String]) -> Catalog {
             catalog.warnings.push(auth_warning("Claude Code", auth));
         } else {
             match discover_claude(&claude).await {
-                Ok(models) => {
+                Ok((models, efforts)) => {
+                    catalog.reasoning_efforts.extend(
+                        efforts
+                            .into_iter()
+                            .map(|(id, levels)| (model_key("claude", &id), levels)),
+                    );
                     for model in &models {
+                        let key = model_key("claude", &model.id);
+                        if catalog.reasoning_efforts.contains_key(&key) {
+                            continue;
+                        }
                         if let Ok(Some(levels)) = discover_claude_efforts(&claude, &model.id).await
                         {
-                            catalog
-                                .reasoning_efforts
-                                .insert(model_key("claude", &model.id), levels);
+                            catalog.reasoning_efforts.insert(key, levels);
                         }
                     }
                     catalog.models.extend(models);
@@ -611,10 +618,20 @@ fn claude_executable() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("claude"))
 }
 
-fn claude_choice(id: String) -> ModelChoice {
+/// Build a Claude choice. `display_name` and `resolved` come from the CLI's
+/// own model list ("Opus 5.5", `claude-opus-5-5`), so an alias such as `opus`
+/// is shown with the version it currently points to.
+fn claude_choice(id: String, display_name: Option<&str>, resolved: Option<&str>) -> ModelChoice {
+    let resolved = resolved.filter(|resolved| *resolved != id);
+    let label = match (display_name, resolved) {
+        (Some(name), Some(resolved)) => format!("{name} ({resolved})"),
+        (Some(name), None) => name.to_owned(),
+        (None, Some(resolved)) => resolved.to_owned(),
+        (None, None) => format!("Claude Code — {id}"),
+    };
     ModelChoice {
         provider: "claude".into(),
-        label: format!("Claude Code — {id}"),
+        label,
         id,
     }
 }
@@ -924,6 +941,15 @@ async fn discover_claude_efforts_for(
     if direct_api_credential.is_some() {
         return Ok(None);
     }
+    let response = probe_claude_initialize(executable, Some(model)).await?;
+    Ok(parse_claude_initialize_efforts(&response, model))
+}
+
+/// Send Claude Code's stream-json `initialize` request and return the
+/// response. The response lists every model the installed CLI offers this
+/// account, with display names, resolved IDs, and effort levels. No user
+/// message is sent, so no model request is made.
+async fn probe_claude_initialize(executable: &Path, model: Option<&str>) -> Result<Value> {
     let mut command = Command::new(executable);
     command
         .args([
@@ -935,7 +961,8 @@ async fn discover_claude_efforts_for(
             "--verbose",
         ])
         .args(CLAUDE_READ_ONLY_FLAGS)
-        .args(["--tools", "", "--model", model])
+        .args(["--tools", ""])
+        .args(model.map(|model| ["--model", model]).into_iter().flatten())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         // Keep the CLI's own diagnostics: a renamed or removed flag is
@@ -954,19 +981,16 @@ async fn discover_claude_efforts_for(
         .with_context(|| format!("start `{}`", executable.display()))?;
     let _process_group = ProbeProcessGroup(child.id());
     let mut stderr = StderrTail::drain(child.stderr.take());
-    let result = discover_claude_effort_child(&mut child, model).await;
+    let result = claude_initialize_child(&mut child).await;
     finish_child(&mut child).await;
     match result {
-        Ok(efforts) => Ok(efforts),
+        Ok(response) => Ok(response),
         // Only failures quote stderr; it can carry user paths.
         Err(error) => Err(anyhow!("{error}{}", stderr.diagnostic().await)),
     }
 }
 
-async fn discover_claude_effort_child(
-    child: &mut Child,
-    model: &str,
-) -> Result<Option<Vec<String>>> {
+async fn claude_initialize_child(child: &mut Child) -> Result<Value> {
     let mut stdin = child
         .stdin
         .take()
@@ -988,8 +1012,7 @@ async fn discover_claude_effort_child(
     )
     .await?;
 
-    let response = read_claude_control_response(&mut lines, "probe-init", deadline).await?;
-    Ok(parse_claude_initialize_efforts(&response, model))
+    read_claude_control_response(&mut lines, "probe-init", deadline).await
 }
 
 async fn read_claude_control_response(
@@ -1060,6 +1083,51 @@ fn parse_claude_initialize_efforts(value: &Value, model: &str) -> Option<Vec<Str
     parse_claude_effort_levels(entry)
 }
 
+/// Models and effort levels from an `initialize` response, in the CLI's own
+/// order. Entries without a `value` cannot be passed to `--model` and are
+/// skipped.
+fn parse_claude_initialize_models(
+    value: &Value,
+) -> (Vec<ModelChoice>, BTreeMap<String, Vec<String>>) {
+    let mut models = Vec::new();
+    let mut efforts = BTreeMap::new();
+    let entries = value
+        .get("response")
+        .and_then(|envelope| envelope.get("response"))
+        .and_then(|response| response.get("models"))
+        .and_then(Value::as_array);
+    let mut seen = HashSet::new();
+    for entry in entries.into_iter().flatten() {
+        let Some(id) = entry
+            .get("value")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+        else {
+            continue;
+        };
+        if !seen.insert(id.to_owned()) {
+            continue;
+        }
+        let text = |field: &str| {
+            entry
+                .get(field)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+        };
+        if let Some(levels) = parse_claude_effort_levels(entry) {
+            efforts.insert(id.to_owned(), levels);
+        }
+        models.push(claude_choice(
+            id.to_owned(),
+            text("displayName"),
+            text("resolvedModel"),
+        ));
+    }
+    (models, efforts)
+}
+
 fn parse_claude_effort_levels(entry: &Value) -> Option<Vec<String>> {
     if entry.get("supportsEffort").and_then(Value::as_bool) == Some(false) {
         return None;
@@ -1079,11 +1147,17 @@ fn parse_claude_effort_levels(entry: &Value) -> Option<Vec<String>> {
     (!efforts.is_empty()).then_some(efforts)
 }
 
-async fn discover_claude(executable: &PathBuf) -> Result<Vec<ModelChoice>> {
+type ClaudeCatalog = (Vec<ModelChoice>, BTreeMap<String, Vec<String>>);
+
+async fn discover_claude(executable: &PathBuf) -> Result<ClaudeCatalog> {
     discover_claude_for(executable, claude_api_configuration_reason()).await
 }
 
-/// Ask Claude Code's model picker which models this account may select.
+/// Ask the installed Claude Code which models this account may select.
+///
+/// The `initialize` model list carries versioned display names ("Opus 5.5")
+/// and effort levels. The `/model` text only lists aliases, so it is used
+/// only when the CLI does not answer `initialize`.
 ///
 /// `direct_api_credential` is threaded in for the same reason as in
 /// [`discover_claude_efforts_for`]: the decision is a parameter, not an
@@ -1091,10 +1165,22 @@ async fn discover_claude(executable: &PathBuf) -> Result<Vec<ModelChoice>> {
 async fn discover_claude_for(
     executable: &PathBuf,
     direct_api_credential: Option<&str>,
-) -> Result<Vec<ModelChoice>> {
+) -> Result<ClaudeCatalog> {
     if let Some(reason) = direct_api_credential {
         bail!("{reason}");
     }
+    if let Ok(response) = probe_claude_initialize(executable, None).await {
+        let catalog = parse_claude_initialize_models(&response);
+        if !catalog.0.is_empty() {
+            return Ok(catalog);
+        }
+    }
+    Ok((discover_claude_picker(executable).await?, BTreeMap::new()))
+}
+
+/// Fallback for CLIs without an `initialize` model list: parse the
+/// `Available:` line of `/model`.
+async fn discover_claude_picker(executable: &PathBuf) -> Result<Vec<ModelChoice>> {
     let mut command = Command::new(executable);
     command
         .args(["--print", "--output-format", "json"])
@@ -1209,7 +1295,7 @@ fn parse_claude_output(text: &str) -> Vec<ModelChoice> {
         });
         let Some(id) = id else { continue };
         if seen.insert(id.clone()) {
-            choices.push(claude_choice(id));
+            choices.push(claude_choice(id, None, None));
         }
     }
     choices
@@ -1539,6 +1625,76 @@ mod tests {
     }
 
     #[test]
+    fn claude_initialize_catalog_keeps_versioned_names() {
+        let response = json!({
+            "type": "control_response",
+            "response": {
+                "subtype": "success",
+                "request_id": "probe-init",
+                "response": {
+                    "models": [
+                        {
+                            "value": "opus",
+                            "resolvedModel": "claude-opus-5-5",
+                            "displayName": "Opus 5.5",
+                            "supportedEffortLevels": ["low", "medium", "high"]
+                        },
+                        {
+                            "value": "claude-haiku-4-5-20251001",
+                            "resolvedModel": "claude-haiku-4-5-20251001",
+                            "displayName": "Haiku 4.5"
+                        },
+                        { "displayName": "No value" },
+                        { "value": "opus", "displayName": "Duplicate" }
+                    ]
+                }
+            }
+        });
+        let (models, efforts) = parse_claude_initialize_models(&response);
+        let rows: Vec<_> = models
+            .iter()
+            .map(|model| (model.id.as_str(), model.label.as_str()))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("opus", "Opus 5.5 (claude-opus-5-5)"),
+                ("claude-haiku-4-5-20251001", "Haiku 4.5"),
+            ]
+        );
+        assert_eq!(efforts.len(), 1);
+        assert_eq!(efforts["opus"], ["low", "medium", "high"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fake_claude_catalog_prefers_initialize_model_list() {
+        let directory = tempfile::tempdir().unwrap();
+        let executable = directory.path().join("claude-fake-init");
+        write_executable_fixture(
+            &executable,
+            r##"#!/bin/sh
+case " $* " in
+  *" --model "*) exit 2 ;;
+esac
+IFS= read -r request || exit 3
+printf '%s\n' '{"type":"control_response","response":{"subtype":"success","request_id":"probe-init","response":{"models":[{"value":"sonnet","resolvedModel":"claude-sonnet-5-5","displayName":"Sonnet 5.5","supportedEffortLevels":["low","high"]}]}}}'
+"##,
+        );
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let (models, efforts) = runtime
+            .block_on(discover_claude_for(&executable, None))
+            .expect("initialize catalog should succeed");
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].id, "sonnet");
+        assert_eq!(models[0].label, "Sonnet 5.5 (claude-sonnet-5-5)");
+        assert_eq!(efforts["sonnet"], ["low", "high"]);
+    }
+
+    #[test]
     fn claude_parser_ignores_current_model_and_other_result_strings() {
         let text = r#"{"type":"result","result":"Current model: claude-opus-5\nAvailable: sonnet, haiku"}"#;
         let models = parse_claude_output(text);
@@ -1721,7 +1877,7 @@ printf '%s\n' '{"type":"result","result":"Current model: Sonnet 5 (default)\nAva
         // The subscription decision is passed in, so this asserts the same
         // behavior whether or not the developer running it has a direct API
         // credential exported.
-        let models = runtime
+        let (models, _) = runtime
             .block_on(discover_claude_for(&executable, None))
             .expect("fake Claude picker should succeed");
         assert_eq!(

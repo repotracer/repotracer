@@ -1094,7 +1094,21 @@ impl App {
         } else {
             ""
         };
-        format!("{}:{}{suffix}", model.provider, model.id)
+        // Claude aliases such as `opus` say nothing about the version they
+        // resolve to, so show the name the installed CLI reports.
+        let version = (model.provider == "claude")
+            .then(|| {
+                self.catalog
+                    .models
+                    .iter()
+                    .find(|candidate| same_model(candidate, model))
+            })
+            .flatten()
+            // The `/model` fallback has no version to show.
+            .filter(|candidate| candidate.label != format!("Claude Code — {}", candidate.id))
+            .map(|candidate| format!(" — {}", candidate.label))
+            .unwrap_or_default();
+        format!("{}:{}{version}{suffix}", model.provider, model.id)
     }
 
     fn draw(&mut self, frame: &mut Frame) {
